@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/offchainlabs/nitro/das/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/util/rpcclient"
 	"github.com/offchainlabs/nitro/validator/server_api"
@@ -34,12 +35,13 @@ type StatelessBlockValidator struct {
 
 	recorder execution.ExecutionRecorder
 
-	inboxReader  InboxReaderInterface
-	inboxTracker InboxTrackerInterface
-	streamer     TransactionStreamerInterface
-	db           ethdb.Database
-	daService    arbstate.DataAvailabilityReader
-	blobReader   arbstate.BlobReader
+	inboxReader    InboxReaderInterface
+	inboxTracker   InboxTrackerInterface
+	streamer       TransactionStreamerInterface
+	db             ethdb.Database
+	daService      arbstate.DataAvailabilityReader
+	blobReader     arbstate.BlobReader
+	eigenDAService eigenda.EigenDAReader
 
 	moduleMutex           sync.Mutex
 	currentWasmModuleRoot common.Hash
@@ -223,6 +225,7 @@ func NewStatelessBlockValidator(
 	arbdb ethdb.Database,
 	das arbstate.DataAvailabilityReader,
 	blobReader arbstate.BlobReader,
+	eigenDAService eigenda.EigenDAReader,
 	config func() *BlockValidatorConfig,
 	stack *node.Node,
 ) (*StatelessBlockValidator, error) {
@@ -242,6 +245,7 @@ func NewStatelessBlockValidator(
 		inboxTracker:       inbox,
 		streamer:           streamer,
 		db:                 arbdb,
+		eigenDAService:     eigenDAService,
 		daService:          das,
 		blobReader:         blobReader,
 	}
@@ -293,6 +297,11 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 		if len(batch.Data) <= 40 {
 			continue
 		}
+
+		if !arbstate.IsDASMessageHeaderByte(batch.Data[40]) && !arbstate.IsBlobHashesHeaderByte(batch.Data[40]) && eigenda.IsEigenDAMessageHeaderByte(batch.Data[40]) {
+			continue
+		}
+
 		if arbstate.IsBlobHashesHeaderByte(batch.Data[40]) {
 			payload := batch.Data[41:]
 			if len(payload)%len(common.Hash{}) != 0 {
@@ -316,6 +325,7 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 				e.Preimages[arbutil.EthVersionedHashPreimageType][versionedHashes[i]] = b[:]
 			}
 		}
+
 		if arbstate.IsDASMessageHeaderByte(batch.Data[40]) {
 			if v.daService == nil {
 				log.Warn("No DAS configured, but sequencer message found with DAS header")
@@ -323,6 +333,17 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 				_, err := arbstate.RecoverPayloadFromDasBatch(
 					ctx, batch.Number, batch.Data, v.daService, e.Preimages, arbstate.KeysetValidate,
 				)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		if eigenda.IsEigenDAMessageHeaderByte(batch.Data[40]) {
+			if v.eigenDAService == nil {
+				log.Warn("EigenDA not configured, but sequencer message found with EigenDA header")
+			} else {
+				_, err := eigenda.RecoverPayloadFromEigenDABatch(ctx, batch.Data[41:], v.eigenDAService, e.Preimages)
 				if err != nil {
 					return err
 				}

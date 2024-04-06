@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -24,6 +25,7 @@ import (
 	"github.com/offchainlabs/nitro/arbos/l1pricing"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/das/dastree"
+	"github.com/offchainlabs/nitro/das/eigenda"
 	"github.com/offchainlabs/nitro/util/blobs"
 	"github.com/offchainlabs/nitro/zeroheavy"
 )
@@ -68,7 +70,7 @@ var (
 	ErrInvalidBlobDataFormat = errors.New("blob batch data is not a list of hashes as expected")
 )
 
-func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash common.Hash, data []byte, daProviders []DataAvailabilityProvider, keysetValidationMode KeysetValidationMode) (*sequencerMessage, error) {
+func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash common.Hash, data []byte, daProviders []DataAvailabilityProvider, eigenDAReader eigenda.EigenDAReader, keysetValidationMode KeysetValidationMode) (*sequencerMessage, error) {
 	if len(data) < 40 {
 		return nil, errors.New("sequencer message missing L1 header")
 	}
@@ -81,12 +83,13 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		segments:             [][]byte{},
 	}
 	payload := data[40:]
+	log.Info("Inbox parse sequencer message: ", "payload", hex.EncodeToString(payload))
 
 	// Stage 0: Check if our node is out of date and we don't understand this batch type
 	// If the parent chain sequencer inbox smart contract authenticated this batch,
 	// an unknown header byte must mean that this node is out of date,
 	// because the smart contract understands the header byte and this node doesn't.
-	if len(payload) > 0 && IsL1AuthenticatedMessageHeaderByte(payload[0]) && !IsKnownHeaderByte(payload[0]) {
+	if len(payload) > 0 && IsL1AuthenticatedMessageHeaderByte(payload[0]) && !IsKnownHeaderByte(payload[0]) && !eigenda.IsEigenDAMessageHeaderByte(payload[0]) {
 		return nil, fmt.Errorf("%w: batch has unsupported authenticated header byte 0x%02x", arbosState.ErrFatalNodeOutOfDate, payload[0])
 	}
 
@@ -97,6 +100,24 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 	if len(payload) > 0 {
 		foundDA := false
 		var err error
+
+		// detect eigenda message from byte
+		if eigenda.IsEigenDAMessageHeaderByte(payload[0]) {
+			if eigenDAReader == nil {
+				log.Error("No EigenDA Reader configured, but sequencer message found with EigenDA header")
+			} else {
+				var err error
+				payload, err = eigenda.RecoverPayloadFromEigenDABatch(ctx, payload[1:], eigenDAReader, nil)
+				if err != nil {
+					return nil, err
+				}
+				if payload == nil {
+					return parsedMsg, nil
+				}
+				foundDA = true
+			}
+		}
+
 		for _, provider := range daProviders {
 			if provider != nil && provider.IsValidHeaderByte(payload[0]) {
 				payload, err = provider.RecoverPayloadFromBatch(ctx, batchNum, batchBlockHash, data, nil, keysetValidationMode)
@@ -374,6 +395,7 @@ type inboxMultiplexer struct {
 	backend                   InboxBackend
 	delayedMessagesRead       uint64
 	daProviders               []DataAvailabilityProvider
+	eigenDAReader             eigenda.EigenDAReader
 	cachedSequencerMessage    *sequencerMessage
 	cachedSequencerMessageNum uint64
 	cachedSegmentNum          uint64
@@ -383,11 +405,12 @@ type inboxMultiplexer struct {
 	keysetValidationMode      KeysetValidationMode
 }
 
-func NewInboxMultiplexer(backend InboxBackend, delayedMessagesRead uint64, daProviders []DataAvailabilityProvider, keysetValidationMode KeysetValidationMode) arbostypes.InboxMultiplexer {
+func NewInboxMultiplexer(backend InboxBackend, delayedMessagesRead uint64, daProviders []DataAvailabilityProvider, eigenDAReader eigenda.EigenDAReader, keysetValidationMode KeysetValidationMode) arbostypes.InboxMultiplexer {
 	return &inboxMultiplexer{
 		backend:              backend,
 		delayedMessagesRead:  delayedMessagesRead,
 		daProviders:          daProviders,
+		eigenDAReader:        eigenDAReader,
 		keysetValidationMode: keysetValidationMode,
 	}
 }
@@ -409,7 +432,7 @@ func (r *inboxMultiplexer) Pop(ctx context.Context) (*arbostypes.MessageWithMeta
 		}
 		r.cachedSequencerMessageNum = r.backend.GetSequencerInboxPosition()
 		var err error
-		r.cachedSequencerMessage, err = parseSequencerMessage(ctx, r.cachedSequencerMessageNum, batchBlockHash, bytes, r.daProviders, r.keysetValidationMode)
+		r.cachedSequencerMessage, err = parseSequencerMessage(ctx, r.cachedSequencerMessageNum, batchBlockHash, bytes, r.daProviders, r.eigenDAReader, r.keysetValidationMode)
 		if err != nil {
 			return nil, err
 		}

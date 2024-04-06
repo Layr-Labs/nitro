@@ -23,6 +23,7 @@ import (
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/broadcaster"
 	m "github.com/offchainlabs/nitro/broadcaster/message"
+	"github.com/offchainlabs/nitro/das/eigenda"
 	"github.com/offchainlabs/nitro/staker"
 	"github.com/offchainlabs/nitro/util/containers"
 )
@@ -39,12 +40,13 @@ type InboxTracker struct {
 	validator  *staker.BlockValidator
 	das        arbstate.DataAvailabilityReader
 	blobReader arbstate.BlobReader
+	eigenDA    eigenda.EigenDAReader
 
 	batchMetaMutex sync.Mutex
 	batchMeta      *containers.LruCache[uint64, BatchMetadata]
 }
 
-func NewInboxTracker(db ethdb.Database, txStreamer *TransactionStreamer, das arbstate.DataAvailabilityReader, blobReader arbstate.BlobReader) (*InboxTracker, error) {
+func NewInboxTracker(db ethdb.Database, txStreamer *TransactionStreamer, das arbstate.DataAvailabilityReader, blobReader arbstate.BlobReader, eigenDAReader eigenda.EigenDAReader) (*InboxTracker, error) {
 	// We support a nil txStreamer for the pruning code
 	if txStreamer != nil && txStreamer.chainConfig.ArbitrumChainParams.DataAvailabilityCommittee && das == nil {
 		return nil, errors.New("data availability service required but unconfigured")
@@ -54,6 +56,7 @@ func NewInboxTracker(db ethdb.Database, txStreamer *TransactionStreamer, das arb
 		txStreamer: txStreamer,
 		das:        das,
 		blobReader: blobReader,
+		eigenDA:    eigenDAReader,
 		batchMeta:  containers.NewLruCache[uint64, BatchMetadata](1000),
 	}
 	return tracker, nil
@@ -613,7 +616,7 @@ func (t *InboxTracker) AddSequencerBatches(ctx context.Context, client arbutil.L
 	if t.blobReader != nil {
 		daProviders = append(daProviders, arbstate.NewDAProviderBlobReader(t.blobReader))
 	}
-	multiplexer := arbstate.NewInboxMultiplexer(backend, prevbatchmeta.DelayedMessageCount, daProviders, arbstate.KeysetValidate)
+	multiplexer := arbstate.NewInboxMultiplexer(backend, prevbatchmeta.DelayedMessageCount, daProviders, t.eigenDA, arbstate.KeysetValidate)
 	batchMessageCounts := make(map[uint64]arbutil.MessageIndex)
 	currentpos := prevbatchmeta.MessageCount + 1
 	for {

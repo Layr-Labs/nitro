@@ -42,6 +42,7 @@ import (
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
 	"github.com/offchainlabs/nitro/das"
+	"github.com/offchainlabs/nitro/das/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/util"
@@ -89,6 +90,7 @@ type BatchPoster struct {
 	gasRefunderAddr    common.Address
 	building           *buildingBatch
 	daWriter           das.DataAvailabilityServiceWriter
+	eigenDAWriter      eigenda.EigenDAWriter
 	dataPoster         *dataposter.DataPoster
 	redisLock          *redislock.Simple
 	messagesPerBatch   *arbmath.MovingAverage[uint64]
@@ -118,8 +120,9 @@ const (
 )
 
 type BatchPosterConfig struct {
-	Enable                             bool `koanf:"enable"`
-	DisableDasFallbackStoreDataOnChain bool `koanf:"disable-das-fallback-store-data-on-chain" reload:"hot"`
+	Enable                                 bool `koanf:"enable"`
+	DisableDasFallbackStoreDataOnChain     bool `koanf:"disable-das-fallback-store-data-on-chain" reload:"hot"`
+	DisableEigenDAFallbackStoreDataOnChain bool `koanf:"disable-eigenda-fallback-store-data-on-chain" reload:"hot"`
 	// Max batch size.
 	MaxSize int `koanf:"max-size" reload:"hot"`
 	// Maximum 4844 blob enabled batch size.
@@ -270,6 +273,7 @@ type BatchPosterOpts struct {
 	TransactOpts  *bind.TransactOpts
 	DAWriter      das.DataAvailabilityServiceWriter
 	ParentChainID *big.Int
+	EigenDAWriter eigenda.EigenDAWriter
 }
 
 func NewBatchPoster(ctx context.Context, opts *BatchPosterOpts) (*BatchPoster, error) {
@@ -302,20 +306,20 @@ func NewBatchPoster(ctx context.Context, opts *BatchPosterOpts) (*BatchPoster, e
 		return nil, err
 	}
 	b := &BatchPoster{
-		l1Reader:           opts.L1Reader,
-		inbox:              opts.Inbox,
-		streamer:           opts.Streamer,
-		arbOSVersionGetter: opts.VersionGetter,
-		syncMonitor:        opts.SyncMonitor,
-		config:             opts.Config,
-		bridge:             bridge,
-		seqInbox:           seqInbox,
-		seqInboxABI:        seqInboxABI,
-		seqInboxAddr:       opts.DeployInfo.SequencerInbox,
-		gasRefunderAddr:    opts.Config().gasRefunder,
-		bridgeAddr:         opts.DeployInfo.Bridge,
-		daWriter:           opts.DAWriter,
-		redisLock:          redisLock,
+		l1Reader:        opts.L1Reader,
+		inbox:           opts.Inbox,
+		streamer:        opts.Streamer,
+		syncMonitor:     opts.SyncMonitor,
+		config:          opts.Config,
+		bridge:          bridge,
+		seqInbox:        seqInbox,
+		seqInboxABI:     seqInboxABI,
+		seqInboxAddr:    opts.DeployInfo.SequencerInbox,
+		gasRefunderAddr: opts.Config().gasRefunder,
+		bridgeAddr:      opts.DeployInfo.Bridge,
+		daWriter:        opts.DAWriter,
+		eigenDAWriter:   opts.EigenDAWriter,
+		redisLock:       redisLock,
 	}
 	b.messagesPerBatch, err = arbmath.NewMovingAverage[uint64](20)
 	if err != nil {
@@ -1218,6 +1222,25 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 		} else {
 			sequencerMsg = das.Serialize(cert)
 		}
+	}
+
+	if b.daWriter == nil && b.eigenDAWriter != nil {
+		log.Info("Start to write data to eigenda: ", "data", hex.EncodeToString(sequencerMsg))
+		daRef, err := b.eigenDAWriter.Store(ctx, sequencerMsg)
+		if err != nil {
+			if config.DisableEigenDAFallbackStoreDataOnChain {
+				log.Warn("Falling back to storing data on chain", "err", err)
+				return false, errors.New("unable to post batch to EigenDA and fallback storing data on chain is disabled")
+			}
+		}
+
+		pointer, err := b.eigenDAWriter.Serialize(daRef)
+		if err != nil {
+			log.Warn("DaRef serialization failed", "err", err)
+			return false, errors.New("DaRef serialization failed")
+		}
+		log.Info("EigenDA transaction receipt(data pointer): ", "hash", hex.EncodeToString(daRef.BatchHeaderHash), "index", daRef.BlobIndex)
+		sequencerMsg = pointer
 	}
 
 	data, kzgBlobs, err := b.encodeAddBatch(new(big.Int).SetUint64(batchPosition.NextSeqNum), batchPosition.MessageCount, b.building.msgCount, sequencerMsg, b.building.segments.delayedMsg, b.building.use4844)

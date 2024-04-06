@@ -13,4 +13,5 @@ pub enum PreimageType {
     Keccak256,
     Sha2_256,
     EthVersionedHash,
+    EigenDAHash,
 }

@@ -52,6 +52,7 @@ pub enum Hostio {
     WavmReadKeccakPreimage,
     WavmReadSha256Preimage,
     WavmReadEthVersionedHashPreimage,
+    WavmReadEigenDAHashPreimage,
     WavmReadInboxMessage,
     WavmReadDelayedInboxMessage,
     WavmHaltAndSetFinished,
@@ -76,6 +77,7 @@ impl FromStr for Hostio {
             ("env", "wavm_read_keccak_256_preimage") => WavmReadKeccakPreimage,
             ("env", "wavm_read_sha2_256_preimage") => WavmReadSha256Preimage,
             ("env", "wavm_read_eth_versioned_hash_preimage") => WavmReadEthVersionedHashPreimage,
+            ("env", "wavm_read_eigen_da_hash_preimage") => WavmReadEigenDAHashPreimage,
             ("env", "wavm_read_inbox_message") => WavmReadInboxMessage,
             ("env", "wavm_read_delayed_inbox_message") => WavmReadDelayedInboxMessage,
             ("env", "wavm_halt_and_set_finished") => WavmHaltAndSetFinished,
@@ -114,6 +116,7 @@ impl Hostio {
             WavmReadKeccakPreimage           => func!([I32, I32], [I32]),
             WavmReadSha256Preimage           => func!([I32, I32], [I32]),
             WavmReadEthVersionedHashPreimage => func!([I32, I32], [I32]),
+            WavmReadEigenDAHashPreimage      => func!([I32, I32], [I32]),
             WavmReadInboxMessage             => func!([I64, I32, I32], [I32]),
             WavmReadDelayedInboxMessage      => func!([I64, I32, I32], [I32]),
             WavmHaltAndSetFinished           => func!(),
@@ -187,6 +190,11 @@ impl Hostio {
                 opcode!(LocalGet, 0);
                 opcode!(LocalGet, 1);
                 opcode!(ReadPreImage, PreimageType::EthVersionedHash);
+            }
+            WavmReadEigenDAHashPreimage => {
+                opcode!(LocalGet, 0);
+                opcode!(LocalGet, 1);
+                opcode!(ReadPreImage, PreimageType::EigenDAHash);
             }
             WavmReadInboxMessage => {
                 opcode!(LocalGet, 0);

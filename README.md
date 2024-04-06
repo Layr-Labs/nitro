@@ -4,13 +4,15 @@
     <img src="https://arbitrum.io/assets/arbitrum/logo_color.png" alt="Logo" width="80" height="80">
   </a>
 
-  <h3 align="center">Arbitrum Nitro</h3>
+  <h3 align="center">Arbitrum Nitro + EigenDA</h3>
 
   <p align="center">
     <a href="https://developer.arbitrum.io/"><strong>Next Generation Ethereum L2 Technology »</strong></a>
     <br />
   </p>
 </p>
+
+This is a fork of Arbitrum Nitro developed by [AltLayer](https://altlayer.io/), in a technical partnership with EigenLabs.
 
 ## About Arbitrum Nitro
 

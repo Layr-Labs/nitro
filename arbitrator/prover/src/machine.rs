@@ -5,6 +5,7 @@ use crate::{
     binary::{parse, FloatInstruction, Local, NameCustomSection, WasmBinary},
     host,
     kzg::prove_kzg_preimage,
+    // kzgbn254::prove_kzg_preimage_bn254,
     memory::Memory,
     merkle::{Merkle, MerkleType},
     reinterpret::{ReinterpretAsSigned, ReinterpretAsUnsigned},
@@ -1885,6 +1886,12 @@ impl Machine {
                                     preimage.len(),
                                 );
                             }
+
+                            if preimage_ty == PreimageType::EigenDAHash {
+                                println!("EIGENDA HASH PREIMAGE: {:?}", preimage);
+                            }
+
+
                             let offset = usize::try_from(offset).unwrap();
                             let len = std::cmp::min(32, preimage.len().saturating_sub(offset));
                             let read = preimage.get(offset..(offset + len)).unwrap_or_default();
@@ -1897,8 +1904,8 @@ impl Machine {
                                 "Missing requested preimage".red(),
                                 hash.red(),
                             );
-                            self.eprint_backtrace();
-                            bail!("missing requested preimage for hash {}", hash);
+                            // self.eprint_backtrace();
+                            // bail!("missing requested preimage for hash {}", hash);
                         }
                     } else {
                         error!();
@@ -2310,7 +2317,7 @@ impl Machine {
                                 .get_const(self.context, preimage_ty, hash)
                             {
                                 Some(b) => b,
-                                None => panic!("Missing requested preimage for hash {}", hash),
+                                None => CBytes::new(),
                             };
                         data.push(0); // preimage proof type
                         match preimage_ty {
@@ -2321,6 +2328,13 @@ impl Machine {
                             PreimageType::EthVersionedHash => {
                                 prove_kzg_preimage(hash, &preimage, offset, &mut data)
                                     .expect("Failed to generate KZG preimage proof");
+                            }
+                            PreimageType::EigenDAHash => {
+                                // TODO - Add eigenDA kzg preimage verification here
+                                // println!("Generating proof for EigenDA preimage");
+                                // prove_kzg_preimage_bn254(hash, &preimage, offset, &mut data)
+                                //     .expect("Failed to generate eigenDA KZG preimage proof");
+                                data.extend(preimage);
                             }
                         }
                     } else if next_inst.opcode == Opcode::ReadInboxMessage {

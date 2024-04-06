@@ -140,5 +140,11 @@ func main() {
 		}
 	}
 
+	// _, err = wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.HexToHash("b071b0cf4fc3288ada3977d7b5b0ff621d238f0f8bebb1def70cf7cf0aa59f41"))
+	_, err = wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.HexToHash("0115550c37432fd41441956b06b83722bf797452eb47ea5d03386932ca84762d"))
+	if err != nil {
+		panic(fmt.Sprintf("failed to resolve eigenda preimage: %v", err))
+	}
+
 	println("verified preimage resolution!\n")
 }

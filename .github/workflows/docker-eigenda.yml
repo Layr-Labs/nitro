@@ -1,0 +1,73 @@
+name: Build nitro-eigenda Docker Image
+on:
+  push:
+    tags: ['*']
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: build and push nitro-eigenda
+            image: nitro-eigenda
+            dockerfile: Dockerfile
+            context: .
+            buildargs: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - # Add support for more platforms with QEMU (optional)
+        # https://github.com/docker/setup-qemu-action
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare Environment Variables
+        run: |
+          echo "SHORT_SHA=${GITHUB_SHA::7}" | tee -a $GITHUB_ENV
+          GIT_TAG=$(git tag --points-at HEAD)
+          echo "GIT_TAG=$GIT_TAG" | tee -a $GITHUB_ENV
+          echo "REF_NAME=$(echo ${GIT_TAG:-$GITHUB_REF_NAME} | sed 's/[^a-zA-Z0-9._]/-/g')" | tee -a $GITHUB_ENV
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.ECR_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ECR_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ secrets.ECR_REGISTRY }}/${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=ref,event=tag,suffix={{sha}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=,format=short,enable=true
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=match,pattern=^(v\d+\.\d+\.\d+-\w*)\..*$,value=$1,enable={{is_default_branch}}
+
+      - name: ${{ matrix.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          file: ${{ matrix.dockerfile }}
+          provenance: false
