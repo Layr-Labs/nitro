@@ -3,18 +3,18 @@
 
 use crate::kzg::ETHEREUM_KZG_SETTINGS;
 use arbutil::PreimageType;
-use ark_ec::AffineRepr;
-use ark_bn254::{Fr, G1Affine, G1Projective, G2Affine};
+// use ark_ec::AffineRepr;
+// use ark_bn254::{Fr, G1Affine, G1Projective, G2Affine};
 use c_kzg::{Blob, KzgCommitment};
-use kzgbn254::{
-    kzg::Kzg as KzgBN254,
-    blob::Blob as EigenDABlob,
-    helpers::remove_empty_byte_from_padded_bytes,
-};
+// use kzgbn254::{
+//     kzg::Kzg as KzgBN254,
+//     blob::Blob as EigenDABlob,
+//     helpers::remove_empty_byte_from_padded_bytes,
+// };
 use digest::Digest;
 use eyre::{eyre, Result};
 use serde::{Deserialize, Serialize};
-use ark_serialize::CanonicalSerialize;
+// use ark_serialize::CanonicalSerialize;
 use sha2::Sha256;
 use sha3::Keccak256;
 use std::{
@@ -290,33 +290,34 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
             Ok(commitment_hash)
         }
         PreimageType::EigenDAHash => {
+            Ok(Sha256::digest(preimage).into())
 
-            let kzg_bn254: KzgBN254 = KzgBN254::setup(
-                "./arbitrator/prover/src/test-files/g1.point", 
-                "./arbitrator/prover/src/test-files/g2.point",
-                "./arbitrator/prover/src/test-files/g2.point.powerOf2",
-                3000,
-                3000
-            ).unwrap();
+            // let kzg_bn254: KzgBN254 = KzgBN254::setup(
+            //     "./arbitrator/prover/src/test-files/g1.point", 
+            //     "./arbitrator/prover/src/test-files/g2.point",
+            //     "./arbitrator/prover/src/test-files/g2.point.powerOf2",
+            //     3000,
+            //     3000
+            // ).unwrap();
 
-            // we are expecting the preimage to be unpadded when turned into a blob function so need to unpad it first
-            let unpadded_preimage_vec = remove_empty_byte_from_padded_bytes(preimage);
-            let unpadded_preimage = unpadded_preimage_vec.as_slice();
+            // // we are expecting the preimage to be unpadded when turned into a blob function so need to unpad it first
+            // let unpadded_preimage_vec = remove_empty_byte_from_padded_bytes(preimage);
+            // let unpadded_preimage = unpadded_preimage_vec.as_slice();
 
-            // repad it here, TODO: need to ask to change the interface for this
-            let blob = EigenDABlob::from_bytes_and_pad(unpadded_preimage);
+            // // repad it here, TODO: need to ask to change the interface for this
+            // let blob = EigenDABlob::from_bytes_and_pad(unpadded_preimage);
             
-            let commitment = kzg_bn254.blob_to_kzg_commitment(&blob).unwrap();
+            // let commitment = kzg_bn254.blob_to_kzg_commitment(&blob).unwrap();
 
-            let mut commitment_bytes = Vec::new();
-            commitment.serialize_uncompressed(&mut commitment_bytes).unwrap();
+            // let mut commitment_bytes = Vec::new();
+            // commitment.serialize_uncompressed(&mut commitment_bytes).unwrap();
 
-            let mut commitment_hash: [u8; 32] = Sha256::digest(&commitment_bytes).into();
-            commitment_hash[0] = 1;
+            // let mut commitment_hash: [u8; 32] = Sha256::digest(&commitment_bytes).into();
+            // commitment_hash[0] = 1;
 
-            println!("commitment_hash UTILS.rs: {:?}", commitment_hash);
+            // println!("commitment_hash UTILS.rs: {:?}", commitment_hash);
 
-            Ok(commitment_hash)
+            // Ok(commitment_hash)
 
             //Ok(Sha256::digest(preimage).into())
         }
