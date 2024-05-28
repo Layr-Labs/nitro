@@ -15,9 +15,9 @@
 	url = https://github.com/WebAssembly/testsuite.git
 [submodule "contracts"]
 	path = contracts
-	url = git@github.com:Layr-Labs/nitro-contracts-private.git
+	url = git@github.com:Layr-Labs/nitro-contracts.git
 	branch = develop
 [submodule "nitro-testnode"]
 	path = nitro-testnode
-	url = git@github.com:Layr-Labs/nitro-testnode-private.git
+	url = git@github.com:Layr-Labs/nitro-testnode.git
 	branch = develop
