@@ -5,7 +5,7 @@ use crate::{
     binary::{parse, FloatInstruction, Local, NameCustomSection, WasmBinary},
     host,
     kzg::prove_kzg_preimage,
-    // kzgbn254::prove_kzg_preimage_bn254,
+    kzgbn254::prove_kzg_preimage_bn254,
     memory::Memory,
     merkle::{Merkle, MerkleType},
     reinterpret::{ReinterpretAsSigned, ReinterpretAsUnsigned},
@@ -2331,10 +2331,10 @@ impl Machine {
                             }
                             PreimageType::EigenDAHash => {
                                 // TODO - Add eigenDA kzg preimage verification here
-                                // println!("Generating proof for EigenDA preimage");
-                                // prove_kzg_preimage_bn254(hash, &preimage, offset, &mut data)
-                                //     .expect("Failed to generate eigenDA KZG preimage proof");
-                                data.extend(preimage);
+                                println!("Generating proof for EigenDA preimage");
+                                prove_kzg_preimage_bn254(hash, &preimage, offset, &mut data)
+                                    .expect("Failed to generate eigenDA KZG preimage proof");
+                                //data.extend(preimage);
                             }
                         }
                     } else if next_inst.opcode == Opcode::ReadInboxMessage {

@@ -30,6 +30,14 @@ smallvec = { version = "1.10.0", features = ["serde"] }
 arbutil = { path = "../arbutil/" }
 c-kzg = "0.4.0" # TODO: look into switching to rust-kzg (no crates.io release or hosted rustdoc yet)
 sha2 = "0.9.9"
+ark-bn254 = "0.4.0"
+ark-std = "0.4.0"
+ark-ff = "0.4.0"
+ark-ec = "0.4.0"
+ark-serialize = "0.4.0"
+num-bigint = "0.4"
+
+kzgbn254 = { git = "https://github.com/afkbyte/rust-kzg-bn254.git", branch = "master", package = "rust-kzg-bn254" }
 
 [lib]
 name = "prover"
