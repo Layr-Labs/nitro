@@ -25,8 +25,8 @@ on:
 jobs:
   analyze:
     name: Analyze
-    if: github.repository == 'OffchainLabs/nitro' # don't run in any forks without "Advanced Security" enabled
-    runs-on: ubuntu-8
+    if: github.repository == 'Layr-Labs/nitro' # don't run in any forks without "Advanced Security" enabled
+    runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
