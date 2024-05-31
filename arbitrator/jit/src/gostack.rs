@@ -29,7 +29,7 @@ impl MemoryViewContainer {
             store: &'a StoreRef,
         ) -> impl (for<'b> FnOnce(&'b Memory) -> MemoryView<'b>) + 'a {
             move |memory: &Memory| {
-                memory.view(&store.clone())
+                memory.view(&store)
             }
         }
 
