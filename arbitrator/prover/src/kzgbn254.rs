@@ -1,18 +1,13 @@
 
-use crate::utils::Bytes32;
 // use ark_ec::{AffineRepr, CurveGroup,pairing::Pairing};
 // use kzgbn254::{
 //     kzg::Kzg,
 //     blob::Blob,
 //     helpers::{remove_empty_byte_from_padded_bytes, to_fr_array}
 // };
-use eyre::{ensure, Result};
 // use ark_bn254::{Bn254, G1Affine, G1Projective, G2Affine};
 use num::BigUint;
-use sha2::{Digest, Sha256};
-use std::{convert::TryFrom, io::Write};
 // use ark_serialize::CanonicalSerialize;
-use num::Zero;
 
 lazy_static::lazy_static! {
 
