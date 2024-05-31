@@ -16,8 +16,8 @@
 [submodule "contracts"]
 	path = contracts
 	url = git@github.com:Layr-Labs/nitro-contracts-private.git
-	branch = develop
+	branch = epociask--rollup-manager-contract
 [submodule "nitro-testnode"]
 	path = nitro-testnode
 	url = git@github.com:Layr-Labs/nitro-testnode-private.git
-	branch = develop
+	branch = epociask--eigenda-support
