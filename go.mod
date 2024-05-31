@@ -1,6 +1,8 @@
 module github.com/offchainlabs/nitro
 
-go 1.20
+go 1.21
+
+toolchain go1.22.2
 
 replace github.com/VictoriaMetrics/fastcache => ./fastcache
 
@@ -45,10 +47,10 @@ require (
 	github.com/rivo/tview v0.0.0-20230814110005-ccc2c8119703
 	github.com/spf13/pflag v1.0.5
 	github.com/wealdtech/go-merkletree v1.0.1-0.20230205101955-ec7a95ea11ca
-	golang.org/x/crypto v0.18.0
-	golang.org/x/sys v0.16.0
-	golang.org/x/term v0.16.0
-	golang.org/x/tools v0.15.0
+	golang.org/x/crypto v0.21.0
+	golang.org/x/sys v0.18.0
+	golang.org/x/term v0.18.0
+	golang.org/x/tools v0.19.0
 	google.golang.org/grpc v1.59.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
@@ -113,7 +115,7 @@ require (
 	github.com/facebookgo/atomicfile v0.0.0-20151019160806-2de1f203e7d5 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/getsentry/sentry-go v0.18.0 // indirect
@@ -254,7 +256,7 @@ require (
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/rhnvrm/simples3 v0.6.1 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
-	github.com/rogpeppe/go-internal v1.10.0 // indirect
+	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/samber/lo v1.36.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -289,8 +291,8 @@ require (
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/mod v0.16.0 // indirect
-	golang.org/x/net v0.20.0 // indirect
-	golang.org/x/sync v0.5.0 // indirect
+	golang.org/x/net v0.22.0 // indirect
+	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
@@ -330,7 +332,7 @@ require (
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/mitchellh/pointerstructure v1.2.0 // indirect
