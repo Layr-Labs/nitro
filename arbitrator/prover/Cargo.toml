@@ -37,7 +37,7 @@ ark-ec = "0.4.0"
 ark-serialize = "0.4.0"
 num-bigint = "0.4"
 
-kzgbn254 = { git = "https://github.com/afkbyte/rust-kzg-bn254.git", branch = "master", package = "rust-kzg-bn254" }
+kzgbn254 = { path = "../rust-kzg-bn254", package = "rust-kzg-bn254" }
 
 [lib]
 name = "prover"
