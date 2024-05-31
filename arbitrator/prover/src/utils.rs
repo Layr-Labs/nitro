@@ -3,8 +3,6 @@
 
 use crate::kzg::ETHEREUM_KZG_SETTINGS;
 use arbutil::PreimageType;
-use ark_ec::AffineRepr;
-use ark_bn254::{Fr, G1Affine, G1Projective, G2Affine};
 use c_kzg::{Blob, KzgCommitment};
 use kzgbn254::{
     kzg::Kzg as KzgBN254,
