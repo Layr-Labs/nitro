@@ -6,7 +6,7 @@ on:
 
 jobs:
   build_and_run:
-    runs-on: ubuntu-latest
+    runs-on: linux-2xl
 
     steps:
     - name: Checkout
