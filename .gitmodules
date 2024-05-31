@@ -16,11 +16,9 @@
 [submodule "contracts"]
 	path = contracts
 	url = git@github.com:Layr-Labs/nitro-contracts-private.git
-	branch = epociask--rollup-manager-contract
 [submodule "nitro-testnode"]
 	path = nitro-testnode
 	url = git@github.com:Layr-Labs/nitro-testnode-private.git
-	branch = epociask--eigenda-support
 [submodule "rust-kzg-bn254"]
 	path = arbitrator/rust-kzg-bn254
 	url = https://github.com/afkbyte/rust-kzg-bn254.git
