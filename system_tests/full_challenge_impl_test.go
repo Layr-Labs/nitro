@@ -233,7 +233,7 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		big.NewInt(117964),
 		reader4844,
 		svcManagerAddr,
-		rollupManagerAddr,
+		svcManagerAddr,
 		false,
 	)
 	Require(t, err)
