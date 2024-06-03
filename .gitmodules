@@ -19,6 +19,7 @@
 [submodule "nitro-testnode"]
 	path = nitro-testnode
 	url = git@github.com:Layr-Labs/nitro-testnode-private.git
-[submodule "rust-kzg-bn254"]
+[submodule "arbitrator/rust-kzg-bn254"]
 	path = arbitrator/rust-kzg-bn254
-	url = https://github.com/afkbyte/rust-kzg-bn254.git
+	url = https://github.com/Layr-Labs/rust-kzg-bn254.git
+	branch = epociask--better-linting
