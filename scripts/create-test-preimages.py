@@ -25,20 +25,7 @@ def kzg_test_data():
         data.extend(h)
     return bytes(data)
 
-def eigen_test_data():
-    # data = []
-    # # generate a 32 byte blob
-    # for i in range(0, 1):
-    #     bytes_64 = bytearray(hashlib.sha512(bytes(str(i), encoding='utf8')).digest())
-    #     bytes_32 = bytes_64[0:32]
-
-    #     # 0 padding for 1st byte of 32 byte word
-    #     bytes_32[0] = 0
-    #     data.extend(bytes_32)
-
-    # print(data)
-    # return bytes(data)
-    
+def eigen_test_data():    
     # the value we are returning is the same string that is returned by the old eigen_test_data but encoded in the style the high level eigenDA client would
     # 00bca02094eb78126a517b206a88c73cfa9ec6f704c7030d18212cace820f025
     data = bytes([
