@@ -87,7 +87,6 @@ type EigenDA struct {
 }
 
 func NewEigenDA(rpc string) (*EigenDA, error) {
-	// nolint:gosec
 	creds := credentials.NewTLS(&tls.Config{
 		InsecureSkipVerify: true,
 	})

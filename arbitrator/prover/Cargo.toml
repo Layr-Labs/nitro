@@ -37,7 +37,10 @@ ark-ec = "0.4.0"
 ark-serialize = "0.4.0"
 num-bigint = "0.4"
 
-kzgbn254 = { path = "../rust-kzg-bn254", package = "rust-kzg-bn254" }
+kzgbn254 = { git = "https://github.com/afkbyte/rust-kzg-bn254.git", branch = "afk/g1-iift-optional", package = "rust-kzg-bn254" }
+ark-poly = "0.4.2"
+io = "0.0.2"
+byteorder = "1.5.0"
 
 [lib]
 name = "prover"

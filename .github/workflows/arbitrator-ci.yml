@@ -22,14 +22,12 @@ env:
 jobs:
   arbitrator:
     name: Run Arbitrator tests
-    runs-on: linux-2xl
+    runs-on: ubuntu-8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          ssh-key: ${{ secrets.SSH_KEY }}
-
 
       - name: Install Ubuntu dependencies
         run: |
@@ -139,10 +137,9 @@ jobs:
 
       - name: Make arbitrator libraries
         run: make -j wasm-ci-build
-      
-      # TODO: Enable clippy check
-      # - name: Clippy check
-      #   run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
+
+      - name: Clippy check
+        run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
 
       - name: Run rust tests
         run: cargo test --all --manifest-path arbitrator/Cargo.toml

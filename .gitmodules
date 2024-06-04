@@ -16,10 +16,8 @@
 [submodule "contracts"]
 	path = contracts
 	url = git@github.com:Layr-Labs/nitro-contracts-private.git
+	branch = develop
 [submodule "nitro-testnode"]
 	path = nitro-testnode
 	url = git@github.com:Layr-Labs/nitro-testnode-private.git
-[submodule "arbitrator/rust-kzg-bn254"]
-	path = arbitrator/rust-kzg-bn254
-	url = https://github.com/Layr-Labs/rust-kzg-bn254.git
-	branch = epociask--better-linting
+	branch = develop

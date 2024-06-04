@@ -7,8 +7,6 @@ BYTES_PER_FIELD_ELEMENT = 32
 FIELD_ELEMENTS_PER_BLOB = 4096
 KZG_ENDIANNESS='big'
 
-BN254_BLS_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617
-EIGENDA_FIELD_ELEMENTS_PER_BLOB = 65536
 
 def write_data_to_file(filename, preimages):
     with open(filename, 'wb') as file:
@@ -28,18 +26,29 @@ def kzg_test_data():
     return bytes(data)
 
 def eigen_test_data():
-    data = []
-    # generate a 32 byte blob
-    for i in range(0, 1):
-        bytes_64 = bytearray(hashlib.sha512(bytes(str(i), encoding='utf8')).digest())
-        bytes_32 = bytes_64[0:32]
+    # data = []
+    # # generate a 32 byte blob
+    # for i in range(0, 1):
+    #     bytes_64 = bytearray(hashlib.sha512(bytes(str(i), encoding='utf8')).digest())
+    #     bytes_32 = bytes_64[0:32]
 
-        # 0 padding for 1st byte of 32 byte word
-        bytes_32[0] = 0
-        data.extend(bytes_32)
+    #     # 0 padding for 1st byte of 32 byte word
+    #     bytes_32[0] = 0
+    #     data.extend(bytes_32)
 
-    print(bytes(data))
-    return bytes(data)
+    # print(data)
+    # return bytes(data)
+    
+    # the value we are returning is the same string that is returned by the old eigen_test_data but encoded in the style the high level eigenDA client would
+    # 00bca02094eb78126a517b206a88c73cfa9ec6f704c7030d18212cace820f025
+    data = bytes([
+    12, 74, 134, 141, 159, 142, 12, 228, 147, 176, 42, 148, 17, 187, 240, 48, 98, 179, 158, 173, 119, 72, 129, 73, 181, 94, 239, 1, 22, 164, 231, 89, 
+    45, 148, 221, 13, 66, 188, 31, 31, 18, 90, 120, 195, 53, 74, 121, 91, 29, 163, 78, 174, 81, 239, 152, 253, 188, 242, 52, 132, 164, 53, 20, 26, 
+    36, 75, 123, 21, 222, 118, 68, 224, 87, 187, 179, 60, 161, 97, 0, 70, 93, 178, 98, 55, 27, 137, 136, 121, 63, 52, 185, 46, 242, 115, 75, 192, 
+    2, 157, 190, 53, 1, 226, 207, 111, 114, 218, 52, 217, 26, 155, 70, 232, 114, 94, 128, 254, 14, 177, 62, 97, 214, 62, 14, 115, 50, 178, 184, 207
+    ])
+
+    return data
 
 if len(sys.argv) < 2:
     print("Usage: python3 create-test-preimages.py <filename>")

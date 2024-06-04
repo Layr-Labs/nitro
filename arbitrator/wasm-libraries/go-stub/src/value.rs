@@ -164,7 +164,6 @@ pub unsafe fn get_field(source: u32, field: &[u8]) -> GoValue {
         }
     } else if source == GO_ID {
         if field == b"_pendingEvent" {
-            #[allow(static_mut_refs)]
             if let Some(event) = &PENDING_EVENT {
                 let id = DynamicObjectPool::singleton()
                     .insert(DynamicObject::PendingEvent(event.clone()));

@@ -7,7 +7,7 @@ use c_kzg::{Blob, KzgCommitment};
 use kzgbn254::{
     kzg::Kzg as KzgBN254,
     blob::Blob as EigenDABlob,
-    helpers::remove_empty_byte_from_padded_bytes,
+    polynomial::PolynomialFormat,
 };
 use digest::Digest;
 use eyre::{eyre, Result};
@@ -297,26 +297,18 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
                 3000
             ).unwrap();
 
-            // we are expecting the preimage to be unpadded when turned into a blob function so need to unpad it first
-            let unpadded_preimage_vec = remove_empty_byte_from_padded_bytes(preimage);
-            let unpadded_preimage = unpadded_preimage_vec.as_slice();
-
-            // repad it here, TODO: need to ask to change the interface for this
-            let blob = EigenDABlob::from_bytes_and_pad(unpadded_preimage);
+            let blob = EigenDABlob::from_padded_bytes_unchecked(preimage);
             
-            let commitment = kzg_bn254.blob_to_kzg_commitment(&blob).unwrap();
+            let blob_polynomial = blob.to_polynomial(PolynomialFormat::InEvaluationForm).unwrap();
+            let blob_commitment = kzg_bn254.commit(&blob_polynomial).unwrap();
 
             let mut commitment_bytes = Vec::new();
-            commitment.serialize_uncompressed(&mut commitment_bytes).unwrap();
+            blob_commitment.serialize_uncompressed(&mut commitment_bytes).unwrap();
 
             let mut commitment_hash: [u8; 32] = Sha256::digest(&commitment_bytes).into();
             commitment_hash[0] = 1;
 
-            println!("commitment_hash UTILS.rs: {:?}", commitment_hash);
-
             Ok(commitment_hash)
-
-            //Ok(Sha256::digest(preimage).into())
         }
     }
 }
