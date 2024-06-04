@@ -49,7 +49,7 @@ pub fn prove_kzg_preimage_bn254(
     // expand roots of unity
     let roots_of_unity = kzg.calculate_roots_of_unity(preimage.len() as u64);
     match roots_of_unity {
-        Ok(roots_of_unity) => println!("Roots of unity: {:?}", roots_of_unity),
+        Ok(_) => (),
         Err(err) => return Err(err.into()),
     };
 
@@ -96,7 +96,6 @@ pub fn prove_kzg_preimage_bn254(
 
     // blob header is the first 32 bytes of the blob bytes
     let blob_header = blob_bytes[..32].to_vec();
-    println!("blob header {:?}", blob_header);
 
     // decode blob header, version is currently unused however in the future we probabky
     let length = match decode_codec_blob_header(&blob_header) {
