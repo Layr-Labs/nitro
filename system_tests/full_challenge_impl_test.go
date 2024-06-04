@@ -211,6 +211,19 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		DelaySeconds:  big.NewInt(10000),
 		FutureSeconds: big.NewInt(10000),
 	}
+
+	// func DeployEigenDAServiceManagerStub(auth *bind.TransactOpts, backend bind.ContractBackend, __avsDirectory common.Address, __paymentCoordinator common.Address, __registryCoordinator common.Address, __stakeRegistry common.Address, _pauserRegistry common.Address, _initialPausedStatus *big.Int, _initialOwner common.Address, _batchConfirmers []common.Address) (common.Address, *types.Transaction, *EigenDAServiceManagerStub, error) {
+
+	svcManagerAddr, tx, _, err := mocksgen.DeployEigenDAServiceManagerStub(&txOpts, l1Client, common.Address{}, common.Address{}, common.Address{}, common.Address{}, common.Address{}, big.NewInt(0), l1Info.GetAddress("deployer"), []common.Address{})
+	Require(t, err)
+	_, err = EnsureTxSucceeded(ctx, l1Client, tx)
+
+	// Require(t, err)
+	// _, err = EnsureTxSucceeded(ctx, l1Client, tx)
+
+	// DeploySequencerInbox(auth, client, maxDataSize, reader4844, dummyManager, dummyManager, isUsingFeeToken)
+	// func DeploySequencerInboxStub(auth *bind.TransactOpts, backend bind.ContractBackend, bridge_ common.Address, sequencer_ common.Address, maxTimeVariation_ ISequencerInboxMaxTimeVariation, maxDataSize_ *big.Int, reader4844_ common.Address, eigenDAServiceManager_ common.Address, eigenDARollupManager_ common.Address, isUsingFeeToken_ bool) (common.Address, *types.Transaction, *SequencerInboxStub, error) {
+
 	seqInboxAddr, tx, seqInbox, err := mocksgen.DeploySequencerInboxStub(
 		&txOpts,
 		l1Client,
@@ -219,6 +232,8 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		timeBounds,
 		big.NewInt(117964),
 		reader4844,
+		svcManagerAddr,
+		svcManagerAddr,
 		false,
 	)
 	Require(t, err)
