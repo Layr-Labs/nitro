@@ -47,7 +47,7 @@ pub fn prove_kzg_preimage_bn254(
     let mut kzg = KZG.clone();
 
     // expand roots of unity
-    let roots_of_unity = kzg.calculate_roots_of_unity(preimage.len() as u64)?;
+    kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 
     // preimage is already padded, unpadding and repadding already padded data can destroy context post IFFT
     // as some elements in the bn254 field are represented by 32 bytes, we know that the preimage is padded
@@ -58,10 +58,10 @@ pub fn prove_kzg_preimage_bn254(
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
     let mut blob_polynomial_coefficient_form = blob_polynomial_evaluation_form.clone();
-    blob_polynomial_coefficient_form.transform_to_form(PolynomialFormat::InCoefficientForm).unwrap();
+    blob_polynomial_coefficient_form.transform_to_form(PolynomialFormat::InCoefficientForm)?;
 
     let mut commitment_bytes = Vec::new();
-    blob_commitment.serialize_uncompressed(&mut commitment_bytes).unwrap();
+    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
 
     let mut expected_hash: Bytes32 = Sha256::digest(&*commitment_bytes).into();
     expected_hash[0] = 1;
@@ -81,10 +81,7 @@ pub fn prove_kzg_preimage_bn254(
 
     // transform polynomial into coefficient form
     let mut blob_polynomial_coefficient_form = blob_polynomial_evaluation_form.clone();
-    match blob_polynomial_coefficient_form.transform_to_form(PolynomialFormat::InCoefficientForm) {
-        Ok(_) => (),
-        Err(err) => return Err(err.into()),
-    };
+    blob_polynomial_coefficient_form.transform_to_form(PolynomialFormat::InCoefficientForm)?;
 
     let blob_coefficients = blob_polynomial_coefficient_form.to_vec();
     let mut blob_bytes = Vec::new();
@@ -125,16 +122,12 @@ pub fn prove_kzg_preimage_bn254(
     let z_g2= (g2_generator * z_fr).into_affine();
 
     // if we are loading in g2 pow2 this is index 0 not 1
-    let g2_tau: G2Affine = match kzg.get_g2_points().get(1) {
-        Some(point) => point.clone(),
-        None => return Err(eyre::eyre!("Failed to get G2 point at index 1")),
-    };
+    let g2_tau: G2Affine = kzg.get_g2_points().get(1)
+        .ok_or_else(|| eyre::eyre!("Failed to get g2 point at index 1 in SRS"))?
+        .clone();
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
-    let kzg_proof = match kzg.compute_kzg_proof_with_roots_of_unity(&blob_polynomial_coefficient_form, proving_offset as u64) {
-        Ok(proof) => proof,
-        Err(err) => return Err(err.into()),
-    };
+    let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(&blob_polynomial_coefficient_form, proving_offset as u64)?;
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
     let xminusz_x1: BigUint = g2_tau_minus_g2_z.x.c1.into();
