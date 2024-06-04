@@ -47,19 +47,15 @@ pub fn prove_kzg_preimage_bn254(
     let mut kzg = KZG.clone();
 
     // expand roots of unity
-    let roots_of_unity = kzg.calculate_roots_of_unity(preimage.len() as u64);
-    match roots_of_unity {
-        Ok(_) => (),
-        Err(err) => return Err(err.into()),
-    };
+    let roots_of_unity = kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 
     // preimage is already padded, unpadding and repadding already padded data can destroy context post IFFT
     // as some elements in the bn254 field are represented by 32 bytes, we know that the preimage is padded
     // to 32 bytes per DA spec as the preimage is retrieved from DA, so we can use this unchecked function
     let blob = Blob::from_padded_bytes_unchecked(preimage);
 
-    let blob_polynomial_evaluation_form = blob.to_polynomial(PolynomialFormat::InEvaluationForm).unwrap();
-    let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form).unwrap();
+    let blob_polynomial_evaluation_form = blob.to_polynomial(PolynomialFormat::InEvaluationForm)?;
+    let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
     let mut blob_polynomial_coefficient_form = blob_polynomial_evaluation_form.clone();
     blob_polynomial_coefficient_form.transform_to_form(PolynomialFormat::InCoefficientForm).unwrap();
@@ -98,10 +94,7 @@ pub fn prove_kzg_preimage_bn254(
     let blob_header = blob_bytes[..32].to_vec();
 
     // decode blob header, version is currently unused however in the future we probabky
-    let length = match decode_codec_blob_header(&blob_header) {
-        Ok((_, length)) => length,
-        Err(err) => return Err(err),
-    };
+    let (_, length) = decode_codec_blob_header(&blob_header)?;
 
     let length_usize = length as usize;
 
@@ -120,15 +113,11 @@ pub fn prove_kzg_preimage_bn254(
     let mut padded_proving_offset_bytes: [u8; 32] = [0u8; 32];
     padded_proving_offset_bytes[32 - proving_offset_bytes.len()..].copy_from_slice(&proving_offset_bytes);
 
-    let proven_y_fr = match blob_polynomial_coefficient_form.get_at_index(proving_offset as usize) {
-        Some(value) => value,
-        None => return Err(eyre::eyre!("Index out of bounds")),
-    };
+    let proven_y_fr = blob_polynomial_coefficient_form.get_at_index(proving_offset as usize)
+        .ok_or_else(|| eyre::eyre!("Index out of bounds"))?;
 
-    let z_fr = match kzg.get_nth_root_of_unity(proving_offset as usize) {
-        Some(value) => value,
-        None => return Err(eyre::eyre!("Failed to get nth root of unity")),
-    };
+    let z_fr = kzg.get_nth_root_of_unity(proving_offset as usize)
+        .ok_or_else(|| eyre::eyre!("Failed to get nth root of unity"))?;
 
     let proven_y = proven_y_fr.into_bigint().to_bytes_be();
     
