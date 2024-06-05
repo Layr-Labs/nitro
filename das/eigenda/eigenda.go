@@ -23,11 +23,16 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+// hasBits returns true if `checking` has all `bits`
+func hasBits(checking byte, bits byte) bool {
+	return (checking & bits) == bits
+}
+
 // EigenDAMessageHeaderFlag indicated that the message is a EigenDARef which will be used to retrieve data from EigenDA
 const EigenDAMessageHeaderFlag byte = 0xed
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
-	return (EigenDAMessageHeaderFlag & header) > 0
+	return hasBits(EigenDAMessageHeaderFlag, header)
 }
 
 type EigenDAWriter interface {
