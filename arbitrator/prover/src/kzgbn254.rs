@@ -1,17 +1,13 @@
-
 use crate::utils::Bytes32;
+use ark_bn254::{Fr, G2Affine};
 use ark_ec::{AffineRepr, CurveGroup};
-use kzgbn254::{
-    blob::Blob, kzg::Kzg, polynomial::PolynomialFormat
-};
+use ark_ff::{BigInteger, PrimeField};
+use ark_serialize::CanonicalSerialize;
 use eyre::{ensure, Result};
-use ark_bn254::{G2Affine, Fr};
+use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::{Digest, Sha256};
-use std::{io::Write, convert::TryInto};
-use ark_serialize::CanonicalSerialize;
-use ark_ff::{PrimeField, BigInteger};
-
+use std::{convert::TryInto, io::Write};
 
 lazy_static::lazy_static! {
 
@@ -21,7 +17,7 @@ lazy_static::lazy_static! {
     // srs_points_to_load = 131072
 
     pub static ref KZG: Kzg = Kzg::setup(
-        "./arbitrator/prover/src/test-files/g1.point", 
+        "./arbitrator/prover/src/test-files/g1.point",
         "./arbitrator/prover/src/test-files/g2.point",
         "./arbitrator/prover/src/test-files/g2.point.powerOf2",
         3000,
@@ -43,7 +39,6 @@ pub fn prove_kzg_preimage_bn254(
     offset: u32,
     out: &mut impl Write,
 ) -> Result<()> {
-
     let mut kzg = KZG.clone();
 
     // expand roots of unity
@@ -108,26 +103,34 @@ pub fn prove_kzg_preimage_bn254(
 
     let proving_offset_bytes = proving_offset.to_be_bytes();
     let mut padded_proving_offset_bytes: [u8; 32] = [0u8; 32];
-    padded_proving_offset_bytes[32 - proving_offset_bytes.len()..].copy_from_slice(&proving_offset_bytes);
+    padded_proving_offset_bytes[32 - proving_offset_bytes.len()..]
+        .copy_from_slice(&proving_offset_bytes);
 
-    let proven_y_fr = blob_polynomial_coefficient_form.get_at_index(proving_offset as usize)
+    let proven_y_fr = blob_polynomial_coefficient_form
+        .get_at_index(proving_offset as usize)
         .ok_or_else(|| eyre::eyre!("Index out of bounds"))?;
 
-    let z_fr = kzg.get_nth_root_of_unity(proving_offset as usize)
+    let z_fr = kzg
+        .get_nth_root_of_unity(proving_offset as usize)
         .ok_or_else(|| eyre::eyre!("Failed to get nth root of unity"))?;
 
     let proven_y = proven_y_fr.into_bigint().to_bytes_be();
-    
+
     let g2_generator = G2Affine::generator();
-    let z_g2= (g2_generator * z_fr).into_affine();
+    let z_g2 = (g2_generator * z_fr).into_affine();
 
     // if we are loading in g2 pow2 this is index 0 not 1
-    let g2_tau: G2Affine = kzg.get_g2_points().get(1)
+    let g2_tau: G2Affine = kzg
+        .get_g2_points()
+        .get(1)
         .ok_or_else(|| eyre::eyre!("Failed to get g2 point at index 1 in SRS"))?
         .clone();
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
-    let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(&blob_polynomial_coefficient_form, proving_offset as u64)?;
+    let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(
+        &blob_polynomial_coefficient_form,
+        proving_offset as u64,
+    )?;
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
     let xminusz_x1: BigUint = g2_tau_minus_g2_z.x.c1.into();
@@ -148,7 +151,6 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
     append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
 
-
     // encode the proof
     let proof_x_bigint: BigUint = kzg_proof.x.into();
     let proof_y_bigint: BigUint = kzg_proof.y.into();
@@ -156,13 +158,12 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut proof_encoded_bytes, &proof_x_bigint);
     append_left_padded_biguint_be(&mut proof_encoded_bytes, &proof_y_bigint);
 
-    out.write_all(&*hash)?;                           // hash [:32]
-    out.write_all(&padded_proving_offset_bytes)?;     // evaluation point [32:64]
-    out.write_all(&*proven_y)?;                       // expected output [64:96]
-    out.write_all(&xminusz_encoded_bytes)?;           // g2TauMinusG2z [96:224]
-    out.write_all(&*commitment_encoded_bytes)?;       // kzg commitment [224:288]
-    out.write_all(&proof_encoded_bytes)?;             // proof [288:352]
-    
+    out.write_all(&*hash)?; // hash [:32]
+    out.write_all(&padded_proving_offset_bytes)?; // evaluation point [32:64]
+    out.write_all(&*proven_y)?; // expected output [64:96]
+    out.write_all(&xminusz_encoded_bytes)?; // g2TauMinusG2z [96:224]
+    out.write_all(&*commitment_encoded_bytes)?; // kzg commitment [224:288]
+    out.write_all(&proof_encoded_bytes)?; // proof [288:352]
 
     Ok(())
 }
@@ -172,15 +173,16 @@ fn append_left_padded_biguint_be(vec: &mut Vec<u8>, biguint: &BigUint) {
     let bytes = biguint.to_bytes_be();
     let padding = 32 - bytes.len();
     vec.extend_from_slice(&vec![0; padding]);
-    vec.extend_from_slice(&bytes);            
+    vec.extend_from_slice(&bytes);
 }
 
 pub fn deserialize_montgomery_elements(data: &[Fr], buffer: &mut Vec<u8>) {
-    let mut temp_buffer: Vec<u8> = data.iter()
+    let mut temp_buffer: Vec<u8> = data
+        .iter()
         .rev()
         .flat_map(|elem| elem.into_bigint().to_bytes_le())
         .collect();
-    
+
     temp_buffer.reverse();
     buffer.extend(temp_buffer);
 }

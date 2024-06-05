@@ -1888,13 +1888,12 @@ impl Machine {
                             }
 
                             if preimage_ty == PreimageType::EigenDAHash {
-                                if !preimage.len().is_power_of_two(){
+                                if !preimage.len().is_power_of_two() {
                                     bail!("EigenDA hash preimage length should be a power of two but is instead {}", preimage.len());
                                 }
 
                                 println!("EIGENDA HASH PREIMAGE: {:?}", preimage);
                             }
-
 
                             let offset = usize::try_from(offset).unwrap();
                             let len = std::cmp::min(32, preimage.len().saturating_sub(offset));

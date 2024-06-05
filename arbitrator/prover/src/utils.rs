@@ -3,16 +3,12 @@
 
 use crate::kzg::ETHEREUM_KZG_SETTINGS;
 use arbutil::PreimageType;
+use ark_serialize::CanonicalSerialize;
 use c_kzg::{Blob, KzgCommitment};
-use kzgbn254::{
-    kzg::Kzg as KzgBN254,
-    blob::Blob as EigenDABlob,
-    polynomial::PolynomialFormat,
-};
 use digest::Digest;
 use eyre::{eyre, Result};
+use kzgbn254::{blob::Blob as EigenDABlob, kzg::Kzg as KzgBN254, polynomial::PolynomialFormat};
 use serde::{Deserialize, Serialize};
-use ark_serialize::CanonicalSerialize;
 use sha2::Sha256;
 use sha3::Keccak256;
 use std::{
@@ -288,18 +284,20 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
             Ok(commitment_hash)
         }
         PreimageType::EigenDAHash => {
-
             let kzg_bn254: KzgBN254 = KzgBN254::setup(
-                "./arbitrator/prover/src/test-files/g1.point", 
+                "./arbitrator/prover/src/test-files/g1.point",
                 "./arbitrator/prover/src/test-files/g2.point",
                 "./arbitrator/prover/src/test-files/g2.point.powerOf2",
                 3000,
-                3000
-            ).unwrap();
+                3000,
+            )
+            .unwrap();
 
             let blob = EigenDABlob::from_padded_bytes_unchecked(preimage);
-            
-            let blob_polynomial = blob.to_polynomial(PolynomialFormat::InEvaluationForm).unwrap();
+
+            let blob_polynomial = blob
+                .to_polynomial(PolynomialFormat::InEvaluationForm)
+                .unwrap();
             let blob_commitment = kzg_bn254.commit(&blob_polynomial).unwrap();
 
             let mut commitment_bytes = Vec::new();
