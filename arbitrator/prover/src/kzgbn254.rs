@@ -1,5 +1,5 @@
 use crate::utils::Bytes32;
-use ark_bn254::{Fr, G2Affine};
+use ark_bn254::G2Affine;
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::CanonicalSerialize;
@@ -7,7 +7,8 @@ use eyre::{ensure, Result};
 use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::{Digest, Sha256};
-use std::{convert::TryInto, io::Write};
+use std::io::Write;
+use hex::encode;
 
 lazy_static::lazy_static! {
 
@@ -41,6 +42,8 @@ pub fn prove_kzg_preimage_bn254(
 ) -> Result<()> {
     let mut kzg = KZG.clone();
 
+    println!("preimage: {}", encode(&preimage));
+
     // expand roots of unity
     kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 
@@ -51,9 +54,6 @@ pub fn prove_kzg_preimage_bn254(
 
     let blob_polynomial_evaluation_form = blob.to_polynomial(PolynomialFormat::InEvaluationForm)?;
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
-
-    let mut blob_polynomial_coefficient_form = blob_polynomial_evaluation_form.clone();
-    blob_polynomial_coefficient_form.transform_to_form(PolynomialFormat::InCoefficientForm)?;
 
     let mut commitment_bytes = Vec::new();
     blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
@@ -74,24 +74,16 @@ pub fn prove_kzg_preimage_bn254(
         offset,
     );
 
-    // transform polynomial into coefficient form
-    let mut blob_polynomial_coefficient_form = blob_polynomial_evaluation_form.clone();
-    blob_polynomial_coefficient_form.transform_to_form(PolynomialFormat::InCoefficientForm)?;
+    // retrieve commitment to preimage
+    let preimage_polynomial = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
+    let preimage_commitment = kzg.commit(&preimage_polynomial)?;
+    let mut preimage_commitment_bytes = Vec::new();
+    preimage_commitment.serialize_uncompressed(&mut preimage_commitment_bytes)?;
+    println!("preimage commitment: {}", encode(&preimage_commitment_bytes));
 
-    let blob_coefficients = blob_polynomial_coefficient_form.to_vec();
-    let mut blob_bytes = Vec::new();
-    deserialize_montgomery_elements(&blob_coefficients, &mut blob_bytes);
+    let mut proving_offset = offset;
 
-    // blob header is the first 32 bytes of the blob bytes
-    let blob_header = blob_bytes[..32].to_vec();
-
-    // decode blob header, version is currently unused however in the future we probabky
-    let (_, length) = decode_codec_blob_header(&blob_header)?;
-
-    let length_usize = length as usize;
-
-    // we set the proving offset to offset + 32 because the first 32 bytes of the array are the header
-    let mut proving_offset = (offset + 32) / 32;
+    let length_usize = preimage.len() as usize;
 
     // address proving past end edge case later
     let proving_past_end = offset as usize >= length_usize;
@@ -106,7 +98,7 @@ pub fn prove_kzg_preimage_bn254(
     padded_proving_offset_bytes[32 - proving_offset_bytes.len()..]
         .copy_from_slice(&proving_offset_bytes);
 
-    let proven_y_fr = blob_polynomial_coefficient_form
+    let proven_y_fr = preimage_polynomial
         .get_at_index(proving_offset as usize)
         .ok_or_else(|| eyre::eyre!("Index out of bounds"))?;
 
@@ -115,6 +107,7 @@ pub fn prove_kzg_preimage_bn254(
         .ok_or_else(|| eyre::eyre!("Failed to get nth root of unity"))?;
 
     let proven_y = proven_y_fr.into_bigint().to_bytes_be();
+    let z = z_fr.into_bigint().to_bytes_be();
 
     let g2_generator = G2Affine::generator();
     let z_g2 = (g2_generator * z_fr).into_affine();
@@ -128,7 +121,7 @@ pub fn prove_kzg_preimage_bn254(
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
     let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(
-        &blob_polynomial_coefficient_form,
+        &preimage_polynomial,
         proving_offset as u64,
     )?;
 
@@ -145,8 +138,8 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut xminusz_encoded_bytes, &xminusz_y0);
 
     // encode the commitment
-    let commitment_x_bigint: BigUint = blob_commitment.x.into();
-    let commitment_y_bigint: BigUint = blob_commitment.y.into();
+    let commitment_x_bigint: BigUint = preimage_commitment.x.into();
+    let commitment_y_bigint: BigUint = preimage_commitment.y.into();
     let mut commitment_encoded_bytes = Vec::with_capacity(32);
     append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
     append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
@@ -159,7 +152,7 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut proof_encoded_bytes, &proof_y_bigint);
 
     out.write_all(&*hash)?; // hash [:32]
-    out.write_all(&padded_proving_offset_bytes)?; // evaluation point [32:64]
+    out.write_all(&*z)?; // evaluation point [32:64]
     out.write_all(&*proven_y)?; // expected output [64:96]
     out.write_all(&xminusz_encoded_bytes)?; // g2TauMinusG2z [96:224]
     out.write_all(&*commitment_encoded_bytes)?; // kzg commitment [224:288]
@@ -174,30 +167,4 @@ fn append_left_padded_biguint_be(vec: &mut Vec<u8>, biguint: &BigUint) {
     let padding = 32 - bytes.len();
     vec.extend_from_slice(&vec![0; padding]);
     vec.extend_from_slice(&bytes);
-}
-
-pub fn deserialize_montgomery_elements(data: &[Fr], buffer: &mut Vec<u8>) {
-    let mut temp_buffer: Vec<u8> = data
-        .iter()
-        .rev()
-        .flat_map(|elem| elem.into_bigint().to_bytes_le())
-        .collect();
-
-    temp_buffer.reverse();
-    buffer.extend(temp_buffer);
-}
-
-fn decode_codec_blob_header(codec_blob_header: &[u8]) -> Result<(u8, u32)> {
-    ensure!(
-        codec_blob_header.len() == 32,
-        "Codec blob header must be 32 bytes long",
-    );
-
-    let version = codec_blob_header[1];
-    let length_bytes: [u8; 4] = codec_blob_header[2..6]
-        .try_into()
-        .map_err(|_| eyre::eyre!("Failed to decode length bytes"))?;
-    let length = u32::from_be_bytes(length_bytes);
-
-    Ok((version, length))
 }
