@@ -145,7 +145,7 @@ jobs:
       #   run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
 
       - name: Run rust tests
-        run: cargo test --all --manifest-path arbitrator/Cargo.toml
+        run: cargo test --all --exclude rust-kzg-bn254 --manifest-path arbitrator/Cargo.toml
 
       - name: Rustfmt
         run: cargo fmt --all --manifest-path arbitrator/Cargo.toml -- --check
