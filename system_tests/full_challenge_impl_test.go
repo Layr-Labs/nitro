@@ -32,8 +32,10 @@ import (
 	"github.com/offchainlabs/nitro/arbstate"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/execution/gethexec"
+	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/solgen/go/challengegen"
 	"github.com/offchainlabs/nitro/solgen/go/mocksgen"
+
 	"github.com/offchainlabs/nitro/solgen/go/ospgen"
 	"github.com/offchainlabs/nitro/solgen/go/yulgen"
 	"github.com/offchainlabs/nitro/staker"
@@ -212,9 +214,7 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		FutureSeconds: big.NewInt(10000),
 	}
 
-	// func DeployEigenDAServiceManagerStub(auth *bind.TransactOpts, backend bind.ContractBackend, __avsDirectory common.Address, __paymentCoordinator common.Address, __registryCoordinator common.Address, __stakeRegistry common.Address, _pauserRegistry common.Address, _initialPausedStatus *big.Int, _initialOwner common.Address, _batchConfirmers []common.Address) (common.Address, *types.Transaction, *EigenDAServiceManagerStub, error) {
-
-	svcManagerAddr, tx, _, err := mocksgen.DeployEigenDAServiceManagerStub(&txOpts, l1Client, common.Address{}, common.Address{}, common.Address{}, common.Address{}, common.Address{}, big.NewInt(0), l1Info.GetAddress("deployer"), []common.Address{})
+	rollupMngr, tx, _, err := bridgegen.DeployEigenDADummyManager(&txOpts, l1Client)
 	Require(t, err)
 	_, err = EnsureTxSucceeded(ctx, l1Client, tx)
 
@@ -232,8 +232,8 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		timeBounds,
 		big.NewInt(117964),
 		reader4844,
-		svcManagerAddr,
-		svcManagerAddr,
+		rollupMngr,
+		rollupMngr,
 		false,
 	)
 	Require(t, err)

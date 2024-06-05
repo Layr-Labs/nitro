@@ -1,17 +1,14 @@
-
 use crate::utils::Bytes32;
+use ark_bn254::G2Affine;
 use ark_ec::{AffineRepr, CurveGroup};
-use kzgbn254::{
-    kzg::Kzg,
-    blob::Blob,
-    helpers::{remove_empty_byte_from_padded_bytes, to_fr_array}
-};
+use ark_ff::{BigInteger, PrimeField};
+use ark_serialize::CanonicalSerialize;
 use eyre::{ensure, Result};
-use ark_bn254::{G2Affine};
+use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::{Digest, Sha256};
-use std::{convert::TryFrom, io::Write};
-use ark_serialize::CanonicalSerialize;
+use std::io::Write;
+use hex::encode;
 
 lazy_static::lazy_static! {
 
@@ -21,7 +18,7 @@ lazy_static::lazy_static! {
     // srs_points_to_load = 131072
 
     pub static ref KZG: Kzg = Kzg::setup(
-        "./arbitrator/prover/src/test-files/g1.point", 
+        "./arbitrator/prover/src/test-files/g1.point",
         "./arbitrator/prover/src/test-files/g2.point",
         "./arbitrator/prover/src/test-files/g2.point.powerOf2",
         3000,
@@ -36,33 +33,30 @@ lazy_static::lazy_static! {
     pub static ref FIELD_ELEMENTS_PER_BLOB: usize = 65536;
 }
 
+/// Creates a KZG preimage proof consumable by the point evaluation precompile.
 pub fn prove_kzg_preimage_bn254(
     hash: Bytes32,
     preimage: &[u8],
     offset: u32,
     out: &mut impl Write,
 ) -> Result<()> {
-
     let mut kzg = KZG.clone();
 
-    // expand the roots of unity, should work as long as it's longer than chunk length and chunks
-    // from my understanding the data_setup_mins pads both min_chunk_len and min_num_chunks to 
-    // the next power of 2 so we can load a max of 2048 from the test values here
-    // then we can take the roots of unity we actually need (len polynomial) and pass them in
-    // @anup, this is a really gross way to do this, pls tell better way
-    kzg.data_setup_mins(1, 2048)?;
+    println!("preimage: {}", encode(&preimage));
 
-    // we are expecting the preimage to be unpadded when turned into a blob function so need to unpad it first
-    let unpadded_preimage_vec: Vec<u8> = remove_empty_byte_from_padded_bytes(preimage);
-    let unpadded_preimage = unpadded_preimage_vec.as_slice();
+    // expand roots of unity
+    kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 
-    // repad it here, TODO: need to ask to change the interface for this
-    let blob = Blob::from_bytes_and_pad(unpadded_preimage);
-    let blob_polynomial = blob.to_polynomial().unwrap();
-    let blob_commitment = kzg.commit(&blob_polynomial).unwrap();
+    // preimage is already padded, unpadding and repadding already padded data can destroy context post IFFT
+    // as some elements in the bn254 field are represented by 32 bytes, we know that the preimage is padded
+    // to 32 bytes per DA spec as the preimage is retrieved from DA, so we can use this unchecked function
+    let blob = Blob::from_padded_bytes_unchecked(preimage);
+
+    let blob_polynomial_evaluation_form = blob.to_polynomial(PolynomialFormat::InEvaluationForm)?;
+    let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
     let mut commitment_bytes = Vec::new();
-    blob_commitment.serialize_uncompressed(&mut commitment_bytes).unwrap();
+    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
 
     let mut expected_hash: Bytes32 = Sha256::digest(&*commitment_bytes).into();
     expected_hash[0] = 1;
@@ -80,47 +74,56 @@ pub fn prove_kzg_preimage_bn254(
         offset,
     );
 
-    let offset_usize = usize::try_from(offset)?;
+    // retrieve commitment to preimage
+    let preimage_polynomial = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
+    let preimage_commitment = kzg.commit(&preimage_polynomial)?;
+    let mut preimage_commitment_bytes = Vec::new();
+    preimage_commitment.serialize_uncompressed(&mut preimage_commitment_bytes)?;
+    println!("preimage commitment: {}", encode(&preimage_commitment_bytes));
+
     let mut proving_offset = offset;
 
+    let length_usize = preimage.len() as usize;
+
     // address proving past end edge case later
-    let proving_past_end = offset_usize >= preimage.len();
+    let proving_past_end = offset as usize >= length_usize;
     if proving_past_end {
         // Proving any offset proves the length which is all we need here,
         // because we're past the end of the preimage.
         proving_offset = 0;
     }
-    
-    let proving_offset_bytes = proving_offset.to_le_bytes();
-    let mut padded_proving_offset_bytes = [0u8; 32];
-    padded_proving_offset_bytes[32 - proving_offset_bytes.len()..].copy_from_slice(&proving_offset_bytes);
 
-    // in production we will first need to perform an IFFT on the blob data to get the expected y value
-    let mut proven_y = blob.get_blob_data();
-    let offset_usize = offset as usize; // Convert offset to usize
-    proven_y = proven_y[offset_usize..(offset_usize + 32)].to_vec();
+    let proving_offset_bytes = proving_offset.to_be_bytes();
+    let mut padded_proving_offset_bytes: [u8; 32] = [0u8; 32];
+    padded_proving_offset_bytes[32 - proving_offset_bytes.len()..]
+        .copy_from_slice(&proving_offset_bytes);
 
-    let proven_y_fr = to_fr_array(&proven_y);
+    let proven_y_fr = preimage_polynomial
+        .get_at_index(proving_offset as usize)
+        .ok_or_else(|| eyre::eyre!("Index out of bounds"))?;
 
-    let polynomial = blob.to_polynomial().unwrap();
-    
+    let z_fr = kzg
+        .get_nth_root_of_unity(proving_offset as usize)
+        .ok_or_else(|| eyre::eyre!("Failed to get nth root of unity"))?;
+
+    let proven_y = proven_y_fr.into_bigint().to_bytes_be();
+    let z = z_fr.into_bigint().to_bytes_be();
+
     let g2_generator = G2Affine::generator();
-    let z_g2= (g2_generator * proven_y_fr[0]).into_affine();
+    let z_g2 = (g2_generator * z_fr).into_affine();
 
-    let g2_tau: G2Affine = kzg.get_g2_points().get(1).unwrap().clone();
+    // if we are loading in g2 pow2 this is index 0 not 1
+    let g2_tau: G2Affine = kzg
+        .get_g2_points()
+        .get(1)
+        .ok_or_else(|| eyre::eyre!("Failed to get g2 point at index 1 in SRS"))?
+        .clone();
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
-    // required roots of unity are the first polynomial length roots in the expanded set
-    let roots_of_unity = kzg.get_expanded_roots_of_unity();
-    let required_roots_of_unity = &roots_of_unity[0..polynomial.len()];
-    // TODO: ask for interface alignment later
-    let kzg_proof = match kzg.compute_kzg_proof(&blob_polynomial, offset as u64, &required_roots_of_unity.to_vec()) {
-        Ok(proof) => proof,
-        Err(err) => return Err(err.into()),
-    };
-
-    let mut kzg_proof_uncompressed_bytes = Vec::new();
-    kzg_proof.serialize_uncompressed(&mut kzg_proof_uncompressed_bytes).unwrap();
+    let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(
+        &preimage_polynomial,
+        proving_offset as u64,
+    )?;
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
     let xminusz_x1: BigUint = g2_tau_minus_g2_z.x.c1.into();
@@ -135,12 +138,11 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut xminusz_encoded_bytes, &xminusz_y0);
 
     // encode the commitment
-    let commitment_x_bigint: BigUint = blob_commitment.x.into();
-    let commitment_y_bigint: BigUint = blob_commitment.y.into();
+    let commitment_x_bigint: BigUint = preimage_commitment.x.into();
+    let commitment_y_bigint: BigUint = preimage_commitment.y.into();
     let mut commitment_encoded_bytes = Vec::with_capacity(32);
     append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
     append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
-
 
     // encode the proof
     let proof_x_bigint: BigUint = kzg_proof.x.into();
@@ -149,21 +151,20 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut proof_encoded_bytes, &proof_x_bigint);
     append_left_padded_biguint_be(&mut proof_encoded_bytes, &proof_y_bigint);
 
-    out.write_all(&*hash)?;                           // hash [:32]
-    out.write_all(&padded_proving_offset_bytes)?;     // evaluation point [32:64]
-    out.write_all(&*proven_y)?;                       // expected output [64:96]
-    out.write_all(&xminusz_encoded_bytes)?;           // g2TauMinusG2z [96:224]
-    out.write_all(&*commitment_encoded_bytes)?;       // kzg commitment [224:288]
-    out.write_all(&proof_encoded_bytes)?;             // proof [288:352]
-    
+    out.write_all(&*hash)?; // hash [:32]
+    out.write_all(&*z)?; // evaluation point [32:64]
+    out.write_all(&*proven_y)?; // expected output [64:96]
+    out.write_all(&xminusz_encoded_bytes)?; // g2TauMinusG2z [96:224]
+    out.write_all(&*commitment_encoded_bytes)?; // kzg commitment [224:288]
+    out.write_all(&proof_encoded_bytes)?; // proof [288:352]
 
     Ok(())
 }
+
 // Helper function to append BigUint bytes into the vector with padding; left padded big endian bytes to 32
 fn append_left_padded_biguint_be(vec: &mut Vec<u8>, biguint: &BigUint) {
     let bytes = biguint.to_bytes_be();
     let padding = 32 - bytes.len();
     vec.extend_from_slice(&vec![0; padding]);
-    vec.extend_from_slice(&bytes);            
+    vec.extend_from_slice(&bytes);
 }
-

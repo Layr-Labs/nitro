@@ -6,8 +6,8 @@
 pub mod binary;
 mod host;
 mod kzg;
-pub mod machine;
 mod kzgbn254;
+pub mod machine;
 /// cbindgen:ignore
 mod memory;
 mod merkle;

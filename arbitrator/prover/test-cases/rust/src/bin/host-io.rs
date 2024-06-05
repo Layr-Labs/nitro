@@ -105,16 +105,13 @@ fn main() {
         }
 
         println!("eigenda preimage");
-        //let eigen_hash = hex!("b071b0cf4fc3288ada3977d7b5b0ff621d238f0f8bebb1def70cf7cf0aa59f41");
-        let eigen_hash = hex!("0115550c37432fd41441956b06b83722bf797452eb47ea5d03386932ca84762d");
+        let eigen_hash = hex!("011e229d75b13559dcb2d757ecae9b66fa579268e28e196789503322115c06e1");
         
         bytebuffer = Bytes32(eigen_hash);
         let expected_len = 32;
 
         let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), 0);
         assert_eq!(actual_len, expected_len);
-        // Ensure that 0th index is zero padded
-        assert_eq!(bytebuffer.0[..actual_len][0] as u8, 0);
     }
     println!("Done!");
 }

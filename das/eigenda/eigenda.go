@@ -23,11 +23,16 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+// hasBits returns true if `checking` has all `bits`
+func hasBits(checking byte, bits byte) bool {
+	return (checking & bits) == bits
+}
+
 // EigenDAMessageHeaderFlag indicated that the message is a EigenDARef which will be used to retrieve data from EigenDA
 const EigenDAMessageHeaderFlag byte = 0xed
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
-	return (EigenDAMessageHeaderFlag & header) > 0
+	return hasBits(header, EigenDAMessageHeaderFlag)
 }
 
 type EigenDAWriter interface {
@@ -188,10 +193,10 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	log.Info("Start recovering payload from eigenda: ", "data", hex.EncodeToString(sequencerMsg))
 	var shaPreimages map[common.Hash][]byte
 	if preimages != nil {
-		if preimages[arbutil.EigenDaPreimageType] == nil {
-			preimages[arbutil.EigenDaPreimageType] = make(map[common.Hash][]byte)
+		if preimages[arbutil.Sha2_256PreimageType] == nil {
+			preimages[arbutil.Sha2_256PreimageType] = make(map[common.Hash][]byte)
 		}
-		shaPreimages = preimages[arbutil.EigenDaPreimageType]
+		shaPreimages = preimages[arbutil.Sha2_256PreimageType]
 	}
 	var daRef EigenDARef
 	daRef.BlobIndex = binary.BigEndian.Uint32(sequencerMsg[:4])

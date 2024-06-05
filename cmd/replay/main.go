@@ -222,9 +222,9 @@ func main() {
 		// once we have a way to unify the interface between DataAvailabilityReader and EigenDAReader, we should be able to retain the old struct.
 		// todo make it compatible with dasReader
 		// var dasReader arbstate.DataAvailabilityReader
-		var dasReader eigenda.EigenDAReader
+		var dasReader *PreimageDASReader
 		if dasEnabled {
-			dasReader = &PreimageEigenDAReader{}
+			dasReader = &PreimageDASReader{}
 		}
 		backend := WavmInbox{}
 		var keysetValidationMode = arbstate.KeysetPanicIfInvalid
@@ -233,11 +233,11 @@ func main() {
 		}
 		var daProviders []arbstate.DataAvailabilityProvider
 		// TODO: add dasReader of type eigenda.EigenDAReader when it conforms to interface
-		// if dasReader != nil {
-		// 	daProviders = append(daProviders, arbstate.NewDAProviderDAS(dasReader))
-		// }
+		if dasReader != nil {
+			daProviders = append(daProviders, arbstate.NewDAProviderDAS(dasReader))
+		}
 		daProviders = append(daProviders, arbstate.NewDAProviderBlobReader(&BlobPreimageReader{}))
-		inboxMultiplexer := arbstate.NewInboxMultiplexer(backend, delayedMessagesRead, daProviders, dasReader, keysetValidationMode)
+		inboxMultiplexer := arbstate.NewInboxMultiplexer(backend, delayedMessagesRead, daProviders, nil, keysetValidationMode)
 		ctx := context.Background()
 		message, err := inboxMultiplexer.Pop(ctx)
 		if err != nil {
