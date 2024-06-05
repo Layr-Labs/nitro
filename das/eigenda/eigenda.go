@@ -32,7 +32,7 @@ func hasBits(checking byte, bits byte) bool {
 const EigenDAMessageHeaderFlag byte = 0xed
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
-	return hasBits(EigenDAMessageHeaderFlag, header)
+	return hasBits(header, EigenDAMessageHeaderFlag)
 }
 
 type EigenDAWriter interface {

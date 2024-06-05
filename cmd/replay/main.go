@@ -6,10 +6,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,10 +28,10 @@ import (
 	"github.com/offchainlabs/nitro/arbos/arbostypes"
 	"github.com/offchainlabs/nitro/arbos/burn"
 	"github.com/offchainlabs/nitro/arbstate"
-	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/das/dastree"
+	"github.com/offchainlabs/nitro/das/eigenda"
 	"github.com/offchainlabs/nitro/gethhook"
 	"github.com/offchainlabs/nitro/wavmio"
 )
@@ -117,12 +117,13 @@ func (dasReader *PreimageDASReader) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-func (dasReader *PreimageDASReader) ExpirationPolicy(ctx context.Context) (daprovider.ExpirationPolicy, error) {
-	return daprovider.DiscardImmediately, nil
+func (dasReader *PreimageDASReader) ExpirationPolicy(ctx context.Context) (arbstate.ExpirationPolicy, error) {
+	return arbstate.DiscardImmediately, nil
 }
 
-type BlobPreimageReader struct {
-}
+type BlobPreimageReader struct{}
+
+type PreimageEigenDAReader struct{}
 
 func (r *BlobPreimageReader) GetBlobs(
 	ctx context.Context,
@@ -147,6 +148,20 @@ func (r *BlobPreimageReader) GetBlobs(
 
 func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 	return nil
+}
+
+// struct for recovering data from preimage, impl interface EigenDAReader
+
+func (dasReader *PreimageEigenDAReader) QueryBlob(ctx context.Context, ref *eigenda.EigenDARef) ([]byte, error) {
+	dataPointer, err := ref.Serialize()
+	if err != nil {
+		return nil, err
+	}
+	shaDataHash := sha256.New()
+	shaDataHash.Write(dataPointer)
+	dataHash := shaDataHash.Sum([]byte{})
+	// check function eigenda.RecoverPayloadFromEigenDABatch, the data population and data reading should be matched.
+	return wavmio.ResolveTypedPreimage(arbutil.Sha2_256PreimageType, common.BytesToHash(dataHash))
 }
 
 // To generate:
@@ -174,10 +189,9 @@ func main() {
 	wavmio.StubInit()
 	gethhook.RequireHookedGeth()
 
-	glogger := log.NewGlogHandler(
-		log.NewTerminalHandler(io.Writer(os.Stderr), false))
-	glogger.Verbosity(log.LevelError)
-	log.SetDefault(log.NewLogger(glogger))
+	glogger := log.NewGlogHandler(log.StreamHandler(os.Stderr, log.TerminalFormat(false)))
+	glogger.Verbosity(log.LvlError)
+	log.Root().SetHandler(glogger)
 
 	populateEcdsaCaches()
 
@@ -204,21 +218,26 @@ func main() {
 		if lastBlockHeader != nil {
 			delayedMessagesRead = lastBlockHeader.Nonce.Uint64()
 		}
-		var dasReader daprovider.DASReader
+		// due to the lack of abstraction, we have to define our own Reader here.
+		// once we have a way to unify the interface between DataAvailabilityReader and EigenDAReader, we should be able to retain the old struct.
+		// todo make it compatible with dasReader
+		// var dasReader arbstate.DataAvailabilityReader
+		var dasReader *PreimageDASReader
 		if dasEnabled {
 			dasReader = &PreimageDASReader{}
 		}
 		backend := WavmInbox{}
-		var keysetValidationMode = daprovider.KeysetPanicIfInvalid
+		var keysetValidationMode = arbstate.KeysetPanicIfInvalid
 		if backend.GetPositionWithinMessage() > 0 {
-			keysetValidationMode = daprovider.KeysetDontValidate
+			keysetValidationMode = arbstate.KeysetDontValidate
 		}
-		var dapReaders []daprovider.Reader
+		var daProviders []arbstate.DataAvailabilityProvider
+		// TODO: add dasReader of type eigenda.EigenDAReader when it conforms to interface
 		if dasReader != nil {
-			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader))
+			daProviders = append(daProviders, arbstate.NewDAProviderDAS(dasReader))
 		}
-		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(&BlobPreimageReader{}))
-		inboxMultiplexer := arbstate.NewInboxMultiplexer(backend, delayedMessagesRead, dapReaders, keysetValidationMode)
+		daProviders = append(daProviders, arbstate.NewDAProviderBlobReader(&BlobPreimageReader{}))
+		inboxMultiplexer := arbstate.NewInboxMultiplexer(backend, delayedMessagesRead, daProviders, nil, keysetValidationMode)
 		ctx := context.Background()
 		message, err := inboxMultiplexer.Pop(ctx)
 		if err != nil {
@@ -270,13 +289,14 @@ func main() {
 			}
 		}
 
-		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee)
+		// message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee)
+		message := readMessage(true)
 
 		chainContext := WavmChainContext{}
 		batchFetcher := func(batchNum uint64) ([]byte, error) {
 			return wavmio.ReadInboxMessage(batchNum), nil
 		}
-		newBlock, _, err = arbos.ProduceBlock(message.Message, message.DelayedMessagesRead, lastBlockHeader, statedb, chainContext, chainConfig, batchFetcher, false)
+		newBlock, _, err = arbos.ProduceBlock(message.Message, message.DelayedMessagesRead, lastBlockHeader, statedb, chainContext, chainConfig, batchFetcher)
 		if err != nil {
 			panic(err)
 		}
