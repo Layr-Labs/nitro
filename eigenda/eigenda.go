@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/offchainlabs/nitro/arbutil"
 )
 
@@ -257,7 +259,27 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 
 func ParseSequencerMsg(calldata []byte) *EigenDABlobInfo {
 	var blobInfo *EigenDABlobInfo
-	// rlp.DecodeBytes(calldata, blobInfo) // see if this works???
+
+	var blobVerificationProof *BlobVerificationProof
+	var blobHeader *BlobHeader
+
+	// try decoding at the offsets
+	blobVerificationProofOffset, err := convertCalldataToInt(calldata[36:68])
+	if err != nil {
+		// todo handle later
+		panic(err)
+	}
+
+	blobVerificationProofOffset += 4
+
+	blobHeaderOffset, err := convertCalldataToInt(calldata[68:100])
+	if err != nil {
+		// todo handle later
+		panic(err)
+	}
+
+	rlp.DecodeBytes(calldata[blobVerificationProofOffset:blobHeaderOffset], blobVerificationProof) // see if this works???
+	rlp.DecodeBytes(calldata[blobHeaderOffset:], blobHeader)
 
 	// blobVerificationProofOffset, err := convertCalldataToInt(calldata[36:68])
 	// if err != nil {
@@ -324,21 +346,24 @@ func ParseSequencerMsg(calldata []byte) *EigenDABlobInfo {
 	// 	},
 	// }
 
-	return blobInfo
+	return &EigenDABlobInfo{
+		BlobVerificationProof: *blobVerificationProof,
+		BlobHeader:            *blobHeader,
+	}
 
 }
 
-// func convertCalldataToInt(calldata []byte) (int, error) {
-// 	num := new(big.Int).SetBytes(calldata)
+func convertCalldataToInt(calldata []byte) (int, error) {
+	num := new(big.Int).SetBytes(calldata)
 
-// 	if num.IsInt64() {
-// 		return int(num.Uint64()), nil
-// 	}
+	if num.IsInt64() {
+		return int(num.Uint64()), nil
+	}
 
-// 	fmt.Println(num)
+	fmt.Println(num)
 
-// 	return 0, errors.New("calldata is not a valid int")
-// }
+	return 0, errors.New("calldata is not a valid int")
+}
 
 // func bytesToUint32Array(b []byte) ([]uint32, error) {
 // 	if len(b)%4 != 0 {
