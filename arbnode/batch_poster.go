@@ -42,7 +42,7 @@ import (
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
 	"github.com/offchainlabs/nitro/das"
-	"github.com/offchainlabs/nitro/das/eigenda"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/util"
@@ -916,7 +916,6 @@ func (b *BatchPoster) encodeAddBatch(
 			new(big.Int).SetUint64(uint64(prevMsgNum)),
 			new(big.Int).SetUint64(uint64(newMsgNum)),
 		)
-		kzgBlobs, err = blobs.EncodeBlobs(l2MessageData)
 
 	} else {
 		calldata, err = method.Inputs.Pack(
@@ -1277,11 +1276,9 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 	}
 
 	var blobInfo *eigenda.EigenDABlobInfo
-	var blobID *eigenda.EigenDABlobID
-
 	if b.daWriter == nil && b.eigenDAWriter != nil && config.PostEigenDA {
 		log.Info("Start to write data to eigenda: ", "data", hex.EncodeToString(sequencerMsg))
-		blobID, blobInfo, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
+		blobInfo, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
 		if err != nil {
 			if config.DisableEigenDAFallbackStoreDataOnChain {
 				log.Warn("Falling back to storing data on chain", "err", err)
@@ -1289,12 +1286,11 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 			}
 		}
 
-		sequencerMsg, err = b.eigenDAWriter.Serialize(blobID)
+		sequencerMsg, err = b.eigenDAWriter.Serialize(blobInfo)
 		if err != nil {
 			log.Warn("DaRef serialization failed", "err", err)
 			return false, errors.New("DaRef serialization failed")
 		}
-		log.Info("EigenDA transaction receipt(data pointer): ", "hash", hex.EncodeToString(blobID.BatchHeaderHash), "index", blobID.BlobIndex)
 	}
 
 	data, kzgBlobs, err := b.encodeAddBatch(new(big.Int).SetUint64(batchPosition.NextSeqNum), batchPosition.MessageCount, b.building.msgCount, sequencerMsg, b.building.segments.delayedMsg, b.building.use4844, b.building.useEigenDA, blobInfo)

@@ -132,6 +132,10 @@ func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDABlobInfo, err
 	return blobInfo, nil
 }
 
+func (e *EigenDA) Serialize(blobInfo *EigenDABlobInfo) ([]byte, error) {
+	return rlp.EncodeToBytes(blobInfo)
+}
+
 func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
 	b.BlobHeader.Commitment = &G1Point{
 		X: new(big.Int).SetBytes(disperserBlobInfo.GetBlobHeader().GetCommitment().GetX()),
@@ -258,8 +262,6 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 // InclusionProof
 
 func ParseSequencerMsg(calldata []byte) *EigenDABlobInfo {
-	var blobInfo *EigenDABlobInfo
-
 	var blobVerificationProof *BlobVerificationProof
 	var blobHeader *BlobHeader
 

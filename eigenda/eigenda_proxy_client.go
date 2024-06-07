@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -41,7 +40,7 @@ func (c *EigenDAProxyClient) Put(data string) (*disperser.BlobInfo, error) {
 	}
 
 	// parse commitment here:
-	cert, err := eigenDA.DecodeCommitment(commitment)
+	cert, err := eigenda.DecodeCommitment(commitment)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode commitment: %w", err)
 	}

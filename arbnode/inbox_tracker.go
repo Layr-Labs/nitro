@@ -23,7 +23,7 @@ import (
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/broadcaster"
 	m "github.com/offchainlabs/nitro/broadcaster/message"
-	"github.com/offchainlabs/nitro/das/eigenda"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/staker"
 	"github.com/offchainlabs/nitro/util/containers"
 )
