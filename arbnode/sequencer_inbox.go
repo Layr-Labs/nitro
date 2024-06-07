@@ -18,6 +18,7 @@ import (
 	"github.com/offchainlabs/nitro/arbstate"
 	"github.com/offchainlabs/nitro/arbutil"
 
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 )
 
@@ -35,6 +36,7 @@ const (
 	batchDataSeparateEvent
 	batchDataNone
 	batchDataBlobHashes
+	batchDataEigenDA
 )
 
 func init() {
@@ -164,6 +166,24 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 			data = append(data, h[:]...)
 		}
 		return data, nil
+	case batchDataEigenDA:
+		// get the transaction data from the log
+		tx, err := arbutil.GetLogTransaction(ctx, client, m.rawLog)
+		if err != nil {
+			return nil, err
+		}
+		// get the input data from the transaction
+		// TODO: decide on if you want to parse it here or parse it upstream, I've decided to parse it upstream and include all of the calldata in the batch
+		calldata := tx.Data()
+
+		// append the eigenDA header flag to the front
+		data := []byte{eigenda.EigenDAMessageHeaderFlag}
+		data = append(data, calldata[:]...)
+
+		// format of eigenDA data is
+		// [0 - 1] header flag
+		// [1 - len(data)] calldata
+		return data, nil
 	default:
 		return nil, fmt.Errorf("batch has invalid data location %v", m.dataLocation)
 	}
@@ -199,6 +219,11 @@ func (m *SequencerInboxBatch) Serialize(ctx context.Context, client arbutil.L1In
 
 	m.serialized = fullData
 	return fullData, nil
+
+	// in the case of eigenDA the serialized data looks like this
+	// [0-40] Header Vals
+	// [40-41]eigenDA header flag
+	// [41 - len(fullData)] transaction calldata
 }
 
 func (i *SequencerInbox) LookupBatchesInRange(ctx context.Context, from, to *big.Int) ([]*SequencerInboxBatch, error) {

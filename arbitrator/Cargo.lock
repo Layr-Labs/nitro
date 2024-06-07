@@ -1941,7 +1941,7 @@ dependencies = [
 
 [[package]]
 name = "rust-kzg-bn254"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "ark-bn254",
  "ark-ec",
