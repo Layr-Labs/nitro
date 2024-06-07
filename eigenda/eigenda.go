@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/offchainlabs/nitro/arbutil"
@@ -187,17 +186,13 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	log.Info("Start recovering payload from eigenda: ", "data", hex.EncodeToString(sequencerMsg))
 	var eigenDAHashPreimages map[common.Hash][]byte
 	if preimages != nil {
-		if preimages[arbutil.EigenDAHash] == nil {
-			preimages[arbutil.EigenDAHash] = make(map[common.Hash][]byte)
+		if preimages[arbutil.EigenDaHashPreimageType] == nil {
+			preimages[arbutil.EigenDaHashPreimageType] = make(map[common.Hash][]byte)
 		}
-		eigenDAHashPreimages = preimages[arbutil.EigenDAHash]
+		eigenDAHashPreimages = preimages[arbutil.EigenDaHashPreimageType]
 	}
 
 	blobInfo := ParseSequencerMsg(sequencerMsg)
-
-	batchHeaderHash := crypto.Keccak256Hash(blobInfo.BlobHeader).Bytes()
-
-	log.Info("Data pointer: ", "info", hex.EncodeToString(batchHeaderHash), "index", blobInfo.BlobVerificationProof.BlobIndex)
 
 	// default is binary and we want polynomial so we don't need to open 2 points cc @ethen
 	data, err := daReader.QueryBlob(ctx, blobInfo, "polynomial")
