@@ -6,6 +6,8 @@ toolchain go1.22.4
 
 replace github.com/VictoriaMetrics/fastcache => ./fastcache
 
+replace github.com/ethereum/go-ethereum/log => github.com/ethereum/go-ethereum/log v1.14.5
+
 replace github.com/ethereum/go-ethereum => ./go-ethereum
 
 replace github.com/cockroachdb/pebble => github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -13,6 +15,14 @@ replace github.com/cockroachdb/pebble => github.com/cockroachdb/pebble v0.0.0-20
 replace github.com/crate-crypto/go-kzg-4844 => github.com/crate-crypto/go-kzg-4844 v0.7.0
 
 replace github.com/wealdtech/go-merkletree => github.com/wealdtech/go-merkletree v1.0.0
+
+// optimism @v1.7.6 needs the transient field which was deprecated in go-libp2p@latest
+replace github.com/libp2p/go-libp2p => github.com/libp2p/go-libp2p v0.33.2
+
+// optimism @v1.7.6 needs the quic-go http3.RoundTripper which was renamed in quic-go@latest
+replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.42.0
+
+replace github.com/quic-go/webtransport-go => github.com/quic-go/webtransport-go v0.7.0
 
 require (
 	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible
@@ -50,11 +60,12 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
 	github.com/wealdtech/go-merkletree v1.0.1-0.20230205101955-ec7a95ea11ca
 	golang.org/x/crypto v0.23.0
-	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
+	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
 	golang.org/x/sys v0.20.0
 	golang.org/x/term v0.20.0
 	golang.org/x/tools v0.21.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+
 )
 
 require (
@@ -120,7 +131,6 @@ require (
 	github.com/ethereum-optimism/optimism v1.7.6 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/facebookgo/atomicfile v0.0.0-20151019160806-2de1f203e7d5 // indirect
-	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fjl/memsize v0.0.2 // indirect
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
@@ -137,7 +147,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
-	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -149,7 +158,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
-	github.com/google/flatbuffers v1.12.1 // indirect
+	github.com/google/flatbuffers v2.0.8+incompatible // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20240509144519-723abb6459b7 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
@@ -192,11 +201,9 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipfs/go-merkledag v0.11.0 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
-	github.com/ipfs/go-path v0.3.0 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/ipfs/go-unixfsnode v1.9.0 // indirect
 	github.com/ipfs/go-verifcid v0.0.3 // indirect
-	github.com/ipld/go-car v0.6.2 // indirect
 	github.com/ipld/go-car/v2 v2.13.1 // indirect
 	github.com/ipld/go-codec-dagpb v1.6.0 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect
@@ -356,11 +363,12 @@ require (
 require (
 	github.com/Layr-Labs/eigenda-proxy v0.0.0-20240607233639-f270ca10fe3c
 	github.com/ethereum/go-ethereum v1.14.0
-	github.com/ipfs/boxo v0.20.0
+	github.com/ipfs/boxo v0.19.0
 	github.com/ipfs/go-cid v0.4.1
+	github.com/ipfs/go-path v0.3.0
 	github.com/ipfs/interface-go-ipfs-core v0.11.2
 	github.com/ipfs/kubo v0.28.0
-	github.com/libp2p/go-libp2p v0.35.0
+	github.com/libp2p/go-libp2p v0.34.1
 	github.com/multiformats/go-multiaddr v0.12.4
 	github.com/multiformats/go-multihash v0.2.3
 )

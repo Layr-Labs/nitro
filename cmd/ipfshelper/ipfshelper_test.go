@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-path"
 	"github.com/offchainlabs/nitro/util/testhelpers"
 )
 
@@ -36,14 +38,17 @@ func TestIpfsHelper(t *testing.T) {
 	testFile := getTempFileWithData(t, testData)
 	ipfsTestFilePath, err := ipfsA.AddFile(ctx, testFile, false)
 	testhelpers.RequireImpl(t, err)
-	testFileCid := ipfsTestFilePath.Cid().String()
+	testFileCid := ipfsTestFilePath.RootCid().String()
 	addrsA, err := ipfsA.GetPeerHostAddresses()
 	testhelpers.RequireImpl(t, err)
 	// create node B connected to node A
 	ipfsB, err := createIpfsHelperImpl(ctx, t.TempDir(), false, addrsA, "test")
 	testhelpers.RequireImpl(t, err)
 	// download the test file with node B
-	downloadedFile, err := ipfsB.DownloadFile(ctx, testFileCid, t.TempDir())
+	dcid, err := cid.Decode(testFileCid)
+	testhelpers.RequireImpl(t, err)
+	p := path.FromCid(dcid)
+	downloadedFile, err := ipfsB.DownloadFile(ctx, p.String(), t.TempDir())
 	testhelpers.RequireImpl(t, err)
 	if !fileDataEqual(t, downloadedFile, testData) {
 		testhelpers.FailImpl(t, "Downloaded file does not contain expected data")
@@ -56,7 +61,10 @@ func TestIpfsHelper(t *testing.T) {
 	testhelpers.RequireImpl(t, err)
 	ipfsC, err := createIpfsHelperImpl(ctx, t.TempDir(), false, addrsB, "test")
 	testhelpers.RequireImpl(t, err)
-	downloadedFile, err = ipfsC.DownloadFile(ctx, testFileCid, t.TempDir())
+	dcid, err = cid.Decode(testFileCid)
+	testhelpers.RequireImpl(t, err)
+	p = path.FromCid(dcid)
+	downloadedFile, err = ipfsC.DownloadFile(ctx, p.String(), t.TempDir())
 	testhelpers.RequireImpl(t, err)
 	if !fileDataEqual(t, downloadedFile, testData) {
 		testhelpers.FailImpl(t, "Downloaded file does not contain expected data")
@@ -99,12 +107,12 @@ func TestNormalizeCidString(t *testing.T) {
 
 func TestCanBeIpfsPath(t *testing.T) {
 	correctPaths := []string{
-		"QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
+		// "QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ", no longer considered a valid string see https://github.com/ipfs/boxo/blob/main/path/path_test.go
 		"/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
 		"/ipns/k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8",
 		"/ipns/docs.ipfs.tech/introduction/",
-		"ipfs://QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
-		"ipns://k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8",
+		//"ipfs://QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ", no longer considered a valid string
+		//"ipns://k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8",
 	}
 	for _, path := range correctPaths {
 		if !CanBeIpfsPath(path) {
