@@ -34,7 +34,7 @@ type payload struct {
 	BlobVerificationProof    *BlobVerificationProof
 	BlobHeader               *BlobHeader
 	AfterDelayedMessagesRead *big.Int
-	GasRefunder              *common.Address
+	GasRefunder              common.Address
 	PrevMessageCount         *big.Int
 	NewMessageCount          *big.Int
 }
@@ -384,20 +384,34 @@ func ParseSequencerMsg(calldata []byte) *EigenDABlobInfo {
 
 func convertToPayload(pa []interface{}) (payload, error) {
 	blobVerificationProof := pa[1].(struct {
-		BatchId       uint32
-		BlobIndex     uint32
+		BatchId       uint32 `json:"batchId"`
+		BlobIndex     uint32 `json:"blobIndex"`
 		BatchMetadata struct {
 			BatchHeader struct {
-				BlobHeadersRoot       [32]uint8
-				QuorumNumbers         []uint8
-				SignedStakeForQuorums []uint8
-				ReferenceBlockNumber  uint32
-			}
-			SignatoryRecordHash     [32]uint8
-			ConfirmationBlockNumber uint32
-		}
-		InclusionProof []uint8
-		QuorumIndices  []uint8
+				BlobHeadersRoot       [32]uint8 `json:"blobHeadersRoot"`
+				QuorumNumbers         []uint8   `json:"quorumNumbers"`
+				SignedStakeForQuorums []uint8   `json:"signedStakeForQuorums"`
+				ReferenceBlockNumber  uint32    `json:"referenceBlockNumber"`
+			} `json:"batchHeader"`
+			SignatoryRecordHash     [32]uint8 `json:"signatoryRecordHash"`
+			ConfirmationBlockNumber uint32    `json:"confirmationBlockNumber"`
+		} `json:"batchMetadata"`
+		InclusionProof []uint8 `json:"inclusionProof"`
+		QuorumIndices  []uint8 `json:"quorumIndices"`
+	})
+
+	blobHeader := pa[2].(struct {
+		Commitment struct {
+			X *big.Int `json:"X"`
+			Y *big.Int `json:"Y"`
+		} `json:"commitment"`
+		DataLength       uint32 `json:"dataLength"`
+		QuorumBlobParams []struct {
+			QuorumNumber                    uint8  `json:"quorumNumber"`
+			AdversaryThresholdPercentage    uint8  `json:"adversaryThresholdPercentage"`
+			ConfirmationThresholdPercentage uint8  `json:"confirmationThresholdPercentage"`
+			ChunkLength                     uint32 `json:"chunkLength"`
+		} `json:"quorumBlobParams"`
 	})
 
 	return payload{
@@ -418,13 +432,35 @@ func convertToPayload(pa []interface{}) (payload, error) {
 			InclusionProof: blobVerificationProof.InclusionProof,
 			QuorumIndices:  blobVerificationProof.QuorumIndices,
 		},
-		BlobHeader:               pa[2].(*BlobHeader),
+		BlobHeader: &BlobHeader{
+			Commitment: &G1Point{},
+			DataLength: blobHeader.DataLength,
+			QuorumBlobParams: func() []*QuorumBlobParams {
+				params := make([]*QuorumBlobParams, len(blobHeader.QuorumBlobParams))
+				for i, p := range blobHeader.QuorumBlobParams {
+					params[i] = &QuorumBlobParams{
+						QuorumNumber:                    p.QuorumNumber,
+						AdversaryThresholdPercentage:    p.AdversaryThresholdPercentage,
+						ConfirmationThresholdPercentage: p.ConfirmationThresholdPercentage,
+						ChunkLength:                     p.ChunkLength,
+					}
+				}
+				return params
+			}(),
+		},
 		AfterDelayedMessagesRead: pa[3].(*big.Int),
-		GasRefunder:              pa[4].(*common.Address),
+		GasRefunder:              pa[4].(common.Address),
 		PrevMessageCount:         pa[5].(*big.Int),
 		NewMessageCount:          pa[6].(*big.Int),
 	}, nil
 }
+
+// type QuorumBlobParams struct {
+// 	QuorumNumber                    uint8
+// 	AdversaryThresholdPercentage    uint8
+// 	ConfirmationThresholdPercentage uint8
+// 	ChunkLength                     uint32
+// }
 
 func convertCalldataToInt(calldata []byte) (int, error) {
 	num := new(big.Int).SetBytes(calldata)
