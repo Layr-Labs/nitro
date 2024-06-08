@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -25,6 +27,16 @@ func IsEigenDAMessageHeaderByte(header byte) bool {
 // hasBits returns true if `checking` has all `bits`
 func hasBits(checking byte, bits byte) bool {
 	return (checking & bits) == bits
+}
+
+type payload struct {
+	SequenceNumber           *big.Int
+	BlobVerificationProof    *BlobVerificationProof
+	BlobHeader               *BlobHeader
+	AfterDelayedMessagesRead *big.Int
+	GasRefunder              *common.Address
+	PrevMessageCount         *big.Int
+	NewMessageCount          *big.Int
 }
 
 type EigenDAWriter interface {
@@ -77,24 +89,24 @@ type QuorumBlobParams struct {
 }
 
 type BlobVerificationProof struct {
-	BatchID        uint32
-	BlobIndex      uint32
-	BatchMetadata  *BatchMetadata
-	InclusionProof []byte
-	QuorumIndices  []byte
+	BatchID        uint32        `json:"batchId"`
+	BlobIndex      uint32        `json:"blobIndex"`
+	BatchMetadata  BatchMetadata `json:"batchMetadata"`
+	InclusionProof []byte        `json:"inclusionProof"`
+	QuorumIndices  []byte        `json:"quorumIndices"`
 }
 
 type BatchMetadata struct {
-	BatchHeader             *BatchHeader
-	SignatoryRecordHash     [32]byte
-	ConfirmationBlockNumber uint32
+	BatchHeader             BatchHeader `json:"batchHeader"`
+	SignatoryRecordHash     [32]byte    `json:"signatoryRecordHash"`
+	ConfirmationBlockNumber uint32      `json:"confirmationBlockNumber"`
 }
 
 type BatchHeader struct {
-	BlobHeadersRoot         []byte
-	QuorumNumbers           []byte
-	QuorumSignedPercentages []byte
-	ReferenceBlockNumber    uint32
+	BlobHeadersRoot       [32]byte `json:"blobHeadersRoot"`
+	QuorumNumbers         []byte   `json:"quorumNumbers"`
+	SignedStakeForQuorums []byte   `json:"signedStakeForQuorums"`
+	ReferenceBlockNumber  uint32   `json:"referenceBlockNumber"`
 }
 
 type EigenDA struct {
@@ -157,8 +169,8 @@ func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
 
 	b.BlobVerificationProof.BatchID = disperserBlobInfo.GetBlobVerificationProof().GetBatchId()
 	b.BlobVerificationProof.BlobIndex = disperserBlobInfo.GetBlobVerificationProof().GetBlobIndex()
-	b.BlobVerificationProof.BatchMetadata = &BatchMetadata{
-		BatchHeader:             &BatchHeader{},
+	b.BlobVerificationProof.BatchMetadata = BatchMetadata{
+		BatchHeader:             BatchHeader{},
 		SignatoryRecordHash:     signatoryRecordHash,
 		ConfirmationBlockNumber: disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetConfirmationBlockNumber(),
 	}
@@ -166,9 +178,9 @@ func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
 	b.BlobVerificationProof.InclusionProof = disperserBlobInfo.GetBlobVerificationProof().GetInclusionProof()
 	b.BlobVerificationProof.QuorumIndices = disperserBlobInfo.GetBlobVerificationProof().GetQuorumIndexes()
 
-	b.BlobVerificationProof.BatchMetadata.BatchHeader.BlobHeadersRoot = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()
+	//b.BlobVerificationProof.BatchMetadata.BatchHeader.BlobHeadersRoot = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()
 	b.BlobVerificationProof.BatchMetadata.BatchHeader.QuorumNumbers = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumNumbers()
-	b.BlobVerificationProof.BatchMetadata.BatchHeader.QuorumSignedPercentages = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumSignedPercentages()
+	b.BlobVerificationProof.BatchMetadata.BatchHeader.SignedStakeForQuorums = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumSignedPercentages()
 	b.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()
 }
 
@@ -257,26 +269,46 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 // InclusionProof
 
 func ParseSequencerMsg(calldata []byte) *EigenDABlobInfo {
-	var blobVerificationProof *BlobVerificationProof
-	var blobHeader *BlobHeader
+
+	// blobVerificationProof := &BlobVerificationProof{}
+	// blobHeader := &BlobHeader{}
 
 	// try decoding at the offsets
-	blobVerificationProofOffset, err := convertCalldataToInt(calldata[36:68])
+	// blobVerificationProofOffset, err := convertCalldataToInt(calldata[36:68])
+	// if err != nil {
+	// 	// todo handle later
+	// 	panic(err)
+	// }
+
+	// blobVerificationProofOffset += 4
+
+	// blobHeaderOffset, err := convertCalldataToInt(calldata[68:100])
+	// if err != nil {
+	// 	// todo handle later
+	// 	panic(err)
+	// }
+
+	sequencerInboxABI := `[ { "inputs": [ { "internalType": "uint256", "name": "_maxDataSize", "type": "uint256" }, { "internalType": "contract IReader4844", "name": "reader4844_", "type": "address" }, { "internalType": "contract IEigenDAServiceManager", "name": "eigenDAServiceManager_", "type": "address" }, { "internalType": "contract IRollupManager", "name": "eigenDARollupManager_", "type": "address" }, { "internalType": "bool", "name": "_isUsingFeeToken", "type": "bool" } ], "stateMutability": "nonpayable", "type": "constructor" }, { "inputs": [], "name": "AlreadyInit", "type": "error" }, { "inputs": [ { "internalType": "bytes32", "name": "", "type": "bytes32" } ], "name": "AlreadyValidDASKeyset", "type": "error" }, { "inputs": [], "name": "BadMaxTimeVariation", "type": "error" }, { "inputs": [], "name": "BadPostUpgradeInit", "type": "error" }, { "inputs": [ { "internalType": "uint256", "name": "stored", "type": "uint256" }, { "internalType": "uint256", "name": "received", "type": "uint256" } ], "name": "BadSequencerNumber", "type": "error" }, { "inputs": [], "name": "DataBlobsNotSupported", "type": "error" }, { "inputs": [ { "internalType": "uint256", "name": "dataLength", "type": "uint256" }, { "internalType": "uint256", "name": "maxDataLength", "type": "uint256" } ], "name": "DataTooLarge", "type": "error" }, { "inputs": [], "name": "DelayedBackwards", "type": "error" }, { "inputs": [], "name": "DelayedTooFar", "type": "error" }, { "inputs": [], "name": "Deprecated", "type": "error" }, { "inputs": [], "name": "ForceIncludeBlockTooSoon", "type": "error" }, { "inputs": [], "name": "ForceIncludeTimeTooSoon", "type": "error" }, { "inputs": [], "name": "HadZeroInit", "type": "error" }, { "inputs": [], "name": "IncorrectMessagePreimage", "type": "error" }, { "inputs": [ { "internalType": "string", "name": "name", "type": "string" } ], "name": "InitParamZero", "type": "error" }, { "inputs": [ { "internalType": "bytes1", "name": "", "type": "bytes1" } ], "name": "InvalidHeaderFlag", "type": "error" }, { "inputs": [], "name": "MissingDataHashes", "type": "error" }, { "inputs": [], "name": "NativeTokenMismatch", "type": "error" }, { "inputs": [ { "internalType": "bytes32", "name": "", "type": "bytes32" } ], "name": "NoSuchKeyset", "type": "error" }, { "inputs": [], "name": "NotBatchPoster", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "", "type": "address" } ], "name": "NotBatchPosterManager", "type": "error" }, { "inputs": [], "name": "NotForked", "type": "error" }, { "inputs": [], "name": "NotOrigin", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "sender", "type": "address" }, { "internalType": "address", "name": "owner", "type": "address" } ], "name": "NotOwner", "type": "error" }, { "inputs": [], "name": "RollupNotChanged", "type": "error" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "messageNum", "type": "uint256" }, { "indexed": false, "internalType": "bytes", "name": "data", "type": "bytes" } ], "name": "InboxMessageDelivered", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "messageNum", "type": "uint256" } ], "name": "InboxMessageDeliveredFromOrigin", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "bytes32", "name": "keysetHash", "type": "bytes32" } ], "name": "InvalidateKeyset", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "id", "type": "uint256" } ], "name": "OwnerFunctionCalled", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "batchSequenceNumber", "type": "uint256" }, { "indexed": false, "internalType": "bytes", "name": "data", "type": "bytes" } ], "name": "SequencerBatchData", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "batchSequenceNumber", "type": "uint256" }, { "indexed": true, "internalType": "bytes32", "name": "beforeAcc", "type": "bytes32" }, { "indexed": true, "internalType": "bytes32", "name": "afterAcc", "type": "bytes32" }, { "indexed": false, "internalType": "bytes32", "name": "delayedAcc", "type": "bytes32" }, { "indexed": false, "internalType": "uint256", "name": "afterDelayedMessagesRead", "type": "uint256" }, { "components": [ { "internalType": "uint64", "name": "minTimestamp", "type": "uint64" }, { "internalType": "uint64", "name": "maxTimestamp", "type": "uint64" }, { "internalType": "uint64", "name": "minBlockNumber", "type": "uint64" }, { "internalType": "uint64", "name": "maxBlockNumber", "type": "uint64" } ], "indexed": false, "internalType": "struct IBridge.TimeBounds", "name": "timeBounds", "type": "tuple" }, { "indexed": false, "internalType": "enum IBridge.BatchDataLocation", "name": "dataLocation", "type": "uint8" } ], "name": "SequencerBatchDelivered", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "bytes32", "name": "keysetHash", "type": "bytes32" }, { "indexed": false, "internalType": "bytes", "name": "keysetBytes", "type": "bytes" } ], "name": "SetValidKeyset", "type": "event" }, { "inputs": [], "name": "BROTLI_MESSAGE_HEADER_FLAG", "outputs": [ { "internalType": "bytes1", "name": "", "type": "bytes1" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "DAS_MESSAGE_HEADER_FLAG", "outputs": [ { "internalType": "bytes1", "name": "", "type": "bytes1" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "DATA_AUTHENTICATED_FLAG", "outputs": [ { "internalType": "bytes1", "name": "", "type": "bytes1" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "DATA_BLOB_HEADER_FLAG", "outputs": [ { "internalType": "bytes1", "name": "", "type": "bytes1" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "EIGENDA_MESSAGE_HEADER_FLAG", "outputs": [ { "internalType": "bytes1", "name": "", "type": "bytes1" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "HEADER_LENGTH", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "TREE_DAS_MESSAGE_HEADER_FLAG", "outputs": [ { "internalType": "bytes1", "name": "", "type": "bytes1" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "ZERO_HEAVY_MESSAGE_HEADER_FLAG", "outputs": [ { "internalType": "bytes1", "name": "", "type": "bytes1" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "sequenceNumber", "type": "uint256" }, { "internalType": "bytes", "name": "data", "type": "bytes" }, { "internalType": "uint256", "name": "afterDelayedMessagesRead", "type": "uint256" }, { "internalType": "contract IGasRefunder", "name": "gasRefunder", "type": "address" }, { "internalType": "uint256", "name": "prevMessageCount", "type": "uint256" }, { "internalType": "uint256", "name": "newMessageCount", "type": "uint256" } ], "name": "addSequencerL2Batch", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "sequenceNumber", "type": "uint256" }, { "internalType": "uint256", "name": "afterDelayedMessagesRead", "type": "uint256" }, { "internalType": "contract IGasRefunder", "name": "gasRefunder", "type": "address" }, { "internalType": "uint256", "name": "prevMessageCount", "type": "uint256" }, { "internalType": "uint256", "name": "newMessageCount", "type": "uint256" } ], "name": "addSequencerL2BatchFromBlobs", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "sequenceNumber", "type": "uint256" }, { "components": [ { "internalType": "uint32", "name": "batchId", "type": "uint32" }, { "internalType": "uint32", "name": "blobIndex", "type": "uint32" }, { "components": [ { "components": [ { "internalType": "bytes32", "name": "blobHeadersRoot", "type": "bytes32" }, { "internalType": "bytes", "name": "quorumNumbers", "type": "bytes" }, { "internalType": "bytes", "name": "signedStakeForQuorums", "type": "bytes" }, { "internalType": "uint32", "name": "referenceBlockNumber", "type": "uint32" } ], "internalType": "struct IEigenDAServiceManager.BatchHeader", "name": "batchHeader", "type": "tuple" }, { "internalType": "bytes32", "name": "signatoryRecordHash", "type": "bytes32" }, { "internalType": "uint32", "name": "confirmationBlockNumber", "type": "uint32" } ], "internalType": "struct IEigenDAServiceManager.BatchMetadata", "name": "batchMetadata", "type": "tuple" }, { "internalType": "bytes", "name": "inclusionProof", "type": "bytes" }, { "internalType": "bytes", "name": "quorumIndices", "type": "bytes" } ], "internalType": "struct EigenDARollupUtils.BlobVerificationProof", "name": "blobVerificationProof", "type": "tuple" }, { "components": [ { "components": [ { "internalType": "uint256", "name": "X", "type": "uint256" }, { "internalType": "uint256", "name": "Y", "type": "uint256" } ], "internalType": "struct BN254.G1Point", "name": "commitment", "type": "tuple" }, { "internalType": "uint32", "name": "dataLength", "type": "uint32" }, { "components": [ { "internalType": "uint8", "name": "quorumNumber", "type": "uint8" }, { "internalType": "uint8", "name": "adversaryThresholdPercentage", "type": "uint8" }, { "internalType": "uint8", "name": "confirmationThresholdPercentage", "type": "uint8" }, { "internalType": "uint32", "name": "chunkLength", "type": "uint32" } ], "internalType": "struct IEigenDAServiceManager.QuorumBlobParam[]", "name": "quorumBlobParams", "type": "tuple[]" } ], "internalType": "struct IEigenDAServiceManager.BlobHeader", "name": "blobHeader", "type": "tuple" }, { "internalType": "uint256", "name": "afterDelayedMessagesRead", "type": "uint256" }, { "internalType": "contract IGasRefunder", "name": "gasRefunder", "type": "address" }, { "internalType": "uint256", "name": "prevMessageCount", "type": "uint256" }, { "internalType": "uint256", "name": "newMessageCount", "type": "uint256" } ], "name": "addSequencerL2BatchFromEigenDA", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "bytes", "name": "", "type": "bytes" }, { "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "contract IGasRefunder", "name": "", "type": "address" } ], "name": "addSequencerL2BatchFromOrigin", "outputs": [], "stateMutability": "pure", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "sequenceNumber", "type": "uint256" }, { "internalType": "bytes", "name": "data", "type": "bytes" }, { "internalType": "uint256", "name": "afterDelayedMessagesRead", "type": "uint256" }, { "internalType": "contract IGasRefunder", "name": "gasRefunder", "type": "address" }, { "internalType": "uint256", "name": "prevMessageCount", "type": "uint256" }, { "internalType": "uint256", "name": "newMessageCount", "type": "uint256" } ], "name": "addSequencerL2BatchFromOrigin", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [], "name": "batchCount", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "batchPosterManager", "outputs": [ { "internalType": "address", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "bridge", "outputs": [ { "internalType": "contract IBridge", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "bytes32", "name": "", "type": "bytes32" } ], "name": "dasKeySetInfo", "outputs": [ { "internalType": "bool", "name": "isValidKeyset", "type": "bool" }, { "internalType": "uint64", "name": "creationBlock", "type": "uint64" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "eigenDARollupManager", "outputs": [ { "internalType": "contract IRollupManager", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "eigenDAServiceManager", "outputs": [ { "internalType": "contract IEigenDAServiceManager", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "_totalDelayedMessagesRead", "type": "uint256" }, { "internalType": "uint8", "name": "kind", "type": "uint8" }, { "internalType": "uint64[2]", "name": "l1BlockAndTime", "type": "uint64[2]" }, { "internalType": "uint256", "name": "baseFeeL1", "type": "uint256" }, { "internalType": "address", "name": "sender", "type": "address" }, { "internalType": "bytes32", "name": "messageDataHash", "type": "bytes32" } ], "name": "forceInclusion", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "bytes32", "name": "ksHash", "type": "bytes32" } ], "name": "getKeysetCreationBlock", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "index", "type": "uint256" } ], "name": "inboxAccs", "outputs": [ { "internalType": "bytes32", "name": "", "type": "bytes32" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "contract IBridge", "name": "bridge_", "type": "address" }, { "components": [ { "internalType": "uint256", "name": "delayBlocks", "type": "uint256" }, { "internalType": "uint256", "name": "futureBlocks", "type": "uint256" }, { "internalType": "uint256", "name": "delaySeconds", "type": "uint256" }, { "internalType": "uint256", "name": "futureSeconds", "type": "uint256" } ], "internalType": "struct ISequencerInbox.MaxTimeVariation", "name": "maxTimeVariation_", "type": "tuple" } ], "name": "initialize", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "bytes32", "name": "ksHash", "type": "bytes32" } ], "name": "invalidateKeysetHash", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "", "type": "address" } ], "name": "isBatchPoster", "outputs": [ { "internalType": "bool", "name": "", "type": "bool" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "", "type": "address" } ], "name": "isSequencer", "outputs": [ { "internalType": "bool", "name": "", "type": "bool" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "isUsingFeeToken", "outputs": [ { "internalType": "bool", "name": "", "type": "bool" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "bytes32", "name": "ksHash", "type": "bytes32" } ], "name": "isValidKeysetHash", "outputs": [ { "internalType": "bool", "name": "", "type": "bool" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "maxDataSize", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "maxTimeVariation", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "postUpgradeInit", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [], "name": "reader4844", "outputs": [ { "internalType": "contract IReader4844", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "removeDelayAfterFork", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [], "name": "rollup", "outputs": [ { "internalType": "contract IOwnable", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "newBatchPosterManager", "type": "address" } ], "name": "setBatchPosterManager", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "addr", "type": "address" }, { "internalType": "bool", "name": "isBatchPoster_", "type": "bool" } ], "name": "setIsBatchPoster", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "addr", "type": "address" }, { "internalType": "bool", "name": "isSequencer_", "type": "bool" } ], "name": "setIsSequencer", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "components": [ { "internalType": "uint256", "name": "delayBlocks", "type": "uint256" }, { "internalType": "uint256", "name": "futureBlocks", "type": "uint256" }, { "internalType": "uint256", "name": "delaySeconds", "type": "uint256" }, { "internalType": "uint256", "name": "futureSeconds", "type": "uint256" } ], "internalType": "struct ISequencerInbox.MaxTimeVariation", "name": "maxTimeVariation_", "type": "tuple" } ], "name": "setMaxTimeVariation", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "bytes", "name": "keysetBytes", "type": "bytes" } ], "name": "setValidKeyset", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [], "name": "totalDelayedMessagesRead", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "newEigenDAServiceManager", "type": "address" } ], "name": "updateEigenDAServiceManager", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [], "name": "updateRollupAddress", "outputs": [], "stateMutability": "nonpayable", "type": "function" } ]`
+
+	abi, err := abi.JSON(strings.NewReader(sequencerInboxABI))
 	if err != nil {
-		// todo handle later
 		panic(err)
 	}
 
-	blobVerificationProofOffset += 4
-
-	blobHeaderOffset, err := convertCalldataToInt(calldata[68:100])
+	method, err := abi.MethodById(calldata[0:4])
 	if err != nil {
-		// todo handle later
 		panic(err)
 	}
 
-	rlp.DecodeBytes(calldata[blobVerificationProofOffset:blobHeaderOffset], blobVerificationProof) // see if this works???
-	rlp.DecodeBytes(calldata[blobHeaderOffset:], blobHeader)
+	p, err := method.Inputs.Unpack(calldata[4:])
+	if err != nil {
+		panic(err)
+	}
+
+	payload, err := convertToPayload(p)
+	if err != nil {
+		panic(err)
+	}
 
 	// blobVerificationProofOffset, err := convertCalldataToInt(calldata[36:68])
 	// if err != nil {
@@ -344,10 +376,54 @@ func ParseSequencerMsg(calldata []byte) *EigenDABlobInfo {
 	// }
 
 	return &EigenDABlobInfo{
-		BlobVerificationProof: *blobVerificationProof,
-		BlobHeader:            *blobHeader,
+		BlobVerificationProof: *payload.BlobVerificationProof,
+		BlobHeader:            *payload.BlobHeader,
 	}
 
+}
+
+func convertToPayload(pa []interface{}) (payload, error) {
+	blobVerificationProof := pa[1].(struct {
+		BatchId       uint32
+		BlobIndex     uint32
+		BatchMetadata struct {
+			BatchHeader struct {
+				BlobHeadersRoot       [32]uint8
+				QuorumNumbers         []uint8
+				SignedStakeForQuorums []uint8
+				ReferenceBlockNumber  uint32
+			}
+			SignatoryRecordHash     [32]uint8
+			ConfirmationBlockNumber uint32
+		}
+		InclusionProof []uint8
+		QuorumIndices  []uint8
+	})
+
+	return payload{
+		SequenceNumber: pa[0].(*big.Int),
+		BlobVerificationProof: &BlobVerificationProof{
+			BatchID:   blobVerificationProof.BatchId,
+			BlobIndex: blobVerificationProof.BlobIndex,
+			BatchMetadata: BatchMetadata{
+				BatchHeader: BatchHeader{
+					BlobHeadersRoot:       blobVerificationProof.BatchMetadata.BatchHeader.BlobHeadersRoot,
+					QuorumNumbers:         blobVerificationProof.BatchMetadata.BatchHeader.QuorumNumbers,
+					SignedStakeForQuorums: blobVerificationProof.BatchMetadata.BatchHeader.SignedStakeForQuorums,
+					ReferenceBlockNumber:  blobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber,
+				},
+				SignatoryRecordHash:     blobVerificationProof.BatchMetadata.SignatoryRecordHash,
+				ConfirmationBlockNumber: blobVerificationProof.BatchMetadata.ConfirmationBlockNumber,
+			},
+			InclusionProof: blobVerificationProof.InclusionProof,
+			QuorumIndices:  blobVerificationProof.QuorumIndices,
+		},
+		BlobHeader:               pa[2].(*BlobHeader),
+		AfterDelayedMessagesRead: pa[3].(*big.Int),
+		GasRefunder:              pa[4].(*common.Address),
+		PrevMessageCount:         pa[5].(*big.Int),
+		NewMessageCount:          pa[6].(*big.Int),
+	}, nil
 }
 
 func convertCalldataToInt(calldata []byte) (int, error) {
