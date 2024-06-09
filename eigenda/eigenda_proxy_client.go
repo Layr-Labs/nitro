@@ -52,7 +52,7 @@ func (c *EigenDAProxyClient) Put(data []byte) (*disperser.BlobInfo, error) {
 	return blobInfo, nil
 }
 
-func (c *EigenDAProxyClient) Get(blobInfo *disperser.BlobInfo, domainFilter string) ([]byte, error) {
+func (c *EigenDAProxyClient) Get(blobInfo *EigenDABlobInfo, domainFilter string) ([]byte, error) {
 	commitment, err := rlp.EncodeToBytes(blobInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode blob info: %w", err)

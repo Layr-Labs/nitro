@@ -40,12 +40,12 @@ type payload struct {
 }
 
 type EigenDAWriter interface {
-	Store(context.Context, []byte) (*EigenDABlobID, *EigenDABlobInfo, error)
-	Serialize(eigenDABlobID *EigenDABlobID) ([]byte, error)
+	Store(context.Context, []byte) (*EigenDABlobInfo, error)
+	Serialize(eigenDABlobInfo *EigenDABlobInfo) ([]byte, error)
 }
 
 type EigenDAReader interface {
-	QueryBlob(ctx context.Context, id *EigenDABlobInfo, domainFilter string) ([]byte, error)
+	QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFilter string) ([]byte, error)
 }
 
 type EigenDAConfig struct {
@@ -122,8 +122,8 @@ func NewEigenDA(proxyServerRpc string) (*EigenDA, error) {
 }
 
 // TODO: There should probably be two types of query blob as the
-func (e *EigenDA) QueryBlob(ctx context.Context, id *disperser.BlobInfo, domainFilter string) ([]byte, error) {
-	data, err := e.client.Get(id, domainFilter)
+func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFilter string) ([]byte, error) {
+	data, err := e.client.Get(cert, domainFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,11 @@ func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
 	b.BlobVerificationProof.InclusionProof = disperserBlobInfo.GetBlobVerificationProof().GetInclusionProof()
 	b.BlobVerificationProof.QuorumIndices = disperserBlobInfo.GetBlobVerificationProof().GetQuorumIndexes()
 
-	//b.BlobVerificationProof.BatchMetadata.BatchHeader.BlobHeadersRoot = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()
+	batchRootSlice := disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()
+	var blobHeadersRoot [32]byte
+	copy(blobHeadersRoot[:], batchRootSlice)
+	b.BlobVerificationProof.BatchMetadata.BatchHeader.BlobHeadersRoot = blobHeadersRoot
+
 	b.BlobVerificationProof.BatchMetadata.BatchHeader.QuorumNumbers = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumNumbers()
 	b.BlobVerificationProof.BatchMetadata.BatchHeader.SignedStakeForQuorums = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumSignedPercentages()
 	b.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber = disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()
