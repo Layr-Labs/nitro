@@ -152,7 +152,7 @@ func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 
 // struct for recovering data from preimage, impl interface EigenDAReader
 
-func (dasReader *PreimageEigenDAReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo) ([]byte, error) {
+func (dasReader *PreimageEigenDAReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
 	dataPointer, err := cert.SerializeCommitment()
 	if err != nil {
 		return nil, err
@@ -241,7 +241,7 @@ func main() {
 			daProviders = append(daProviders, arbstate.NewDAProviderEigenDA(eigenDAReader))
 		}
 		daProviders = append(daProviders, arbstate.NewDAProviderBlobReader(&BlobPreimageReader{}))
-		inboxMultiplexer := arbstate.NewInboxMultiplexer(backend, delayedMessagesRead, daProviders, nil, keysetValidationMode)
+		inboxMultiplexer := arbstate.NewInboxMultiplexer(backend, delayedMessagesRead, daProviders, keysetValidationMode)
 		ctx := context.Background()
 		message, err := inboxMultiplexer.Pop(ctx)
 		if err != nil {

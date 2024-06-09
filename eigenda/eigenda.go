@@ -147,6 +147,10 @@ func (e *EigenDA) Serialize(blobInfo *EigenDABlobInfo) ([]byte, error) {
 	return rlp.EncodeToBytes(blobInfo)
 }
 
+func (e *EigenDABlobInfo) SerializeCommitment() ([]byte, error) {
+	return append(e.BlobHeader.Commitment.X.Bytes(), e.BlobHeader.Commitment.Y.Bytes()...), nil
+}
+
 func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
 	b.BlobHeader.Commitment = &G1Point{
 		X: new(big.Int).SetBytes(disperserBlobInfo.GetBlobHeader().GetCommitment().GetX()),
@@ -219,9 +223,12 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 
 	// record preimage data,
 	log.Info("Recording preimage data for EigenDA")
+	pointer, err := blobInfo.SerializeCommitment()
+	if err != nil {
+		return nil, err
+	}
 	shaDataHash := sha256.New()
-	shaDataHash.Write(blobInfo.BlobHeader.Commitment.X.Bytes())
-	shaDataHash.Write(blobInfo.BlobHeader.Commitment.Y.Bytes())
+	shaDataHash.Write(pointer)
 	dataHash := shaDataHash.Sum([]byte{})
 	dataHash[0] = 1
 	if eigenDAPreimages != nil {
