@@ -396,7 +396,8 @@ func (e *daProviderForEigenDA) RecoverPayloadFromBatch(
 	keysetValidationMode KeysetValidationMode,
 ) ([]byte, error) {
 	// we start from the 41st byte of sequencerMsg because bytes 0 - 40 are the header, and 40 - 41 is the eigenDA header flag
-	return eigenda.RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], e.eigenDAReader, preimages)
+	// we use the binary domain here because this is what we use in the derivation pipeline
+	return eigenda.RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], e.eigenDAReader, preimages, "binary")
 }
 
 type KeysetValidationMode uint8

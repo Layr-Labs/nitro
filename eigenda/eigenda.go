@@ -202,6 +202,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	sequencerMsg []byte, // this is literally the calldata of the transaction/
 	daReader EigenDAReader,
 	preimages map[arbutil.PreimageType]map[common.Hash][]byte,
+	domain string,
 ) ([]byte, error) {
 	log.Info("Start recovering payload from eigenda: ", "data", hex.EncodeToString(sequencerMsg))
 	var eigenDAPreimages map[common.Hash][]byte
@@ -215,7 +216,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	blobInfo := ParseSequencerMsg(sequencerMsg)
 
 	// default is binary and we want polynomial so we don't need to open 2 points cc @ethen
-	data, err := daReader.QueryBlob(ctx, blobInfo, "polynomial")
+	data, err := daReader.QueryBlob(ctx, blobInfo, domain)
 	if err != nil {
 		log.Error("Failed to query data from EigenDA", "err", err)
 		return nil, err
