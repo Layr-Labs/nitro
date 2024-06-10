@@ -123,7 +123,7 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 			} else if IsBlobHashesHeaderByte(payload[0]) {
 				return nil, ErrNoBlobReader
 			} else if eigenda.IsEigenDAMessageHeaderByte(payload[0]) {
-				return nil, ErrNoEigenDAReader
+				log.Error(ErrNoEigenDAReader)
 			}
 		}
 	}
