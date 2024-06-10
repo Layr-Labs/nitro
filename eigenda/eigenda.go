@@ -123,7 +123,7 @@ func NewEigenDA(proxyServerRpc string) (*EigenDA, error) {
 
 // TODO: There should probably be two types of query blob as the
 func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFilter string) ([]byte, error) {
-	data, err := e.client.Get(cert, domainFilter)
+	data, err := e.client.Get(ctx, cert, domainFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -132,11 +132,14 @@ func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFi
 }
 
 func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDABlobInfo, error) {
+	log.Info("Storing blob")
 	var blobInfo *EigenDABlobInfo
-	commitment, err := e.client.Put(data)
+	commitment, err := e.client.Put(ctx, data)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Info("Stored blob", "commitment", hex.EncodeToString(commitment.GetBlobHeader().GetCommitment().GetX()), "y", hex.EncodeToString(commitment.GetBlobHeader().GetCommitment().GetY()))
 
 	blobInfo.loadBlobInfo(commitment)
 

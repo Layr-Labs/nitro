@@ -546,6 +546,8 @@ func createNodeImpl(
 		eigenDAWriter = eigenDAService
 	}
 
+	log.Info("EigenDA reader", "reader", eigenDAReader)
+
 	inboxTracker, err := NewInboxTracker(arbDb, txStreamer, daReader, blobReader, eigenDAReader)
 	if err != nil {
 		return nil, err

@@ -1090,7 +1090,7 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 		}
 
 		var useEigenDA bool
-		if config.PostEigenDA && b.eigenDAWriter != nil {
+		if b.eigenDAWriter != nil {
 			useEigenDA = true
 		}
 
@@ -1276,7 +1276,7 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 	}
 
 	var blobInfo *eigenda.EigenDABlobInfo
-	if b.daWriter == nil && b.eigenDAWriter != nil && config.PostEigenDA {
+	if b.daWriter == nil && b.eigenDAWriter != nil {
 		log.Info("Start to write data to eigenda: ", "data", hex.EncodeToString(sequencerMsg))
 		blobInfo, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
 		if err != nil {
@@ -1336,6 +1336,7 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 	}
 	log.Info(
 		"BatchPoster: batch sent",
+		"eigenDA", b.building.useEigenDA,
 		"sequenceNumber", batchPosition.NextSeqNum,
 		"from", batchPosition.MessageCount,
 		"to", b.building.msgCount,

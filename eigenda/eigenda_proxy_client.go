@@ -2,12 +2,15 @@ package eigenda
 
 import (
 	"bytes"
+	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -20,13 +23,27 @@ func NewEigenDAProxyClient(RPCUrl string) *EigenDAProxyClient {
 }
 
 // TODO: proper error types
-func (c *EigenDAProxyClient) Put(data []byte) (*disperser.BlobInfo, error) {
-	var blobInfo *disperser.BlobInfo
+func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) (*disperser.BlobInfo, error) {
+	log.Info("Putting blob EIGENDAPROXYCLIENT", "data", hex.EncodeToString(data))
 
-	url := fmt.Sprintf("%s/put", c.RPCUrl)
-	resp, err := http.Post(url, "text/plain", bytes.NewBuffer([]byte(data)))
+	body := bytes.NewReader(data)
+
+	log.Info("Creating HTTP POST request", "body", body)
+
+	url := fmt.Sprintf("%s/put/", c.RPCUrl)
+	log.Info("Creating HTTP POST request", "url", url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to store data: %w", err)
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	log.Info("Sending HTTP POST request", "url", url)
+	log.Info("Sending HTTP POST request", "body", body)
+	log.Info("Sending HTTP POST request", "req", req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -39,20 +56,17 @@ func (c *EigenDAProxyClient) Put(data []byte) (*disperser.BlobInfo, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
+	var blobInfo disperser.BlobInfo
 	cert := commitment[3:]
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode commitment: %w", err)
-	}
-
-	err = rlp.DecodeBytes(cert, blobInfo)
+	err = rlp.DecodeBytes(cert, &blobInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode blob info: %w", err)
 	}
 
-	return blobInfo, nil
+	return &blobInfo, nil
 }
 
-func (c *EigenDAProxyClient) Get(blobInfo *EigenDABlobInfo, domainFilter string) ([]byte, error) {
+func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *EigenDABlobInfo, domainFilter string) ([]byte, error) {
 	commitment, err := rlp.EncodeToBytes(blobInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode blob info: %w", err)
@@ -60,13 +74,19 @@ func (c *EigenDAProxyClient) Get(blobInfo *EigenDABlobInfo, domainFilter string)
 
 	rpcurl := fmt.Sprintf("%s/get/%s", c.RPCUrl, commitment)
 
-	// if not nil put in the domain filter as a part of the query url
-	if domainFilter != "" {
+	// if not nil or binary (default) put in the domain filter as a part of the query url
+	if domainFilter != "" && domainFilter != "binary" {
 		rpcurl = fmt.Sprintf("%s?domain=%s", rpcurl, url.QueryEscape(domainFilter))
 	}
-	resp, err := http.Get(rpcurl)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rpcurl, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve data: %w", err)
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
