@@ -85,6 +85,7 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 	}
 	payload := data[40:]
 	log.Info("Inbox parse sequencer message: ", "payload", hex.EncodeToString(payload))
+	log.Info("Inbox parse header message: ", "header", hex.EncodeToString(data[:40]))
 
 	// Stage 0: Check if our node is out of date and we don't understand this batch type
 	// If the parent chain sequencer inbox smart contract authenticated this batch,
