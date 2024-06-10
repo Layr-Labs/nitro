@@ -67,7 +67,6 @@ const MinLifetimeSecondsForDataAvailabilityCert = 7 * 24 * 60 * 60 // one week
 
 var (
 	ErrNoBlobReader          = errors.New("blob batch payload was encountered but no BlobReader was configured")
-	ErrNoEigenDAReader       = errors.New("eigenDA versioned batch payload was encountered but no instance of EigenDA was configured")
 	ErrInvalidBlobDataFormat = errors.New("blob batch data is not a list of hashes as expected")
 )
 
@@ -123,7 +122,7 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 			} else if IsBlobHashesHeaderByte(payload[0]) {
 				return nil, ErrNoBlobReader
 			} else if eigenda.IsEigenDAMessageHeaderByte(payload[0]) {
-				log.Error(ErrNoEigenDAReader)
+				log.Error("eigenDA versioned batch payload was encountered but no instance of EigenDA was configured")
 			}
 		}
 	}
