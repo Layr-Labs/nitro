@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -273,7 +272,7 @@ func ParseSequencerMsg(calldata []byte) *EigenDABlobInfo {
 }
 
 func convertToPayload(pa []interface{}) (payload, error) {
-	blobVerificationProof := pa[1].(struct {
+	blobVerificationProof, ok := pa[1].(struct {
 		BatchId       uint32 `json:"batchId"`
 		BlobIndex     uint32 `json:"blobIndex"`
 		BatchMetadata struct {
@@ -289,8 +288,11 @@ func convertToPayload(pa []interface{}) (payload, error) {
 		InclusionProof []uint8 `json:"inclusionProof"`
 		QuorumIndices  []uint8 `json:"quorumIndices"`
 	})
+	if !ok {
+		return payload{}, fmt.Errorf("pa[1] is not a DA certificate type")
+	}
 
-	blobHeader := pa[2].(struct {
+	blobHeader, ok := pa[2].(struct {
 		Commitment struct {
 			X *big.Int `json:"X"`
 			Y *big.Int `json:"Y"`
@@ -303,6 +305,26 @@ func convertToPayload(pa []interface{}) (payload, error) {
 			ChunkLength                     uint32 `json:"chunkLength"`
 		} `json:"quorumBlobParams"`
 	})
+	if !ok {
+		return payload{}, fmt.Errorf("pa[2] is not a DA certificate type")
+	}
+
+	afterDelayedMessagesRead, ok := pa[3].(*big.Int)
+	if !ok {
+		return payload{}, fmt.Errorf("pa[3] is not a big int")
+	}
+	gasRefunder, ok := pa[4].(common.Address)
+	if !ok {
+		return payload{}, fmt.Errorf("pa[4] is not an Address struct")
+	}
+	prevMessageCount, ok := pa[5].(*big.Int)
+	if !ok {
+		return payload{}, fmt.Errorf("pa[5] is not a big int")
+	}
+	newMessageCount, ok := pa[6].(*big.Int)
+	if !ok {
+		return payload{}, fmt.Errorf("pa[6] is not a big int")
+	}
 
 	return payload{
 		SequenceNumber: pa[0].(*big.Int),
@@ -338,20 +360,9 @@ func convertToPayload(pa []interface{}) (payload, error) {
 				return params
 			}(),
 		},
-		AfterDelayedMessagesRead: pa[3].(*big.Int),
-		GasRefunder:              pa[4].(common.Address),
-		PrevMessageCount:         pa[5].(*big.Int),
-		NewMessageCount:          pa[6].(*big.Int),
+		AfterDelayedMessagesRead: afterDelayedMessagesRead,
+		GasRefunder:              gasRefunder,
+		PrevMessageCount:         prevMessageCount,
+		NewMessageCount:          newMessageCount,
 	}, nil
-}
-func convertCalldataToInt(calldata []byte) (int, error) {
-	num := new(big.Int).SetBytes(calldata)
-
-	if num.IsInt64() {
-		return int(num.Uint64()), nil
-	}
-
-	fmt.Println(num)
-
-	return 0, errors.New("calldata is not a valid int")
 }

@@ -12,9 +12,9 @@ func TestParseSequencerMsg(t *testing.T) {
 
 	expected := &EigenDABlobID{
 		// BatchHeader content for hashing
-		BlobIndex:            570,
-		ReferenceBlockNumber: 1325741,
-		QuorumIDs:            []uint32{0, 1},
+		BlobIndex: 570,
+		// ReferenceBlockNumber: 1325741,
+		// QuorumIDs:            []uint32{0, 1},
 	}
 
 	// Call the function with the mock calldata

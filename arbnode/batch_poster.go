@@ -1286,7 +1286,7 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 			}
 		}
 
-		//sequencerMsg, err = b.eigenDAWriter.Serialize(blobInfo)
+		// sequencerMsg, err = b.eigenDAWriter.Serialize(blobInfo)
 		// if err != nil {
 		// 	log.Warn("DaRef serialization failed", "err", err)
 		// 	return false, errors.New("DaRef serialization failed")

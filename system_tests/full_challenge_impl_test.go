@@ -217,6 +217,7 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 	rollupMngr, tx, _, err := bridgegen.DeployEigenDADummyManager(&txOpts, l1Client)
 	Require(t, err)
 	_, err = EnsureTxSucceeded(ctx, l1Client, tx)
+	Require(t, err)
 
 	// Require(t, err)
 	// _, err = EnsureTxSucceeded(ctx, l1Client, tx)

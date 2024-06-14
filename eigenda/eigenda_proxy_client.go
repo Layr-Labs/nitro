@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -18,8 +18,8 @@ type EigenDAProxyClient struct {
 	RPCUrl string
 }
 
-func NewEigenDAProxyClient(RPCUrl string) *EigenDAProxyClient {
-	return &EigenDAProxyClient{RPCUrl: RPCUrl}
+func NewEigenDAProxyClient(rpc string) *EigenDAProxyClient {
+	return &EigenDAProxyClient{RPCUrl: rpc}
 }
 
 // TODO: proper error types
@@ -51,7 +51,7 @@ func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) (*disperser.B
 		return nil, fmt.Errorf("failed to store data: %s", resp.Status)
 	}
 
-	commitment, err := ioutil.ReadAll(resp.Body)
+	commitment, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -94,7 +94,7 @@ func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *EigenDABlobInfo,
 		return nil, fmt.Errorf("failed to retrieve data: %s", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
