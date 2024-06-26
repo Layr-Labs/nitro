@@ -89,24 +89,24 @@ type QuorumBlobParams struct {
 }
 
 type BlobVerificationProof struct {
-	BatchID        uint32        `json:"batchId"`
-	BlobIndex      uint32        `json:"blobIndex"`
-	BatchMetadata  BatchMetadata `json:"batchMetadata"`
-	InclusionProof []byte        `json:"inclusionProof"`
-	QuorumIndices  []byte        `json:"quorumIndices"`
+	BatchID        uint32
+	BlobIndex      uint32
+	BatchMetadata  BatchMetadata
+	InclusionProof []byte
+	QuorumIndices  []byte
 }
 
 type BatchMetadata struct {
-	BatchHeader             BatchHeader `json:"batchHeader"`
-	SignatoryRecordHash     [32]byte    `json:"signatoryRecordHash"`
-	ConfirmationBlockNumber uint32      `json:"confirmationBlockNumber"`
+	BatchHeader             BatchHeader
+	SignatoryRecordHash     [32]byte
+	ConfirmationBlockNumber uint32
 }
 
 type BatchHeader struct {
-	BlobHeadersRoot       [32]byte `json:"blobHeadersRoot"`
-	QuorumNumbers         []byte   `json:"quorumNumbers"`
-	SignedStakeForQuorums []byte   `json:"signedStakeForQuorums"`
-	ReferenceBlockNumber  uint32   `json:"referenceBlockNumber"`
+	BlobHeadersRoot       [32]byte
+	QuorumNumbers         []byte
+	SignedStakeForQuorums []byte
+	ReferenceBlockNumber  uint32
 }
 
 type EigenDA struct {
@@ -133,7 +133,7 @@ func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFi
 
 func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDABlobInfo, error) {
 	log.Info("Storing blob")
-	var blobInfo *EigenDABlobInfo
+	var blobInfo = &EigenDABlobInfo{}
 	commitment, err := e.client.Put(ctx, data)
 	if err != nil {
 		return nil, err
@@ -155,9 +155,17 @@ func (e *EigenDABlobInfo) SerializeCommitment() ([]byte, error) {
 }
 
 func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
+	// dump blob info
+	println("BlobInfo: ", disperserBlobInfo.String())
+
+	x := disperserBlobInfo.GetBlobHeader().GetCommitment().GetX()
+	y := disperserBlobInfo.GetBlobHeader().GetCommitment().GetY()
+
+	b.BlobHeader = BlobHeader{}
+
 	b.BlobHeader.Commitment = &G1Point{
-		X: new(big.Int).SetBytes(disperserBlobInfo.GetBlobHeader().GetCommitment().GetX()),
-		Y: new(big.Int).SetBytes(disperserBlobInfo.GetBlobHeader().GetCommitment().GetY()),
+		X: new(big.Int).SetBytes(x),
+		Y: new(big.Int).SetBytes(y),
 	}
 
 	b.BlobHeader.DataLength = disperserBlobInfo.GetBlobHeader().GetDataLength()
@@ -171,9 +179,11 @@ func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
 		})
 	}
 
+	println("Set quorum blob params")
 	var signatoryRecordHash [32]byte
 	copy(signatoryRecordHash[:], disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetSignatoryRecordHash())
 
+	println("Set signatory record hash")
 	b.BlobVerificationProof.BatchID = disperserBlobInfo.GetBlobVerificationProof().GetBatchId()
 	b.BlobVerificationProof.BlobIndex = disperserBlobInfo.GetBlobVerificationProof().GetBlobIndex()
 	b.BlobVerificationProof.BatchMetadata = BatchMetadata{
@@ -182,8 +192,15 @@ func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
 		ConfirmationBlockNumber: disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetConfirmationBlockNumber(),
 	}
 
+	// dump fields
+	println("BatchID: ", b.BlobVerificationProof.BatchID)
+	println("BlobIndex: ", b.BlobVerificationProof.BlobIndex)
+	println("ConfirmationBlockNumber: ", b.BlobVerificationProof.BatchMetadata.ConfirmationBlockNumber)
+
 	b.BlobVerificationProof.InclusionProof = disperserBlobInfo.GetBlobVerificationProof().GetInclusionProof()
 	b.BlobVerificationProof.QuorumIndices = disperserBlobInfo.GetBlobVerificationProof().GetQuorumIndexes()
+
+	println("Set inclusion proof and quorum indices")
 
 	batchRootSlice := disperserBlobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()
 	var blobHeadersRoot [32]byte

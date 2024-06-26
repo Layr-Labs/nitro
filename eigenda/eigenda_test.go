@@ -1,6 +1,10 @@
 package eigenda
 
 import (
+	common "github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"encoding/hex"
 	"testing"
 )
@@ -27,4 +31,33 @@ func TestParseSequencerMsg(t *testing.T) {
 		t.Errorf("BlobIndex was incorrect, got: %v, want: %v", result.BlobVerificationProof.BlobIndex, expected.BlobIndex)
 	}
 
+}
+
+func TestLoadBlobInfo(t *testing.T) {
+	x, err := hexutil.Decode("0x007e2db2683cd5ec31b62b50b9a685140076b483f1f85b931f493480cbfd9eda")
+	if err != nil {
+		t.Fatalf("error decoding hex string: %v", err)
+	}
+
+	y, err := hexutil.Decode("0x10a964fcc86dbace6cedd749b878523e8bdc8ad1c04104cdbf1482d79e3367b9")
+	if err != nil {
+		t.Fatalf("error decoding hex string: %v", err)
+	}
+
+	dBlobInfo := &disperser.BlobInfo{
+		BlobHeader: &disperser.BlobHeader{
+			Commitment: &common.G1Commitment{
+				X: x,
+				Y: y,
+			},
+		},
+	}
+
+	var blobInfo = &EigenDABlobInfo{}
+
+	blobInfo.loadBlobInfo(dBlobInfo)
+
+	if blobInfo == nil {
+		t.Fatalf("loadBlobInfo returned nil")
+	}
 }

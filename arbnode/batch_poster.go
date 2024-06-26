@@ -885,6 +885,7 @@ func (b *BatchPoster) encodeAddBatch(
 	}
 	if useEigenDA {
 		methodName = sequencerBatchPostWithEigendaMethodName
+		println("Using eigenDA")
 	}
 	method, ok := b.seqInboxABI.Methods[methodName]
 	if !ok {
@@ -907,10 +908,120 @@ func (b *BatchPoster) encodeAddBatch(
 			new(big.Int).SetUint64(uint64(newMsgNum)),
 		)
 	} else if useEigenDA {
+
+		println("Using eigenDA and packing calldata inputs")
+		println(fmt.Sprintf("Blob verification proof: %+v", eigenDaBlobInfo.BlobVerificationProof))
+
+		// dump inputs
+		println(fmt.Sprintf("inputs: %+v", method.Inputs))
+
+		println(fmt.Sprintf("inputs @ index 1: %+v", method.Inputs[1]))
+
+		// BlobVerificationProof ABI
+		blobVerificationProofType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+			{
+				Name: "batchID",
+				Type: "uint32",
+			},
+			{
+				Name: "batchIndex",
+				Type: "uint32",
+			},
+			{
+				Name: "batchMetadata",
+				Type: "tuple",
+				Components: []abi.ArgumentMarshaling{
+					{
+						Name: "batchHeader",
+						Type: "tuple",
+						Components: []abi.ArgumentMarshaling{
+							{
+								Name: "blobHeadersRoot",
+								Type: "bytes32",
+							},
+							{
+								Name: "quorumNumbers",
+								Type: "bytes",
+							},
+							{
+								Name: "signedStakeForQuorums",
+								Type: "bytes",
+							},
+							{
+								Name: "referenceBlockNumber",
+								Type: "uint32",
+							},
+						},
+					},
+					{
+						Name: "signatoryRecordHash",
+						Type: "bytes32",
+					},
+					{
+						Name: "confirmationBlockNumber",
+						Type: "uint32",
+					},
+				},
+			},
+			{
+				Name: "inclusionProof",
+				Type: "bytes",
+			},
+			{
+				Name: "quroumIndices",
+				Type: "bytes",
+			},
+		})
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+			{Name: "commitment", Type: "tuple", Components: []abi.ArgumentMarshaling{
+				{Name: "X", Type: "uint256"},
+				{Name: "Y", Type: "uint256"},
+			}},
+			{Name: "dataLength", Type: "uint32"},
+			{Name: "quorumBlobParams", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
+				{Name: "quorumNumber", Type: "uint8"},
+				{Name: "adversaryThresholdPercentage", Type: "uint8"},
+				{Name: "confirmationThresholdPercentage", Type: "uint8"},
+				{Name: "chunkLength", Type: "uint32"},
+			}},
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Create ABI arguments
+		arguments := abi.Arguments{
+			{Type: blobVerificationProofType},
+		}
+
+		// pack arguments
+		// Pack the BlobHeader
+		bvpBytes, err := arguments.Pack(eigenDaBlobInfo.BlobVerificationProof)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Create ABI arguments
+		arguments = abi.Arguments{
+			{Type: blobHeaderType},
+		}
+
+		// pack arguments
+		// Pack the BlobHeader
+		bhBytes, err := arguments.Pack(eigenDaBlobInfo.BlobHeader)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		calldata, err = method.Inputs.Pack(
 			seqNum,
-			eigenDaBlobInfo.BlobVerificationProof,
-			eigenDaBlobInfo.BlobHeader,
+			bvpBytes,
+			bhBytes,
 			new(big.Int).SetUint64(delayedMsg),
 			b.config().gasRefunder,
 			new(big.Int).SetUint64(uint64(prevMsgNum)),
@@ -1093,6 +1204,8 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 		if b.eigenDAWriter != nil {
 			useEigenDA = true
 		}
+
+		println("use4844", use4844, "useEigenDA", useEigenDA)
 
 		b.building = &buildingBatch{
 			segments:      newBatchSegments(batchPosition.DelayedMessageCount, b.config(), b.GetBacklogEstimate(), use4844),
