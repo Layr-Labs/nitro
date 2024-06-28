@@ -73,7 +73,7 @@ type EigenDABlobInfo struct {
 type BlobHeader struct {
 	Commitment       *G1Point
 	DataLength       uint32
-	QuorumBlobParams []*QuorumBlobParams
+	QuorumBlobParams []QuorumBlobParams
 }
 
 type G1Point struct {
@@ -88,25 +88,28 @@ type QuorumBlobParams struct {
 	ChunkLength                     uint32
 }
 
+// (uint32,uint32,((bytes32,bytes,bytes,uint32),bytes32,uint32),bytes,bytes)
+//
+//	x     x           x       x    x      x       x        x     x     x
 type BlobVerificationProof struct {
-	BatchID        uint32
-	BlobIndex      uint32
-	BatchMetadata  BatchMetadata
-	InclusionProof []byte
-	QuorumIndices  []byte
+	BatchID        uint32        `json:"batchId"`        // uint32
+	BlobIndex      uint32        `json:"blobIndex"`      // uint32
+	BatchMetadata  BatchMetadata `json:"batchMetadata"`  // nest
+	InclusionProof []byte        `json:"inclusionProof"` // bytes
+	QuorumIndices  []byte        `json:"quorumIndices"`  // bytes
 }
 
 type BatchMetadata struct {
-	BatchHeader             BatchHeader
-	SignatoryRecordHash     [32]byte
-	ConfirmationBlockNumber uint32
+	BatchHeader             BatchHeader `json:"batchHeader"`
+	SignatoryRecordHash     [32]byte    `json:"signatoryRecordHash"`     // bytes32
+	ConfirmationBlockNumber uint32      `json:"confirmationBlockNumber"` // uint32
 }
 
 type BatchHeader struct {
-	BlobHeadersRoot       [32]byte
-	QuorumNumbers         []byte
-	SignedStakeForQuorums []byte
-	ReferenceBlockNumber  uint32
+	BlobHeadersRoot       [32]byte `json:"blobHeadersRoot"`
+	QuorumNumbers         []byte   `json:"quorumNumbers"`
+	SignedStakeForQuorums []byte   `json:"signedStakeForQuorums"`
+	ReferenceBlockNumber  uint32   `json:"referenceBlockNumber"`
 }
 
 type EigenDA struct {
@@ -171,7 +174,7 @@ func (b *EigenDABlobInfo) loadBlobInfo(disperserBlobInfo *disperser.BlobInfo) {
 	b.BlobHeader.DataLength = disperserBlobInfo.GetBlobHeader().GetDataLength()
 
 	for _, quorumBlobParam := range disperserBlobInfo.GetBlobHeader().GetBlobQuorumParams() {
-		b.BlobHeader.QuorumBlobParams = append(b.BlobHeader.QuorumBlobParams, &QuorumBlobParams{
+		b.BlobHeader.QuorumBlobParams = append(b.BlobHeader.QuorumBlobParams, QuorumBlobParams{
 			QuorumNumber:                    uint8(quorumBlobParam.QuorumNumber),
 			AdversaryThresholdPercentage:    uint8(quorumBlobParam.AdversaryThresholdPercentage),
 			ConfirmationThresholdPercentage: uint8(quorumBlobParam.ConfirmationThresholdPercentage),
@@ -342,10 +345,10 @@ func convertToPayload(pa []interface{}) (payload, error) {
 		BlobHeader: &BlobHeader{
 			Commitment: &G1Point{},
 			DataLength: blobHeader.DataLength,
-			QuorumBlobParams: func() []*QuorumBlobParams {
-				params := make([]*QuorumBlobParams, len(blobHeader.QuorumBlobParams))
+			QuorumBlobParams: func() []QuorumBlobParams {
+				params := make([]QuorumBlobParams, len(blobHeader.QuorumBlobParams))
 				for i, p := range blobHeader.QuorumBlobParams {
-					params[i] = &QuorumBlobParams{
+					params[i] = QuorumBlobParams{
 						QuorumNumber:                    p.QuorumNumber,
 						AdversaryThresholdPercentage:    p.AdversaryThresholdPercentage,
 						ConfirmationThresholdPercentage: p.ConfirmationThresholdPercentage,

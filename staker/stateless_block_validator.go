@@ -344,6 +344,7 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 				log.Warn("EigenDA not configured, but sequencer message found with EigenDA header")
 			} else {
 
+				println("RecoverPayloadFromEigenDABatch .... recovering payload for EigenDA batch")
 				// we use the polynomial domain here because this is what we use in the fraud proof pipeline
 				_, err := eigenda.RecoverPayloadFromEigenDABatch(ctx, batch.Data[41:], v.eigenDAService, e.Preimages, "polynomial")
 				if err != nil {

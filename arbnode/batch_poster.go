@@ -885,7 +885,6 @@ func (b *BatchPoster) encodeAddBatch(
 	}
 	if useEigenDA {
 		methodName = sequencerBatchPostWithEigendaMethodName
-		println("Using eigenDA")
 	}
 	method, ok := b.seqInboxABI.Methods[methodName]
 	if !ok {
@@ -918,49 +917,67 @@ func (b *BatchPoster) encodeAddBatch(
 		println(fmt.Sprintf("inputs @ index 1: %+v", method.Inputs[1]))
 
 		// BlobVerificationProof ABI
+		/*
+
+					        "components": [
+			            {"name": "batchId", "type": "uint32"},
+			            {"name": "blobIndex", "type": "uint32"},
+			            {"components": [
+			                {"components": [
+			                    {"name": "blobHeadersRoot", "type": "bytes32"},
+			                    {"name": "quorumNumbers", "type": "bytes"},
+			                    {"name": "signedStakeForQuorums", "type": "bytes"},
+			                    {"name": "referenceBlockNumber", "type": "uint32"}
+			                ], "name": "batchHeader", "type": "tuple"},
+			                {"name": "signatoryRecordHash", "type": "bytes32"},
+			                {"name": "confirmationBlockNumber", "type": "uint32"}
+			            ], "name": "batchMetadata", "type": "tuple"},
+			            {"name": "inclusionProof", "type": "bytes"},
+			            {"name": "quorumIndices", "type": "bytes"}
+			        ],
+			        "name": "BlobVerificationProof",
+			        "type": "tuple"
+			    }]
+		*/
+
+		/*
+			type BlobVerificationProof struct {
+				BatchID        uint32        `json:"batchId"`
+				BlobIndex      uint32        `json:"blobIndex"`
+				BatchMetadata  BatchMetadata `json:"batchMetadata"`
+				InclusionProof []byte        `json:"inclusionProof"`
+				QuorumIndices  []byte        `json:"quorumIndices"`
+			}
+
+			type BatchMetadata struct {
+				BatchHeader             BatchHeader `json:"batchHeader"`
+				SignatoryRecordHash     [32]byte    `json:"signatoryRecordHash"`
+				ConfirmationBlockNumber uint32      `json:"confirmationBlockNumber"`
+			}
+
+			type BatchHeader struct {
+				BlobHeadersRoot       [32]byte `json:"blobHeadersRoot"`
+				QuorumNumbers         []byte   `json:"quorumNumbers"`
+				SignedStakeForQuorums []byte   `json:"signedStakeForQuorums"`
+				ReferenceBlockNumber  uint32   `json:"referenceBlockNumber"`
+			}
+
+		*/
 		blobVerificationProofType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-			{
-				Name: "batchID",
-				Type: "uint32",
-			},
-			{
-				Name: "batchIndex",
-				Type: "uint32",
-			},
-			{
-				Name: "batchMetadata",
-				Type: "tuple",
+			{Name: "batchID", Type: "uint32"},
+			{Name: "blobIndex", Type: "uint32"},
+			{Name: "batchMetadata", Type: "tuple",
 				Components: []abi.ArgumentMarshaling{
-					{
-						Name: "batchHeader",
-						Type: "tuple",
+					{Name: "batchHeader", Type: "tuple",
 						Components: []abi.ArgumentMarshaling{
-							{
-								Name: "blobHeadersRoot",
-								Type: "bytes32",
-							},
-							{
-								Name: "quorumNumbers",
-								Type: "bytes",
-							},
-							{
-								Name: "signedStakeForQuorums",
-								Type: "bytes",
-							},
-							{
-								Name: "referenceBlockNumber",
-								Type: "uint32",
-							},
+							{Name: "blobHeadersRoot", Type: "bytes32"},
+							{Name: "quorumNumbers", Type: "bytes"},
+							{Name: "signedStakeForQuorums", Type: "bytes"},
+							{Name: "referenceBlockNumber", Type: "uint32"},
 						},
 					},
-					{
-						Name: "signatoryRecordHash",
-						Type: "bytes32",
-					},
-					{
-						Name: "confirmationBlockNumber",
-						Type: "uint32",
-					},
+					{Name: "signatoryRecordHash", Type: "bytes32"},
+					{Name: "confirmationBlockNumber", Type: "uint32"},
 				},
 			},
 			{
@@ -968,11 +985,12 @@ func (b *BatchPoster) encodeAddBatch(
 				Type: "bytes",
 			},
 			{
-				Name: "quroumIndices",
+				Name: "quorumIndices",
 				Type: "bytes",
 			},
 		})
 
+		println(fmt.Sprintf("blobVerificationProofType: %+v", blobVerificationProofType))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -994,39 +1012,51 @@ func (b *BatchPoster) encodeAddBatch(
 			return nil, nil, err
 		}
 
+		u256Type, err := abi.NewType("uint256", "", nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		// Create ABI arguments
 		arguments := abi.Arguments{
+			{Type: u256Type},
 			{Type: blobVerificationProofType},
-		}
-
-		// pack arguments
-		// Pack the BlobHeader
-		bvpBytes, err := arguments.Pack(eigenDaBlobInfo.BlobVerificationProof)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Create ABI arguments
-		arguments = abi.Arguments{
 			{Type: blobHeaderType},
+			{Type: u256Type},
+			{Type: u256Type},
+			{Type: u256Type},
 		}
+
+		println("Sequence number ", seqNum.String())
+		// define values array
+		values := make([]interface{}, 6)
+		values[0] = seqNum
+		values[1] = eigenDaBlobInfo.BlobVerificationProof
+		values[2] = eigenDaBlobInfo.BlobHeader
+		values[3] = new(big.Int).SetUint64(delayedMsg)
+		values[4] = new(big.Int).SetUint64(uint64(prevMsgNum))
+		values[5] = new(big.Int).SetUint64(uint64(newMsgNum))
 
 		// pack arguments
 		// Pack the BlobHeader
-		bhBytes, err := arguments.Pack(eigenDaBlobInfo.BlobHeader)
+		calldata, err = arguments.PackValues(values)
+
 		if err != nil {
 			return nil, nil, err
 		}
 
-		calldata, err = method.Inputs.Pack(
-			seqNum,
-			bvpBytes,
-			bhBytes,
-			new(big.Int).SetUint64(delayedMsg),
-			b.config().gasRefunder,
-			new(big.Int).SetUint64(uint64(prevMsgNum)),
-			new(big.Int).SetUint64(uint64(newMsgNum)),
-		)
+		// data := make([]byte, 0)
+
+		// calldata, err = method.Inputs.Pack(
+		// 	seqNum,
+		// 	bvpBytes,
+		// 	bhBytes,
+		// 	new(big.Int).SetUint64(delayedMsg),
+		// 	new(big.Int).SetUint64(uint64(prevMsgNum)),
+		// 	new(big.Int).SetUint64(uint64(newMsgNum)),
+		// )
+		println(fmt.Sprintf("calldata: %s", hexutil.Encode(calldata)))
+		println(fmt.Sprintf("err: %e", err))
 
 	} else {
 		calldata, err = method.Inputs.Pack(
@@ -1043,6 +1073,7 @@ func (b *BatchPoster) encodeAddBatch(
 	}
 	fullCalldata := append([]byte{}, method.ID...)
 	fullCalldata = append(fullCalldata, calldata...)
+	println("Full calldata: %s", hexutil.Encode(fullCalldata))
 	return fullCalldata, kzgBlobs, nil
 }
 
