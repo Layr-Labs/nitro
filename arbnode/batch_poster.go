@@ -908,61 +908,6 @@ func (b *BatchPoster) encodeAddBatch(
 		)
 	} else if useEigenDA {
 
-		println("Using eigenDA and packing calldata inputs")
-		println(fmt.Sprintf("Blob verification proof: %+v", eigenDaBlobInfo.BlobVerificationProof))
-
-		// dump inputs
-		println(fmt.Sprintf("inputs: %+v", method.Inputs))
-
-		println(fmt.Sprintf("inputs @ index 1: %+v", method.Inputs[1]))
-
-		// BlobVerificationProof ABI
-		/*
-
-					        "components": [
-			            {"name": "batchId", "type": "uint32"},
-			            {"name": "blobIndex", "type": "uint32"},
-			            {"components": [
-			                {"components": [
-			                    {"name": "blobHeadersRoot", "type": "bytes32"},
-			                    {"name": "quorumNumbers", "type": "bytes"},
-			                    {"name": "signedStakeForQuorums", "type": "bytes"},
-			                    {"name": "referenceBlockNumber", "type": "uint32"}
-			                ], "name": "batchHeader", "type": "tuple"},
-			                {"name": "signatoryRecordHash", "type": "bytes32"},
-			                {"name": "confirmationBlockNumber", "type": "uint32"}
-			            ], "name": "batchMetadata", "type": "tuple"},
-			            {"name": "inclusionProof", "type": "bytes"},
-			            {"name": "quorumIndices", "type": "bytes"}
-			        ],
-			        "name": "BlobVerificationProof",
-			        "type": "tuple"
-			    }]
-		*/
-
-		/*
-			type BlobVerificationProof struct {
-				BatchID        uint32        `json:"batchId"`
-				BlobIndex      uint32        `json:"blobIndex"`
-				BatchMetadata  BatchMetadata `json:"batchMetadata"`
-				InclusionProof []byte        `json:"inclusionProof"`
-				QuorumIndices  []byte        `json:"quorumIndices"`
-			}
-
-			type BatchMetadata struct {
-				BatchHeader             BatchHeader `json:"batchHeader"`
-				SignatoryRecordHash     [32]byte    `json:"signatoryRecordHash"`
-				ConfirmationBlockNumber uint32      `json:"confirmationBlockNumber"`
-			}
-
-			type BatchHeader struct {
-				BlobHeadersRoot       [32]byte `json:"blobHeadersRoot"`
-				QuorumNumbers         []byte   `json:"quorumNumbers"`
-				SignedStakeForQuorums []byte   `json:"signedStakeForQuorums"`
-				ReferenceBlockNumber  uint32   `json:"referenceBlockNumber"`
-			}
-
-		*/
 		blobVerificationProofType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 			{Name: "batchID", Type: "uint32"},
 			{Name: "blobIndex", Type: "uint32"},
@@ -990,7 +935,6 @@ func (b *BatchPoster) encodeAddBatch(
 			},
 		})
 
-		println(fmt.Sprintf("blobVerificationProofType: %+v", blobVerificationProofType))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1027,7 +971,6 @@ func (b *BatchPoster) encodeAddBatch(
 			{Type: u256Type},
 		}
 
-		println("Sequence number ", seqNum.String())
 		// define values array
 		values := make([]interface{}, 6)
 		values[0] = seqNum
@@ -1044,19 +987,6 @@ func (b *BatchPoster) encodeAddBatch(
 		if err != nil {
 			return nil, nil, err
 		}
-
-		// data := make([]byte, 0)
-
-		// calldata, err = method.Inputs.Pack(
-		// 	seqNum,
-		// 	bvpBytes,
-		// 	bhBytes,
-		// 	new(big.Int).SetUint64(delayedMsg),
-		// 	new(big.Int).SetUint64(uint64(prevMsgNum)),
-		// 	new(big.Int).SetUint64(uint64(newMsgNum)),
-		// )
-		println(fmt.Sprintf("calldata: %s", hexutil.Encode(calldata)))
-		println(fmt.Sprintf("err: %e", err))
 
 	} else {
 		calldata, err = method.Inputs.Pack(

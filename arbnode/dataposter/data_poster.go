@@ -379,6 +379,7 @@ func (p *DataPoster) waitForL1Finality() bool {
 // Returns the next nonce, its metadata if stored, a bool indicating if the metadata is present, the cumulative weight, and an error if present.
 // Unlike GetNextNonceAndMeta, this does not call the metadataRetriever if the metadata is not stored in the queue.
 func (p *DataPoster) getNextNonceAndMaybeMeta(ctx context.Context, thisWeight uint64) (uint64, []byte, bool, uint64, error) {
+	println("getNextNonceAndMaybeMeta")
 	// Ensure latest finalized block state is available.
 	blockNum, err := p.client.BlockNumber(ctx)
 	if err != nil {
@@ -1026,6 +1027,7 @@ const minWait = time.Second * 10
 func (p *DataPoster) Start(ctxIn context.Context) {
 	p.StopWaiter.Start(ctxIn, p)
 	p.CallIteratively(func(ctx context.Context) time.Duration {
+		println("Data poster CallIteratively")
 		p.mutex.Lock()
 		defer p.mutex.Unlock()
 		err := p.updateBalance(ctx)

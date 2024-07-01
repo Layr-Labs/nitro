@@ -10,9 +10,14 @@ import (
 	"net/url"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+func Encode(b []byte) []byte {
+	return append([]byte{byte(0x1), byte(0x0), byte(0x0)}, b...)
+}
 
 type EigenDAProxyClient struct {
 	RPCUrl string
@@ -66,13 +71,17 @@ func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) (*disperser.B
 	return &blobInfo, nil
 }
 
-func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *EigenDABlobInfo, domainFilter string) ([]byte, error) {
+func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *DisperserBlobInfo, domainFilter string) ([]byte, error) {
+
+	println(fmt.Sprintf("Getting blob EIGENDAPROXYCLIENT %+v", blobInfo))
+	println(fmt.Sprintf("Batch header %+v", blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader))
+
 	commitment, err := rlp.EncodeToBytes(blobInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode blob info: %w", err)
 	}
 
-	rpcurl := fmt.Sprintf("%s/get/%s", c.RPCUrl, commitment)
+	rpcurl := fmt.Sprintf("%s/get/%s", c.RPCUrl, hexutil.Encode((Encode(commitment))))
 
 	// if not nil or binary (default) put in the domain filter as a part of the query url
 	if domainFilter != "" && domainFilter != "binary" {

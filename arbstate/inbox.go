@@ -14,6 +14,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/log"
@@ -82,9 +83,12 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		afterDelayedMessages: binary.BigEndian.Uint64(data[32:40]),
 		segments:             [][]byte{},
 	}
+
+	log.Info("Reading calldata payload from sequencer inbox", "calldata", hexutil.Encode(data))
 	payload := data[40:]
 	log.Info("Inbox parse sequencer message: ", "payload", hex.EncodeToString(payload))
 	log.Info("Inbox parse header message: ", "header", hex.EncodeToString(data[:40]))
+	log.Info("Parsed header", "struct", fmt.Sprintf("%+v", parsedMsg))
 
 	// Stage 0: Check if our node is out of date and we don't understand this batch type
 	// If the parent chain sequencer inbox smart contract authenticated this batch,
@@ -99,10 +103,12 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 	// as these headers are validated by the sequencer inbox and not other DASs.
 	// We try to extract payload from the first occuring valid DA provider in the daProviders list
 	if len(payload) > 0 {
+		println("looking for DA provider")
 		foundDA := false
 		var err error
 
 		for _, provider := range daProviders {
+			println(fmt.Sprintf("Reading message from provider: %v", provider))
 			if provider != nil && provider.IsValidHeaderByte(payload[0]) {
 				payload, err = provider.RecoverPayloadFromBatch(ctx, batchNum, batchBlockHash, data, nil, keysetValidationMode)
 				if err != nil {
@@ -437,6 +443,7 @@ const BatchSegmentKindAdvanceL1BlockNumber uint8 = 4
 // Pop returns the message from the top of the sequencer inbox and removes it from the queue.
 // Note: this does *not* return parse errors, those are transformed into invalid messages
 func (r *inboxMultiplexer) Pop(ctx context.Context) (*arbostypes.MessageWithMetadata, error) {
+	println("Popping message from sequencer inbox")
 	if r.cachedSequencerMessage == nil {
 		// Note: batchBlockHash will be zero in the replay binary, but that's fine
 		bytes, batchBlockHash, realErr := r.backend.PeekSequencerInbox()
