@@ -153,16 +153,20 @@ func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 // struct for recovering data from preimage, impl interface EigenDAReader
 
 func (dasReader *PreimageEigenDAReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
-	dataPointer, err := cert.SerializeCommitment()
+	kzgCommit, err := cert.SerializeCommitment()
 	if err != nil {
 		return nil, err
 	}
 	shaDataHash := sha256.New()
-	shaDataHash.Write(dataPointer)
+	shaDataHash.Write(kzgCommit)
 	dataHash := shaDataHash.Sum([]byte{})
 	dataHash[0] = 1
-	// check function eigenda.RecoverPayloadFromEigenDABatch, the data population and data reading should be matched.
-	return wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.BytesToHash(dataHash))
+	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.BytesToHash(dataHash))
+	if err != nil {
+		return nil, err
+	}
+
+	return preimage, nil
 }
 
 // To generate:
