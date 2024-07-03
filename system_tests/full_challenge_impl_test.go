@@ -232,8 +232,6 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		timeBounds,
 		big.NewInt(117964),
 		reader4844,
-		rollupMngr,
-		rollupMngr,
 		false,
 	)
 	Require(t, err)
