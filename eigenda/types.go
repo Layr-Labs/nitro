@@ -2,13 +2,10 @@ package eigenda
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -57,14 +54,6 @@ type BatchMetadata struct {
 	BatchHeaderHash         []byte      `json:"batchHeaderHash"`
 }
 
-/*
-	BlobHeadersRoot       [32]byte
-	QuorumNumbers         []byte
-	SignedStakeForQuorums []byte
-	ReferenceBlockNumber  uint32
-
-*/
-
 type BatchHeader struct {
 	BlobHeadersRoot       [32]byte `json:"blobHeadersRoot"`
 	QuorumNumbers         []byte   `json:"quorumNumbers"`
@@ -72,23 +61,13 @@ type BatchHeader struct {
 	ReferenceBlockNumber  uint32   `json:"referenceBlockNumber"`
 }
 
-func HashBatchHeader(batchHeader BatchHeader) ([32]byte, error) {
-
-	log.Info("Computing batch header hash for EigenDA", "batchHeader", batchHeader)
-
-	// The order here has to match the field ordering of BatchHeader defined in IEigenDAServiceManager.sol
+func (h *DisperserBatchHeader) Encode() ([]byte, error) {
+	// The order here has to match the field ordering of ReducedBatchHeader defined in IEigenDAServiceManager.sol
+	// ref: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
 	batchHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{
-			Name: "batchRoot",
+			Name: "blobHeadersRoot",
 			Type: "bytes32",
-		},
-		{
-			Name: "quorumNumbers",
-			Type: "bytes",
-		},
-		{
-			Name: "confirmationThresholdPercentages",
-			Type: "bytes",
 		},
 		{
 			Name: "referenceBlockNumber",
@@ -96,7 +75,7 @@ func HashBatchHeader(batchHeader BatchHeader) ([32]byte, error) {
 		},
 	})
 	if err != nil {
-		return [32]byte{}, err
+		return nil, err
 	}
 
 	arguments := abi.Arguments{
@@ -105,33 +84,38 @@ func HashBatchHeader(batchHeader BatchHeader) ([32]byte, error) {
 		},
 	}
 
+	bytes32BatchRoot := [32]byte(h.BatchRoot)
+
+	// cast batch root to bytes32
+
 	s := struct {
-		BatchRoot                        [32]byte
-		QuorumNumbers                    []byte
-		ConfirmationThresholdPercentages []byte
-		ReferenceBlockNumber             uint32
+		BlobHeadersRoot      [32]byte
+		ReferenceBlockNumber uint32
 	}{
-		BatchRoot:                        batchHeader.BlobHeadersRoot,
-		QuorumNumbers:                    batchHeader.QuorumNumbers,
-		ConfirmationThresholdPercentages: batchHeader.SignedStakeForQuorums,
-		ReferenceBlockNumber:             uint32(batchHeader.ReferenceBlockNumber),
+		BlobHeadersRoot:      bytes32BatchRoot,
+		ReferenceBlockNumber: uint32(h.ReferenceBlockNumber),
 	}
 
 	bytes, err := arguments.Pack(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes, nil
+}
+
+// GetBatchHeaderHash returns the hash of the reduced BatchHeader that is used to sign the Batch
+// ref: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/libraries/EigenDAHasher.sol#L65
+func (h DisperserBatchHeader) GetBatchHeaderHash() ([32]byte, error) {
+	headerByte, err := h.Encode()
 	if err != nil {
 		return [32]byte{}, err
 	}
 
 	var headerHash [32]byte
 	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write(bytes)
-
-	hash := hasher.Sum(nil)
-	copy(headerHash[:], hash[:32])
-
-	// dump header hash to dynamic byte array
-
-	log.Info("Computed batch header hash for EigenDA", "hash", fmt.Sprintf("%s", hexutil.Encode(hash)))
+	hasher.Write(headerByte)
+	copy(headerHash[:], hasher.Sum(nil)[:32])
 
 	return headerHash, nil
 }
@@ -301,7 +285,7 @@ func (e *EigenDABlobInfo) ToDisperserBlobInfo() (*DisperserBlobInfo, error) {
 
 	// set batchHeaderHash if not set
 
-	batchHeaderHash, err := HashBatchHeader(e.BlobVerificationProof.BatchMetadata.BatchHeader)
+	batchHeaderHash, err := disperserBlobVerificationProof.BatchMetadata.BatchHeader.GetBatchHeaderHash()
 	if err != nil {
 		return nil, err
 	}

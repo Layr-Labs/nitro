@@ -83,8 +83,6 @@ func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDABlobInfo, err
 		return nil, err
 	}
 
-	log.Info("Received the following batch header from EigenDA", "batchHeader", cert.BlobVerificationProof.BatchMetadata)
-
 	blobInfo.LoadBlobInfo(cert)
 
 	return blobInfo, nil
