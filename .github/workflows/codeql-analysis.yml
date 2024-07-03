@@ -26,7 +26,7 @@ jobs:
   analyze:
     name: Analyze
     if: github.repository == 'Layr-Labs/nitro' # don't run in any forks without "Advanced Security" enabled
-    runs-on: linux-xl
+    runs-on: linux-2xl
     permissions:
       actions: read
       contents: read

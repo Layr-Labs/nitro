@@ -13,7 +13,7 @@ on:
 jobs:
   docker:
     name: Docker build
-    runs-on: linux-xl
+    runs-on: linux-2xl
     services:
       # local registery
       registry:
