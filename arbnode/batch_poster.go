@@ -1354,17 +1354,8 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 		log.Info("Start to write data to eigenda: ", "data", hex.EncodeToString(sequencerMsg))
 		blobInfo, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
 		if err != nil {
-			if config.DisableEigenDAFallbackStoreDataOnChain {
-				log.Warn("Falling back to storing data on chain", "err", err)
-				return false, errors.New("unable to post batch to EigenDA and fallback storing data on chain is disabled")
-			}
+			return false, err
 		}
-
-		//sequencerMsg, err = b.eigenDAWriter.Serialize(blobInfo)
-		// if err != nil {
-		// 	log.Warn("DaRef serialization failed", "err", err)
-		// 	return false, errors.New("DaRef serialization failed")
-		// }
 	}
 
 	data, kzgBlobs, err := b.encodeAddBatch(new(big.Int).SetUint64(batchPosition.NextSeqNum), batchPosition.MessageCount, b.building.msgCount, sequencerMsg, b.building.segments.delayedMsg, b.building.use4844, b.building.useEigenDA, blobInfo)

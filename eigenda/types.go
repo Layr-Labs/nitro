@@ -2,9 +2,14 @@ package eigenda
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
+	"golang.org/x/crypto/sha3"
 )
 
 /*
@@ -52,11 +57,83 @@ type BatchMetadata struct {
 	BatchHeaderHash         []byte      `json:"batchHeaderHash"`
 }
 
+/*
+	BlobHeadersRoot       [32]byte
+	QuorumNumbers         []byte
+	SignedStakeForQuorums []byte
+	ReferenceBlockNumber  uint32
+
+*/
+
 type BatchHeader struct {
 	BlobHeadersRoot       [32]byte `json:"blobHeadersRoot"`
 	QuorumNumbers         []byte   `json:"quorumNumbers"`
 	SignedStakeForQuorums []byte   `json:"signedStakeForQuorums"`
 	ReferenceBlockNumber  uint32   `json:"referenceBlockNumber"`
+}
+
+func HashBatchHeader(batchHeader BatchHeader) ([32]byte, error) {
+
+	log.Info("Computing batch header hash for EigenDA", "batchHeader", batchHeader)
+
+	// The order here has to match the field ordering of BatchHeader defined in IEigenDAServiceManager.sol
+	batchHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{
+			Name: "batchRoot",
+			Type: "bytes32",
+		},
+		{
+			Name: "quorumNumbers",
+			Type: "bytes",
+		},
+		{
+			Name: "confirmationThresholdPercentages",
+			Type: "bytes",
+		},
+		{
+			Name: "referenceBlockNumber",
+			Type: "uint32",
+		},
+	})
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	arguments := abi.Arguments{
+		{
+			Type: batchHeaderType,
+		},
+	}
+
+	s := struct {
+		BatchRoot                        [32]byte
+		QuorumNumbers                    []byte
+		ConfirmationThresholdPercentages []byte
+		ReferenceBlockNumber             uint32
+	}{
+		BatchRoot:                        batchHeader.BlobHeadersRoot,
+		QuorumNumbers:                    batchHeader.QuorumNumbers,
+		ConfirmationThresholdPercentages: batchHeader.SignedStakeForQuorums,
+		ReferenceBlockNumber:             uint32(batchHeader.ReferenceBlockNumber),
+	}
+
+	bytes, err := arguments.Pack(s)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	var headerHash [32]byte
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write(bytes)
+
+	hash := hasher.Sum(nil)
+	copy(headerHash[:], hash[:32])
+
+	// dump header hash to dynamic byte array
+
+	log.Info("Computed batch header hash for EigenDA", "hash", fmt.Sprintf("%s", hexutil.Encode(hash)))
+
+	return headerHash, nil
 }
 
 // SerializeCommitment serializes the kzg commitment points to a byte slice
@@ -169,7 +246,7 @@ type DisperserBatchHeader struct {
 /*
 Convert EigenDABlobInfo to DisperserBlobInfo struct for compatibility with proxy server expected type
 */
-func (e *EigenDABlobInfo) ToDisperserBlobInfo() *DisperserBlobInfo {
+func (e *EigenDABlobInfo) ToDisperserBlobInfo() (*DisperserBlobInfo, error) {
 	// Convert BlobHeader
 	var disperserBlobHeader DisperserBlobHeader
 	commitment := G1Commitment{
@@ -222,10 +299,19 @@ func (e *EigenDABlobInfo) ToDisperserBlobInfo() *DisperserBlobInfo {
 		}
 	}
 
+	// set batchHeaderHash if not set
+
+	batchHeaderHash, err := HashBatchHeader(e.BlobVerificationProof.BatchMetadata.BatchHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	disperserBlobVerificationProof.BatchMetadata.BatchHeaderHash = batchHeaderHash[:]
+
 	return &DisperserBlobInfo{
 		BlobHeader:            disperserBlobHeader,
 		BlobVerificationProof: disperserBlobVerificationProof,
-	}
+	}, nil
 }
 
 // InboxPayload is a structured representation of the calldata used for the EigenDA `addSequencerL2BatchFromEigenDA` method call

@@ -150,8 +150,8 @@ func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 	return nil
 }
 
-// struct for recovering data from preimage, impl interface EigenDAReader
-
+// QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
+// certificate kzg commitment for identifying the preimage.
 func (dasReader *PreimageEigenDAReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
 	kzgCommit, err := cert.SerializeCommitment()
 	if err != nil {
@@ -166,7 +166,14 @@ func (dasReader *PreimageEigenDAReader) QueryBlob(ctx context.Context, cert *eig
 		return nil, err
 	}
 
-	return preimage, nil
+	// since the preimage is in encoded co-efficient form, we need to decode it to get the actual blob
+	// i.e,polynomial -> FFT -> length decode -> inverse onec -> blob
+	decodedBlob, err := eigenda.DecodeiFFTBlob(preimage)
+	if err != nil {
+		println("Error decoding blob: ", err)
+		return nil, err
+	}
+	return decodedBlob, nil
 }
 
 // To generate:

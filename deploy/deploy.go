@@ -251,7 +251,7 @@ func DeployOnL1(ctx context.Context, parentChainReader *headerreader.HeaderReade
 			return nil, fmt.Errorf("dummy manager deploy error: %w", err)
 		}
 
-		log.Info("Dummy manager deployed at ", dummyRollupManager.String())
+		log.Info("Dummy eigenda rollup manager deployed", "address", dummyRollupManager.String())
 		eigenDARollupManager = dummyRollupManager
 	}
 
@@ -264,7 +264,7 @@ func DeployOnL1(ctx context.Context, parentChainReader *headerreader.HeaderReade
 			return nil, fmt.Errorf("dummy svc manager deploy error: %w", err)
 		}
 
-		log.Info("Dummy service manager deployed at ", dummySvcManager.String())
+		log.Info("Dummy eigenda service manager", "address", dummySvcManager.String())
 		eigenDASvcManager = dummySvcManager
 
 	}

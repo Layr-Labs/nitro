@@ -61,7 +61,12 @@ func NewEigenDA(proxyServerRpc string) (*EigenDA, error) {
 func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFilter string) ([]byte, error) {
 	log.Info("Querying blob from EigenDA")
 
-	data, err := e.client.Get(ctx, cert.ToDisperserBlobInfo(), domainFilter)
+	info, err := cert.ToDisperserBlobInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := e.client.Get(ctx, info, domainFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -71,12 +76,14 @@ func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFi
 
 // Store disperses a blob to EigenDA and returns the appropriate EigenDABlobInfo or certificate values
 func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDABlobInfo, error) {
-	log.Info("Dispersing blob to EigenDA")
+	log.Info("Dispersing blob to EigenDA", "data", hex.EncodeToString(data))
 	var blobInfo = &EigenDABlobInfo{}
 	cert, err := e.client.Put(ctx, data)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Info("Received the following batch header from EigenDA", "batchHeader", cert.BlobVerificationProof.BatchMetadata)
 
 	blobInfo.LoadBlobInfo(cert)
 

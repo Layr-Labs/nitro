@@ -343,12 +343,14 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 			if v.eigenDAService == nil {
 				log.Warn("EigenDA not configured, but sequencer message found with EigenDA header")
 			} else {
-				// we use the polynomial domain here because this is what we use in the fraud proof pipeline
-				_, err := eigenda.RecoverPayloadFromEigenDABatch(ctx, batch.Data[41:], v.eigenDAService, e.Preimages, "binary")
+				// we fetch the polynomial representation of the blob since its in coefficient form and compatible for
+				// generating witness proofs and kzg commitments within the arbitrator when constructing machine state proofs
+				// for EigenDA preimage types
+				_, err := eigenda.RecoverPayloadFromEigenDABatch(ctx, batch.Data[41:], v.eigenDAService, e.Preimages, "polynomial")
 				if err != nil {
 					return err
 				}
-				log.Info("Recovered polynomial from EigenDA batch", "batch", batch.Number)
+				log.Info("Recovered blob coefficient from EigenDA batch", "batch", batch.Number)
 			}
 		}
 	}
