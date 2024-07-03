@@ -82,6 +82,7 @@ enum DynamicObject {
 #[derive(Clone, Debug)]
 pub struct PendingEvent {
     pub id: JsValue,
+    #[allow(dead_code)]
     pub this: JsValue,
     pub args: Vec<GoValue>,
 }
