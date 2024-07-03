@@ -75,7 +75,6 @@ func (v *JitSpawner) execute(
 		return validator.GoGlobalState{}, fmt.Errorf("unabled to get WASM machine: %w", err)
 	}
 
-	println("Proving execution from JIT spawner in validation server")
 	state, err := machine.prove(ctx, entry)
 	return state, err
 }

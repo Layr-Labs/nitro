@@ -688,6 +688,8 @@ func DeployOnTestL1(
 		nativeToken,
 		maxDataSize,
 		false,
+		common.HexToAddress(0x0),
+		common.HexToAddress(0x0),
 	)
 	Require(t, err)
 	l1info.SetContract("Bridge", addresses.Bridge)

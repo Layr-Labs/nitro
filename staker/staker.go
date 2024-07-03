@@ -96,7 +96,6 @@ type L1ValidatorConfig struct {
 }
 
 func (c *L1ValidatorConfig) ParseStrategy() (StakerStrategy, error) {
-	println("Strategy", strings.ToLower(c.Strategy))
 	switch strings.ToLower(c.Strategy) {
 	case "watchtower":
 		return WatchtowerStrategy, nil

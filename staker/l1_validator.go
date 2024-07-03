@@ -473,7 +473,6 @@ func (v *L1Validator) createNewNodeAction(
 	validatedGS validator.GoGlobalState,
 	lastNodeHashIfExists *common.Hash,
 ) (nodeAction, error) {
-	println("Creating a new node")
 	if !prevInboxMaxCount.IsUint64() {
 		return nil, fmt.Errorf("inbox max count %v isn't a uint64", prevInboxMaxCount)
 	}
