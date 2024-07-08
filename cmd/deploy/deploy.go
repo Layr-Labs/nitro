@@ -37,6 +37,10 @@ func main() {
 
 	ctx := context.Background()
 
+	/* EigenDA dependency contracts */
+	svcManagerString := flag.String("svcManager", "0x0000000000000000000000000000000000000000", "the address of the eigenda service manager contract")
+	daRollupManagerString := flag.String("daRollupManager", "0x0000000000000000000000000000000000000000", "the address of the eigenda rollup manager contract")
+
 	l1conn := flag.String("l1conn", "", "l1 connection")
 	l1keystore := flag.String("l1keystore", "", "l1 private key store")
 	deployAccount := flag.String("l1DeployAccount", "", "l1 seq account to use (default is first account in keystore)")
@@ -178,6 +182,9 @@ func main() {
 	defer l1Reader.StopAndWait()
 
 	nativeToken := common.HexToAddress(*nativeTokenAddressString)
+	eigenDASvcManager := common.HexToAddress(*svcManagerString)
+	eigenDARollupManager := common.HexToAddress(*daRollupManagerString)
+
 	deployedAddresses, err := deploycode.DeployOnL1(
 		ctx,
 		l1Reader,
@@ -189,6 +196,8 @@ func main() {
 		nativeToken,
 		maxDataSize,
 		*isUsingFeeToken,
+		eigenDASvcManager,
+		eigenDARollupManager,
 	)
 	if err != nil {
 		flag.Usage()
