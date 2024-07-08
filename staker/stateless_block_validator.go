@@ -5,6 +5,7 @@ package staker
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"testing"
@@ -269,6 +270,7 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 		for _, dapReader := range v.dapReaders {
 			if dapReader != nil && dapReader.IsValidHeaderByte(batch.Data[40]) {
 				preimageRecorder := daprovider.RecordPreimagesTo(e.Preimages)
+				println("Recovering payload from batch: ", batch.Number, " with data: ", hex.EncodeToString(batch.Data))
 				_, err := dapReader.RecoverPayloadFromBatch(ctx, batch.Number, batch.BlockHash, batch.Data, preimageRecorder, true)
 				if err != nil {
 					// Matches the way keyset validation was done inside DAS readers i.e logging the error
@@ -286,21 +288,6 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 		if !foundDA {
 			if daprovider.IsDASMessageHeaderByte(batch.Data[40]) {
 				log.Error("No DAS Reader configured, but sequencer message found with DAS header")
-			}
-		}
-
-		if eigenda.IsEigenDAMessageHeaderByte(batch.Data[40]) {
-			if v.eigenDAService == nil {
-				log.Warn("EigenDA not configured, but sequencer message found with EigenDA header")
-			} else {
-				// we fetch the polynomial representation of the blob since its in coefficient form and compatible for
-				// generating witness proofs and kzg commitments within the arbitrator when constructing machine state proofs
-				// for EigenDA preimage types
-				_, err := eigenda.RecoverPayloadFromEigenDABatch(ctx, batch.Data[41:], v.eigenDAService, e.Preimages, "polynomial")
-				if err != nil {
-					return err
-				}
-				log.Info("Recovered blob coefficient from EigenDA batch", "batch", batch.Number)
 			}
 		}
 	}

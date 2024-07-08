@@ -2,16 +2,11 @@ package eigenda
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
-	"errors"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/offchainlabs/nitro/arbutil"
+	"github.com/offchainlabs/nitro/arbstate/daprovider"
 )
 
 const (
@@ -20,11 +15,9 @@ const (
 	sequencerInboxABI = `[{"type":"constructor","inputs":[{"name":"_maxDataSize","type":"uint256","internalType":"uint256"},{"name":"reader4844_","type":"address","internalType":"contract IReader4844"},{"name":"eigenDAServiceManager_","type":"address","internalType":"contract IEigenDAServiceManager"},{"name":"eigenDARollupManager_","type":"address","internalType":"contract IRollupManager"},{"name":"_isUsingFeeToken","type":"bool","internalType":"bool"}],"stateMutability":"nonpayable"},{"type":"function","name":"BROTLI_MESSAGE_HEADER_FLAG","inputs":[],"outputs":[{"name":"","type":"bytes1","internalType":"bytes1"}],"stateMutability":"view"},{"type":"function","name":"DAS_MESSAGE_HEADER_FLAG","inputs":[],"outputs":[{"name":"","type":"bytes1","internalType":"bytes1"}],"stateMutability":"view"},{"type":"function","name":"DATA_AUTHENTICATED_FLAG","inputs":[],"outputs":[{"name":"","type":"bytes1","internalType":"bytes1"}],"stateMutability":"view"},{"type":"function","name":"DATA_BLOB_HEADER_FLAG","inputs":[],"outputs":[{"name":"","type":"bytes1","internalType":"bytes1"}],"stateMutability":"view"},{"type":"function","name":"EIGENDA_MESSAGE_HEADER_FLAG","inputs":[],"outputs":[{"name":"","type":"bytes1","internalType":"bytes1"}],"stateMutability":"view"},{"type":"function","name":"HEADER_LENGTH","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},{"type":"function","name":"TREE_DAS_MESSAGE_HEADER_FLAG","inputs":[],"outputs":[{"name":"","type":"bytes1","internalType":"bytes1"}],"stateMutability":"view"},{"type":"function","name":"ZERO_HEAVY_MESSAGE_HEADER_FLAG","inputs":[],"outputs":[{"name":"","type":"bytes1","internalType":"bytes1"}],"stateMutability":"view"},{"type":"function","name":"addSequencerL2Batch","inputs":[{"name":"sequenceNumber","type":"uint256","internalType":"uint256"},{"name":"data","type":"bytes","internalType":"bytes"},{"name":"afterDelayedMessagesRead","type":"uint256","internalType":"uint256"},{"name":"gasRefunder","type":"address","internalType":"contract IGasRefunder"},{"name":"prevMessageCount","type":"uint256","internalType":"uint256"},{"name":"newMessageCount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"addSequencerL2BatchFromBlobs","inputs":[{"name":"sequenceNumber","type":"uint256","internalType":"uint256"},{"name":"afterDelayedMessagesRead","type":"uint256","internalType":"uint256"},{"name":"gasRefunder","type":"address","internalType":"contract IGasRefunder"},{"name":"prevMessageCount","type":"uint256","internalType":"uint256"},{"name":"newMessageCount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"addSequencerL2BatchFromEigenDA","inputs":[{"name":"sequenceNumber","type":"uint256","internalType":"uint256"},{"name":"blobVerificationProof","type":"tuple","internalType":"struct EigenDARollupUtils.BlobVerificationProof","components":[{"name":"batchId","type":"uint32","internalType":"uint32"},{"name":"blobIndex","type":"uint32","internalType":"uint32"},{"name":"batchMetadata","type":"tuple","internalType":"struct IEigenDAServiceManager.BatchMetadata","components":[{"name":"batchHeader","type":"tuple","internalType":"struct IEigenDAServiceManager.BatchHeader","components":[{"name":"blobHeadersRoot","type":"bytes32","internalType":"bytes32"},{"name":"quorumNumbers","type":"bytes","internalType":"bytes"},{"name":"signedStakeForQuorums","type":"bytes","internalType":"bytes"},{"name":"referenceBlockNumber","type":"uint32","internalType":"uint32"}]},{"name":"signatoryRecordHash","type":"bytes32","internalType":"bytes32"},{"name":"confirmationBlockNumber","type":"uint32","internalType":"uint32"}]},{"name":"inclusionProof","type":"bytes","internalType":"bytes"},{"name":"quorumIndices","type":"bytes","internalType":"bytes"}]},{"name":"blobHeader","type":"tuple","internalType":"struct IEigenDAServiceManager.BlobHeader","components":[{"name":"commitment","type":"tuple","internalType":"struct BN254.G1Point","components":[{"name":"X","type":"uint256","internalType":"uint256"},{"name":"Y","type":"uint256","internalType":"uint256"}]},{"name":"dataLength","type":"uint32","internalType":"uint32"},{"name":"quorumBlobParams","type":"tuple[]","internalType":"struct IEigenDAServiceManager.QuorumBlobParam[]","components":[{"name":"quorumNumber","type":"uint8","internalType":"uint8"},{"name":"adversaryThresholdPercentage","type":"uint8","internalType":"uint8"},{"name":"confirmationThresholdPercentage","type":"uint8","internalType":"uint8"},{"name":"chunkLength","type":"uint32","internalType":"uint32"}]}]},{"name":"afterDelayedMessagesRead","type":"uint256","internalType":"uint256"},{"name":"prevMessageCount","type":"uint256","internalType":"uint256"},{"name":"newMessageCount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"addSequencerL2BatchFromOrigin","inputs":[{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"bytes","internalType":"bytes"},{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"address","internalType":"contract IGasRefunder"}],"outputs":[],"stateMutability":"pure"},{"type":"function","name":"addSequencerL2BatchFromOrigin","inputs":[{"name":"sequenceNumber","type":"uint256","internalType":"uint256"},{"name":"data","type":"bytes","internalType":"bytes"},{"name":"afterDelayedMessagesRead","type":"uint256","internalType":"uint256"},{"name":"gasRefunder","type":"address","internalType":"contract IGasRefunder"},{"name":"prevMessageCount","type":"uint256","internalType":"uint256"},{"name":"newMessageCount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"batchCount","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},{"type":"function","name":"batchPosterManager","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},{"type":"function","name":"bridge","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IBridge"}],"stateMutability":"view"},{"type":"function","name":"dasKeySetInfo","inputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"outputs":[{"name":"isValidKeyset","type":"bool","internalType":"bool"},{"name":"creationBlock","type":"uint64","internalType":"uint64"}],"stateMutability":"view"},{"type":"function","name":"eigenDARollupManager","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IRollupManager"}],"stateMutability":"view"},{"type":"function","name":"eigenDAServiceManager","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IEigenDAServiceManager"}],"stateMutability":"view"},{"type":"function","name":"forceInclusion","inputs":[{"name":"_totalDelayedMessagesRead","type":"uint256","internalType":"uint256"},{"name":"kind","type":"uint8","internalType":"uint8"},{"name":"l1BlockAndTime","type":"uint64[2]","internalType":"uint64[2]"},{"name":"baseFeeL1","type":"uint256","internalType":"uint256"},{"name":"sender","type":"address","internalType":"address"},{"name":"messageDataHash","type":"bytes32","internalType":"bytes32"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"getKeysetCreationBlock","inputs":[{"name":"ksHash","type":"bytes32","internalType":"bytes32"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},{"type":"function","name":"inboxAccs","inputs":[{"name":"index","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"stateMutability":"view"},{"type":"function","name":"initialize","inputs":[{"name":"bridge_","type":"address","internalType":"contract IBridge"},{"name":"maxTimeVariation_","type":"tuple","internalType":"struct ISequencerInbox.MaxTimeVariation","components":[{"name":"delayBlocks","type":"uint256","internalType":"uint256"},{"name":"futureBlocks","type":"uint256","internalType":"uint256"},{"name":"delaySeconds","type":"uint256","internalType":"uint256"},{"name":"futureSeconds","type":"uint256","internalType":"uint256"}]}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"invalidateKeysetHash","inputs":[{"name":"ksHash","type":"bytes32","internalType":"bytes32"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"isBatchPoster","inputs":[{"name":"","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},{"type":"function","name":"isSequencer","inputs":[{"name":"","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},{"type":"function","name":"isUsingFeeToken","inputs":[],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},{"type":"function","name":"isValidKeysetHash","inputs":[{"name":"ksHash","type":"bytes32","internalType":"bytes32"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},{"type":"function","name":"maxDataSize","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},{"type":"function","name":"maxTimeVariation","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},{"type":"function","name":"postUpgradeInit","inputs":[],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"reader4844","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IReader4844"}],"stateMutability":"view"},{"type":"function","name":"removeDelayAfterFork","inputs":[],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"rollup","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IOwnable"}],"stateMutability":"view"},{"type":"function","name":"setBatchPosterManager","inputs":[{"name":"newBatchPosterManager","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"setIsBatchPoster","inputs":[{"name":"addr","type":"address","internalType":"address"},{"name":"isBatchPoster_","type":"bool","internalType":"bool"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"setIsSequencer","inputs":[{"name":"addr","type":"address","internalType":"address"},{"name":"isSequencer_","type":"bool","internalType":"bool"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"setMaxTimeVariation","inputs":[{"name":"maxTimeVariation_","type":"tuple","internalType":"struct ISequencerInbox.MaxTimeVariation","components":[{"name":"delayBlocks","type":"uint256","internalType":"uint256"},{"name":"futureBlocks","type":"uint256","internalType":"uint256"},{"name":"delaySeconds","type":"uint256","internalType":"uint256"},{"name":"futureSeconds","type":"uint256","internalType":"uint256"}]}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"setValidKeyset","inputs":[{"name":"keysetBytes","type":"bytes","internalType":"bytes"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"totalDelayedMessagesRead","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},{"type":"event","name":"InboxMessageDelivered","inputs":[{"name":"messageNum","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"data","type":"bytes","indexed":false,"internalType":"bytes"}],"anonymous":false},{"type":"event","name":"InboxMessageDeliveredFromOrigin","inputs":[{"name":"messageNum","type":"uint256","indexed":true,"internalType":"uint256"}],"anonymous":false},{"type":"event","name":"InvalidateKeyset","inputs":[{"name":"keysetHash","type":"bytes32","indexed":true,"internalType":"bytes32"}],"anonymous":false},{"type":"event","name":"OwnerFunctionCalled","inputs":[{"name":"id","type":"uint256","indexed":true,"internalType":"uint256"}],"anonymous":false},{"type":"event","name":"SequencerBatchData","inputs":[{"name":"batchSequenceNumber","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"data","type":"bytes","indexed":false,"internalType":"bytes"}],"anonymous":false},{"type":"event","name":"SequencerBatchDelivered","inputs":[{"name":"batchSequenceNumber","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"beforeAcc","type":"bytes32","indexed":true,"internalType":"bytes32"},{"name":"afterAcc","type":"bytes32","indexed":true,"internalType":"bytes32"},{"name":"delayedAcc","type":"bytes32","indexed":false,"internalType":"bytes32"},{"name":"afterDelayedMessagesRead","type":"uint256","indexed":false,"internalType":"uint256"},{"name":"timeBounds","type":"tuple","indexed":false,"internalType":"struct IBridge.TimeBounds","components":[{"name":"minTimestamp","type":"uint64","internalType":"uint64"},{"name":"maxTimestamp","type":"uint64","internalType":"uint64"},{"name":"minBlockNumber","type":"uint64","internalType":"uint64"},{"name":"maxBlockNumber","type":"uint64","internalType":"uint64"}]},{"name":"dataLocation","type":"uint8","indexed":false,"internalType":"enum IBridge.BatchDataLocation"}],"anonymous":false},{"type":"event","name":"SetValidKeyset","inputs":[{"name":"keysetHash","type":"bytes32","indexed":true,"internalType":"bytes32"},{"name":"keysetBytes","type":"bytes","indexed":false,"internalType":"bytes"}],"anonymous":false},{"type":"error","name":"AlreadyInit","inputs":[]},{"type":"error","name":"AlreadyValidDASKeyset","inputs":[{"name":"","type":"bytes32","internalType":"bytes32"}]},{"type":"error","name":"BadMaxTimeVariation","inputs":[]},{"type":"error","name":"BadPostUpgradeInit","inputs":[]},{"type":"error","name":"BadSequencerNumber","inputs":[{"name":"stored","type":"uint256","internalType":"uint256"},{"name":"received","type":"uint256","internalType":"uint256"}]},{"type":"error","name":"DataBlobsNotSupported","inputs":[]},{"type":"error","name":"DataTooLarge","inputs":[{"name":"dataLength","type":"uint256","internalType":"uint256"},{"name":"maxDataLength","type":"uint256","internalType":"uint256"}]},{"type":"error","name":"DelayedBackwards","inputs":[]},{"type":"error","name":"DelayedTooFar","inputs":[]},{"type":"error","name":"Deprecated","inputs":[]},{"type":"error","name":"ForceIncludeBlockTooSoon","inputs":[]},{"type":"error","name":"ForceIncludeTimeTooSoon","inputs":[]},{"type":"error","name":"HadZeroInit","inputs":[]},{"type":"error","name":"IncorrectMessagePreimage","inputs":[]},{"type":"error","name":"InitParamZero","inputs":[{"name":"name","type":"string","internalType":"string"}]},{"type":"error","name":"InvalidHeaderFlag","inputs":[{"name":"","type":"bytes1","internalType":"bytes1"}]},{"type":"error","name":"MissingDataHashes","inputs":[]},{"type":"error","name":"NativeTokenMismatch","inputs":[]},{"type":"error","name":"NoSuchKeyset","inputs":[{"name":"","type":"bytes32","internalType":"bytes32"}]},{"type":"error","name":"NotBatchPoster","inputs":[]},{"type":"error","name":"NotBatchPosterManager","inputs":[{"name":"","type":"address","internalType":"address"}]},{"type":"error","name":"NotForked","inputs":[]},{"type":"error","name":"NotOrigin","inputs":[]},{"type":"error","name":"NotOwner","inputs":[{"name":"sender","type":"address","internalType":"address"},{"name":"owner","type":"address","internalType":"address"}]}]`
 )
 
-// EigenDAMessageHeaderFlag indicates the message is an EigenDA message
-const EigenDAMessageHeaderFlag byte = 0xed
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
-	return hasBits(EigenDAMessageHeaderFlag, header)
+	return hasBits(daprovider.EigenDAMessageHeaderFlag, header)
 }
 
 // hasBits returns true if `checking` has all `bits`
@@ -90,84 +83,4 @@ func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDABlobInfo, err
 
 func (e *EigenDA) Serialize(blobInfo *EigenDABlobInfo) ([]byte, error) {
 	return rlp.EncodeToBytes(blobInfo)
-}
-
-func RecoverPayloadFromEigenDABatch(ctx context.Context,
-	sequencerMsg []byte,
-	daReader EigenDAReader,
-	preimages map[arbutil.PreimageType]map[common.Hash][]byte,
-	domain string,
-) ([]byte, error) {
-	log.Info("Start recovering payload from eigenda: ", "data", hex.EncodeToString(sequencerMsg))
-	var eigenDAPreimages map[common.Hash][]byte
-	if preimages != nil {
-		if preimages[arbutil.EigenDaPreimageType] == nil {
-			preimages[arbutil.EigenDaPreimageType] = make(map[common.Hash][]byte)
-		}
-		eigenDAPreimages = preimages[arbutil.EigenDaPreimageType]
-	}
-
-	blobInfo, err := ParseSequencerMsg(sequencerMsg)
-	if err != nil {
-		log.Error("Failed to parse sequencer message", "err", err)
-		return nil, err
-	}
-
-	data, err := daReader.QueryBlob(ctx, blobInfo, domain)
-	if err != nil {
-		log.Error("Failed to query data from EigenDA", "err", err)
-		return nil, err
-	}
-
-	// record preimage data for EigenDA using the hash of the commitment
-	// for lookups in the replay script
-	kzgCommit, err := blobInfo.SerializeCommitment()
-	if err != nil {
-		return nil, err
-	}
-	shaDataHash := sha256.New()
-	shaDataHash.Write(kzgCommit)
-	dataHash := shaDataHash.Sum([]byte{})
-	dataHash[0] = 1
-	if eigenDAPreimages != nil {
-		eigenDAPreimages[common.BytesToHash(dataHash)] = data
-	}
-	return data, nil
-}
-
-// ParseSequencerMsg parses the inbox tx calldata into a structured EigenDABlobInfo
-func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
-
-	if len(calldata) < 4 {
-		return nil, errors.New("calldata is shorter than expected method signature length")
-	}
-
-	// TODO: Construct the ABI struct at node initialization
-	abi, err := abi.JSON(strings.NewReader(sequencerInboxABI))
-	if err != nil {
-		return nil, err
-	}
-
-	method, err := abi.MethodById(calldata[0:4])
-	if err != nil {
-		return nil, err
-	}
-
-	callDataValues, err := method.Inputs.Unpack(calldata[4:])
-	if err != nil {
-		return nil, err
-	}
-
-	inboxPayload := &InboxPayload{}
-
-	err = inboxPayload.Load(callDataValues)
-	if err != nil {
-		return nil, err
-	}
-
-	return &EigenDABlobInfo{
-		BlobVerificationProof: inboxPayload.BlobVerificationProof,
-		BlobHeader:            inboxPayload.BlobHeader,
-	}, nil
-
 }

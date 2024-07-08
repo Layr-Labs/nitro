@@ -7,13 +7,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -63,11 +63,7 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		segments:             [][]byte{},
 	}
 
-	log.Info("Reading calldata payload from sequencer inbox", "calldata", hexutil.Encode(data))
 	payload := data[40:]
-	log.Info("Inbox parse sequencer message: ", "payload", hex.EncodeToString(payload))
-	log.Info("Inbox parse header message: ", "header", hex.EncodeToString(data[:40]))
-	log.Info("Parsed header", "struct", fmt.Sprintf("%+v", parsedMsg))
 
 	// Stage 0: Check if our node is out of date and we don't understand this batch type
 	// If the parent chain sequencer inbox smart contract authenticated this batch,
@@ -87,6 +83,7 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		var err error
 		for _, dapReader := range dapReaders {
 			if dapReader != nil && dapReader.IsValidHeaderByte(payload[0]) {
+				println(fmt.Sprintf("Data being sent for recovery: %s", hexutil.Encode(payload)))
 				payload, err = dapReader.RecoverPayloadFromBatch(ctx, batchNum, batchBlockHash, data, nil, keysetValidationMode != daprovider.KeysetDontValidate)
 				if err != nil {
 					// Matches the way keyset validation was done inside DAS readers i.e logging the error

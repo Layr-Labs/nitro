@@ -124,9 +124,6 @@ func (dasReader *PreimageDASReader) ExpirationPolicy(ctx context.Context) (dapro
 }
 
 type BlobPreimageReader struct{}
-
-type PreimageEigenDAReader struct{}
-
 func (r *BlobPreimageReader) GetBlobs(
 	ctx context.Context,
 	batchBlockHash common.Hash,
@@ -152,18 +149,26 @@ func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 	return nil
 }
 
+
+type EigenDAPreimageReader struct{}
 // QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
 // certificate kzg commitment for identifying the preimage.
-func (dasReader *PreimageEigenDAReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
+func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
 	kzgCommit, err := cert.SerializeCommitment()
 	if err != nil {
 		return nil, err
 	}
+
+	println("kzgCommit: ", hex.EncodeToString(kzgCommit))
 	shaDataHash := sha256.New()
 	shaDataHash.Write(kzgCommit)
 	dataHash := shaDataHash.Sum([]byte{})
 	dataHash[0] = 1
-	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.BytesToHash(dataHash))
+
+	hash := common.BytesToHash(dataHash)
+	println("Querying blob for hash: ", hash.String())
+
+	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +182,8 @@ func (dasReader *PreimageEigenDAReader) QueryBlob(ctx context.Context, cert *eig
 	}
 	return decodedBlob, nil
 }
+
+
 
 // To generate:
 // key, _ := crypto.HexToECDSA("0000000000000000000000000000000000000000000000000000000000000001")
@@ -234,10 +241,11 @@ func main() {
 			delayedMessagesRead = lastBlockHeader.Nonce.Uint64()
 		}
 		var dasReader daprovider.DASReader
+		var eigenDAReader *EigenDAPreimageReader
 		if dasEnabled {
 			dasReader = &PreimageDASReader{}
 		} else if eigenDAEnabled {
-			eigenDAReader = &PreimageEigenDAReader{}
+			eigenDAReader = &EigenDAPreimageReader{}
 		}
 		backend := WavmInbox{}
 		var keysetValidationMode = daprovider.KeysetPanicIfInvalid
@@ -248,6 +256,10 @@ func main() {
 		if dasReader != nil {
 			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader))
 		}
+		if eigenDAReader != nil {
+			dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
+		}
+
 		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(&BlobPreimageReader{}))
 		inboxMultiplexer := arbstate.NewInboxMultiplexer(backend, delayedMessagesRead, dapReaders, keysetValidationMode)
 		ctx := context.Background()
@@ -301,7 +313,7 @@ func main() {
 			}
 		}
 
-		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee, chainConfig.ArbitrumChainParams.EigenDA)
+		message := readMessage(false, true)
 
 		chainContext := WavmChainContext{}
 		batchFetcher := func(batchNum uint64) ([]byte, error) {

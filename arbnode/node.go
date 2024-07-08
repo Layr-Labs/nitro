@@ -522,11 +522,11 @@ func createNodeImpl(
 		return nil, err
 	}
 
+	var eigenDAReader eigenda.EigenDAReader
+	var eigenDAWriter eigenda.EigenDAWriter
 	var daWriter das.DataAvailabilityServiceWriter
 	var daReader das.DataAvailabilityServiceReader
 	var dasLifecycleManager *das.LifecycleManager
-	var eigenDAReader eigenda.EigenDAReader
-	var eigenDAWriter eigenda.EigenDAWriter
 	if config.DataAvailability.Enable {
 		if config.BatchPoster.Enable {
 			daWriter, daReader, dasLifecycleManager, err = das.CreateBatchPosterDAS(ctx, &config.DataAvailability, dataSigner, l1client, deployInfo.SequencerInbox)
@@ -564,6 +564,9 @@ func createNodeImpl(
 		return nil, errors.New("data availability service required but unconfigured")
 	}
 	var dapReaders []daprovider.Reader
+	if eigenDAReader != nil {
+		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
+	}
 	if daReader != nil {
 		dapReaders = append(dapReaders, daprovider.NewReaderForDAS(daReader))
 	}
@@ -697,6 +700,7 @@ func createNodeImpl(
 		if daWriter != nil {
 			dapWriter = daprovider.NewWriterForDAS(daWriter)
 		}
+
 		batchPoster, err = NewBatchPoster(ctx, &BatchPosterOpts{
 			DataPosterDB:  rawdb.NewTable(arbDb, storage.BatchPosterPrefix),
 			L1Reader:      l1Reader,
@@ -708,6 +712,7 @@ func createNodeImpl(
 			DeployInfo:    deployInfo,
 			TransactOpts:  txOptsBatchPoster,
 			DAPWriter:     dapWriter,
+			EigenDAWriter: eigenDAWriter,
 			ParentChainID: parentChainID,
 		})
 		if err != nil {

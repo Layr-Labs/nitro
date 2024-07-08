@@ -3047,11 +3047,9 @@ impl Machine {
                                     .expect("Failed to generate KZG preimage proof");
                             }
                             PreimageType::EigenDAHash => {
-                                // TODO - Add eigenDA kzg preimage verification here
                                 println!("Generating proof for EigenDA preimage");
                                 prove_kzg_preimage_bn254(hash, &preimage, offset, &mut data)
                                     .expect("Failed to generate eigenDA KZG preimage proof");
-                                //data.extend(preimage);
                             }
                         }
                     } else if next_inst.opcode == Opcode::ReadInboxMessage {

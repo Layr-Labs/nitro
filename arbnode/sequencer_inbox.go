@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/arbutil"
-	"github.com/offchainlabs/nitro/eigenda"
 
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 )
@@ -180,14 +179,11 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 		calldata := tx.Data()
 		println("appending EigenDA message header flag to calldata")
 		// append the eigenDA header flag to the front
-		data := []byte{eigenda.EigenDAMessageHeaderFlag}
+		data := []byte{daprovider.EigenDAMessageHeaderFlag}
 		data = append(data, calldata[:]...)
 
 		println(fmt.Sprintf("Returning the following calldata: %s", hexutil.Encode(data)))
-
-		// format of eigenDA data is
-		// [0 - 1] header flag
-		// [1 - len(data)] calldata
+		
 		return data, nil
 	default:
 		return nil, fmt.Errorf("batch has invalid data location %v", m.dataLocation)
