@@ -11,7 +11,6 @@ import (
 )
 
 type Writer interface {
-	Type() string
 	// Store posts the batch data to the invoking DA provider
 	// And returns sequencerMsg which is later used to retrieve the batch data
 	Store(
@@ -45,8 +44,4 @@ func (d *writerForDAS) Store(ctx context.Context, message []byte, timeout uint64
 	} else {
 		return Serialize(cert), nil
 	}
-}
-
-func (d *writerForDAS) Type() string {
-	return "DAS"
 }

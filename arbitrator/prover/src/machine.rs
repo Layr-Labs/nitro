@@ -8,7 +8,10 @@ use crate::{
         self, parse, ExportKind, ExportMap, FloatInstruction, Local, NameCustomSection, WasmBinary,
     },
     host,
+<<<<<<< HEAD
     kzgbn254::prove_kzg_preimage_bn254,
+=======
+>>>>>>> 3ecd01ebcf768025ecadb96e50b90d89bc4c6bc5
     memory::Memory,
     merkle::{Merkle, MerkleType},
     programs::{config::CompileConfig, meter::MeteredMachine, ModuleMod, StylusData},

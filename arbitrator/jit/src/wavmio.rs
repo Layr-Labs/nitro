@@ -186,6 +186,15 @@ pub fn resolve_preimage_impl(
         );
     }
 
+    if calculated_hash != *hash {
+        error!(
+            "Calculated hash {} of preimage {} does not match provided hash {}",
+            hex::encode(calculated_hash),
+            hex::encode(preimage),
+            hex::encode(*hash)
+        );
+    }
+
     if offset % 32 != 0 {
         error!("bad offset {offset} in {name}")
     };
