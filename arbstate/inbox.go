@@ -14,6 +14,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/log"
@@ -25,7 +26,7 @@ import (
 	"github.com/offchainlabs/nitro/arbos/l1pricing"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/das/dastree"
-	"github.com/offchainlabs/nitro/das/eigenda"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/util/blobs"
 	"github.com/offchainlabs/nitro/zeroheavy"
 )
@@ -70,7 +71,7 @@ var (
 	ErrInvalidBlobDataFormat = errors.New("blob batch data is not a list of hashes as expected")
 )
 
-func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash common.Hash, data []byte, daProviders []DataAvailabilityProvider, eigenDAReader eigenda.EigenDAReader, keysetValidationMode KeysetValidationMode) (*sequencerMessage, error) {
+func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash common.Hash, data []byte, daProviders []DataAvailabilityProvider, keysetValidationMode KeysetValidationMode) (*sequencerMessage, error) {
 	if len(data) < 40 {
 		return nil, errors.New("sequencer message missing L1 header")
 	}
@@ -82,8 +83,12 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		afterDelayedMessages: binary.BigEndian.Uint64(data[32:40]),
 		segments:             [][]byte{},
 	}
+
+	log.Info("Reading calldata payload from sequencer inbox", "calldata", hexutil.Encode(data))
 	payload := data[40:]
 	log.Info("Inbox parse sequencer message: ", "payload", hex.EncodeToString(payload))
+	log.Info("Inbox parse header message: ", "header", hex.EncodeToString(data[:40]))
+	log.Info("Parsed header", "struct", fmt.Sprintf("%+v", parsedMsg))
 
 	// Stage 0: Check if our node is out of date and we don't understand this batch type
 	// If the parent chain sequencer inbox smart contract authenticated this batch,
@@ -98,27 +103,12 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 	// as these headers are validated by the sequencer inbox and not other DASs.
 	// We try to extract payload from the first occuring valid DA provider in the daProviders list
 	if len(payload) > 0 {
+		println("looking for DA provider")
 		foundDA := false
 		var err error
 
-		// detect eigenda message from byte
-		if eigenda.IsEigenDAMessageHeaderByte(payload[0]) {
-			if eigenDAReader == nil {
-				log.Error("No EigenDA Reader configured, but sequencer message found with EigenDA header")
-			} else {
-				var err error
-				payload, err = eigenda.RecoverPayloadFromEigenDABatch(ctx, payload[1:], eigenDAReader, nil)
-				if err != nil {
-					return nil, err
-				}
-				if payload == nil {
-					return parsedMsg, nil
-				}
-				foundDA = true
-			}
-		}
-
 		for _, provider := range daProviders {
+			println(fmt.Sprintf("Reading message from provider: %v", provider))
 			if provider != nil && provider.IsValidHeaderByte(payload[0]) {
 				payload, err = provider.RecoverPayloadFromBatch(ctx, batchNum, batchBlockHash, data, nil, keysetValidationMode)
 				if err != nil {
@@ -137,6 +127,8 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 				log.Error("No DAS Reader configured, but sequencer message found with DAS header")
 			} else if IsBlobHashesHeaderByte(payload[0]) {
 				return nil, ErrNoBlobReader
+			} else if eigenda.IsEigenDAMessageHeaderByte(payload[0]) {
+				log.Error("eigenDA versioned batch payload was encountered but no instance of EigenDA was configured")
 			}
 		}
 	}
@@ -385,6 +377,35 @@ func (b *dAProviderForBlobReader) RecoverPayloadFromBatch(
 	return payload, nil
 }
 
+// NewDAProviderEigenDA is generally meant to be only used by nitro.
+// DA Providers should implement methods in the DataAvailabilityProvider interface independently
+func NewDAProviderEigenDA(eigenDAReader eigenda.EigenDAReader) *daProviderForEigenDA {
+	return &daProviderForEigenDA{
+		eigenDAReader: eigenDAReader,
+	}
+}
+
+type daProviderForEigenDA struct {
+	eigenDAReader eigenda.EigenDAReader
+}
+
+func (e *daProviderForEigenDA) IsValidHeaderByte(headerByte byte) bool {
+	return eigenda.IsEigenDAMessageHeaderByte(headerByte)
+}
+
+func (e *daProviderForEigenDA) RecoverPayloadFromBatch(
+	ctx context.Context,
+	batchNum uint64,
+	batchBlockHash common.Hash,
+	sequencerMsg []byte,
+	preimages map[arbutil.PreimageType]map[common.Hash][]byte,
+	keysetValidationMode KeysetValidationMode,
+) ([]byte, error) {
+	// we start from the 41st byte of sequencerMsg because bytes 0 - 40 are the header, and 40 - 41 is the eigenDA header flag
+	// we use the binary domain here because this is what we use in the derivation pipeline
+	return eigenda.RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], e.eigenDAReader, preimages, "binary")
+}
+
 type KeysetValidationMode uint8
 
 const KeysetValidate KeysetValidationMode = 0
@@ -395,7 +416,6 @@ type inboxMultiplexer struct {
 	backend                   InboxBackend
 	delayedMessagesRead       uint64
 	daProviders               []DataAvailabilityProvider
-	eigenDAReader             eigenda.EigenDAReader
 	cachedSequencerMessage    *sequencerMessage
 	cachedSequencerMessageNum uint64
 	cachedSegmentNum          uint64
@@ -405,12 +425,11 @@ type inboxMultiplexer struct {
 	keysetValidationMode      KeysetValidationMode
 }
 
-func NewInboxMultiplexer(backend InboxBackend, delayedMessagesRead uint64, daProviders []DataAvailabilityProvider, eigenDAReader eigenda.EigenDAReader, keysetValidationMode KeysetValidationMode) arbostypes.InboxMultiplexer {
+func NewInboxMultiplexer(backend InboxBackend, delayedMessagesRead uint64, daProviders []DataAvailabilityProvider, keysetValidationMode KeysetValidationMode) arbostypes.InboxMultiplexer {
 	return &inboxMultiplexer{
 		backend:              backend,
 		delayedMessagesRead:  delayedMessagesRead,
 		daProviders:          daProviders,
-		eigenDAReader:        eigenDAReader,
 		keysetValidationMode: keysetValidationMode,
 	}
 }
@@ -424,6 +443,7 @@ const BatchSegmentKindAdvanceL1BlockNumber uint8 = 4
 // Pop returns the message from the top of the sequencer inbox and removes it from the queue.
 // Note: this does *not* return parse errors, those are transformed into invalid messages
 func (r *inboxMultiplexer) Pop(ctx context.Context) (*arbostypes.MessageWithMetadata, error) {
+	println("Popping message from sequencer inbox")
 	if r.cachedSequencerMessage == nil {
 		// Note: batchBlockHash will be zero in the replay binary, but that's fine
 		bytes, batchBlockHash, realErr := r.backend.PeekSequencerInbox()
@@ -432,7 +452,7 @@ func (r *inboxMultiplexer) Pop(ctx context.Context) (*arbostypes.MessageWithMeta
 		}
 		r.cachedSequencerMessageNum = r.backend.GetSequencerInboxPosition()
 		var err error
-		r.cachedSequencerMessage, err = parseSequencerMessage(ctx, r.cachedSequencerMessageNum, batchBlockHash, bytes, r.daProviders, r.eigenDAReader, r.keysetValidationMode)
+		r.cachedSequencerMessage, err = parseSequencerMessage(ctx, r.cachedSequencerMessageNum, batchBlockHash, bytes, r.daProviders, r.keysetValidationMode)
 		if err != nil {
 			return nil, err
 		}

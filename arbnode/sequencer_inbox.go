@@ -14,9 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/offchainlabs/nitro/arbstate"
 	"github.com/offchainlabs/nitro/arbutil"
+	"github.com/offchainlabs/nitro/eigenda"
 
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 )
@@ -35,6 +37,7 @@ const (
 	batchDataSeparateEvent
 	batchDataNone
 	batchDataBlobHashes
+	batchDataEigenDA
 )
 
 func init() {
@@ -118,6 +121,7 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 		if err != nil {
 			return nil, err
 		}
+
 		args := make(map[string]interface{})
 		err = addSequencerL2BatchFromOriginCallABI.Inputs.UnpackIntoMap(args, data[4:])
 		if err != nil {
@@ -163,6 +167,27 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 		for _, h := range tx.BlobHashes() {
 			data = append(data, h[:]...)
 		}
+		return data, nil
+
+	case batchDataEigenDA:
+		// get the transaction data from the log
+		tx, err := arbutil.GetLogTransaction(ctx, client, m.rawLog)
+		if err != nil {
+			return nil, err
+		}
+		// get the input data from the transaction
+		// TODO: decide on if you want to parse it here or parse it upstream, I've decided to parse it upstream and include all of the calldata in the batch
+		calldata := tx.Data()
+		println("appending EigenDA message header flag to calldata")
+		// append the eigenDA header flag to the front
+		data := []byte{eigenda.EigenDAMessageHeaderFlag}
+		data = append(data, calldata[:]...)
+
+		println(fmt.Sprintf("Returning the following calldata: %s", hexutil.Encode(data)))
+
+		// format of eigenDA data is
+		// [0 - 1] header flag
+		// [1 - len(data)] calldata
 		return data, nil
 	default:
 		return nil, fmt.Errorf("batch has invalid data location %v", m.dataLocation)

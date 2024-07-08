@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/offchainlabs/nitro/das/eigenda"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/util/rpcclient"
 	"github.com/offchainlabs/nitro/validator/server_api"
@@ -343,10 +343,14 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 			if v.eigenDAService == nil {
 				log.Warn("EigenDA not configured, but sequencer message found with EigenDA header")
 			} else {
-				_, err := eigenda.RecoverPayloadFromEigenDABatch(ctx, batch.Data[41:], v.eigenDAService, e.Preimages)
+				// we fetch the polynomial representation of the blob since its in coefficient form and compatible for
+				// generating witness proofs and kzg commitments within the arbitrator when constructing machine state proofs
+				// for EigenDA preimage types
+				_, err := eigenda.RecoverPayloadFromEigenDABatch(ctx, batch.Data[41:], v.eigenDAService, e.Preimages, "polynomial")
 				if err != nil {
 					return err
 				}
+				log.Info("Recovered blob coefficient from EigenDA batch", "batch", batch.Number)
 			}
 		}
 	}

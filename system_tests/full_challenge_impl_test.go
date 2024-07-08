@@ -32,7 +32,6 @@ import (
 	"github.com/offchainlabs/nitro/arbstate"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/execution/gethexec"
-	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/solgen/go/challengegen"
 	"github.com/offchainlabs/nitro/solgen/go/mocksgen"
 
@@ -214,10 +213,6 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		FutureSeconds: big.NewInt(10000),
 	}
 
-	rollupMngr, tx, _, err := bridgegen.DeployEigenDADummyManager(&txOpts, l1Client)
-	Require(t, err)
-	_, err = EnsureTxSucceeded(ctx, l1Client, tx)
-
 	// Require(t, err)
 	// _, err = EnsureTxSucceeded(ctx, l1Client, tx)
 
@@ -232,8 +227,6 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		timeBounds,
 		big.NewInt(117964),
 		reader4844,
-		rollupMngr,
-		rollupMngr,
 		false,
 	)
 	Require(t, err)
