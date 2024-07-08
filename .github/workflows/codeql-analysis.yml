@@ -48,6 +48,9 @@ jobs:
         submodules: true
         ssh-key: ${{ secrets.SSH_KEY }}
 
+    - name: Install dependencies
+      run: sudo apt update && sudo apt install -y wabt
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
@@ -71,7 +74,7 @@ jobs:
     - name: Install go
       uses: actions/setup-go@v4
       with:
-        go-version: 1.20.x
+        go-version: 1.21.x
 
     - name: Install rust stable
       uses: dtolnay/rust-toolchain@stable

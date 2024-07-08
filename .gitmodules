@@ -23,3 +23,15 @@
 	path = arbitrator/rust-kzg-bn254
 	url = https://github.com/Layr-Labs/rust-kzg-bn254.git
 	branch = epociask--better-linting
+[submodule "arbitrator/tools/wasmer"]
+	path = arbitrator/tools/wasmer
+	url = https://github.com/OffchainLabs/wasmer.git
+[submodule "arbitrator/langs/rust"]
+	path = arbitrator/langs/rust
+	url = https://github.com/OffchainLabs/stylus-sdk-rs.git
+[submodule "arbitrator/langs/c"]
+	path = arbitrator/langs/c
+	url = https://github.com/OffchainLabs/stylus-sdk-c.git
+[submodule "arbitrator/langs/bf"]
+	path = arbitrator/langs/bf
+	url = https://github.com/OffchainLabs/stylus-sdk-bf.git

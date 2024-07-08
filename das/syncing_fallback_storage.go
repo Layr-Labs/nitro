@@ -6,7 +6,6 @@ package das
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -20,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/offchainlabs/nitro/arbstate"
+	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/util/arbmath"
@@ -57,7 +56,6 @@ func init() {
 }
 
 type SyncToStorageConfig struct {
-	CheckAlreadyExists       bool          `koanf:"check-already-exists"`
 	Eager                    bool          `koanf:"eager"`
 	EagerLowerBoundBlock     uint64        `koanf:"eager-lower-bound-block"`
 	RetentionPeriod          time.Duration `koanf:"retention-period"`
@@ -68,7 +66,6 @@ type SyncToStorageConfig struct {
 }
 
 var DefaultSyncToStorageConfig = SyncToStorageConfig{
-	CheckAlreadyExists:       true,
 	Eager:                    false,
 	EagerLowerBoundBlock:     0,
 	RetentionPeriod:          time.Duration(math.MaxInt64),
@@ -79,7 +76,6 @@ var DefaultSyncToStorageConfig = SyncToStorageConfig{
 }
 
 func SyncToStorageConfigAddOptions(prefix string, f *flag.FlagSet) {
-	f.Bool(prefix+".check-already-exists", DefaultSyncToStorageConfig.CheckAlreadyExists, "check if the data already exists in this DAS's storage. Must be disabled for fast sync with an IPFS backend")
 	f.Bool(prefix+".eager", DefaultSyncToStorageConfig.Eager, "eagerly sync batch data to this DAS's storage from the rest endpoints, using L1 as the index of batch data hashes; otherwise only sync lazily")
 	f.Uint64(prefix+".eager-lower-bound-block", DefaultSyncToStorageConfig.EagerLowerBoundBlock, "when eagerly syncing, start indexing forward from this L1 block. Only used if there is no sync state")
 	f.Uint64(prefix+".parent-chain-blocks-per-read", DefaultSyncToStorageConfig.ParentChainBlocksPerRead, "when eagerly syncing, max l1 blocks to read per poll")
@@ -94,7 +90,7 @@ type l1SyncService struct {
 
 	config     SyncToStorageConfig
 	syncTo     StorageService
-	dataSource arbstate.DataAvailabilityReader
+	dataSource daprovider.DASReader
 
 	l1Reader      *headerreader.HeaderReader
 	inboxContract *bridgegen.SequencerInbox
@@ -106,7 +102,9 @@ type l1SyncService struct {
 	lastBatchAcc   common.Hash
 }
 
-const nextBlockNoFilename = "nextBlockNumber"
+// The original syncing process had a bug, so the file was renamed to cause any mirrors
+// in the wild to re-sync from their configured starting block number.
+const nextBlockNoFilename = "nextBlockNumberV2"
 
 func readSyncStateOrDefault(syncDir string, dflt uint64) uint64 {
 	if syncDir == "" {
@@ -161,7 +159,7 @@ func writeSyncState(syncDir string, blockNr uint64) error {
 	return os.Rename(f.Name(), path)
 }
 
-func newl1SyncService(config *SyncToStorageConfig, syncTo StorageService, dataSource arbstate.DataAvailabilityReader, l1Reader *headerreader.HeaderReader, inboxAddr common.Address) (*l1SyncService, error) {
+func newl1SyncService(config *SyncToStorageConfig, syncTo StorageService, dataSource daprovider.DASReader, l1Reader *headerreader.HeaderReader, inboxAddr common.Address) (*l1SyncService, error) {
 	l1Client := l1Reader.Client()
 	inboxContract, err := bridgegen.NewSequencerInbox(inboxAddr, l1Client)
 	if err != nil {
@@ -212,26 +210,18 @@ func (s *l1SyncService) processBatchDelivered(ctx context.Context, batchDelivere
 	binary.BigEndian.PutUint64(header[32:40], deliveredEvent.AfterDelayedMessagesRead.Uint64())
 
 	data = append(header, data...)
-	preimages := make(map[arbutil.PreimageType]map[common.Hash][]byte)
-	if _, err = arbstate.RecoverPayloadFromDasBatch(ctx, deliveredEvent.BatchSequenceNumber.Uint64(), data, s.dataSource, preimages, arbstate.KeysetValidate); err != nil {
+	var payload []byte
+	if payload, err = daprovider.RecoverPayloadFromDasBatch(ctx, deliveredEvent.BatchSequenceNumber.Uint64(), data, s.dataSource, nil, true); err != nil {
 		log.Error("recover payload failed", "txhash", batchDeliveredLog.TxHash, "data", data)
 		return err
 	}
-	for _, preimages := range preimages {
-		for hash, contents := range preimages {
-			var err error
-			if s.config.CheckAlreadyExists {
-				_, err = s.syncTo.GetByHash(ctx, hash)
-			}
-			if err == nil || errors.Is(err, ErrNotFound) {
-				if err := s.syncTo.Put(ctx, contents, storeUntil); err != nil {
-					return err
-				}
-			} else {
-				return err
-			}
+
+	if payload != nil {
+		if err := s.syncTo.Put(ctx, payload, storeUntil); err != nil {
+			return err
 		}
 	}
+
 	seqNumber := deliveredEvent.BatchSequenceNumber
 	if seqNumber == nil {
 		seqNumber = common.Big0
@@ -291,7 +281,7 @@ func FindDASDataFromLog(
 		log.Warn("BatchDelivered - no data found", "data", data)
 		return nil, nil
 	}
-	if !arbstate.IsDASMessageHeaderByte(data[0]) {
+	if !daprovider.IsDASMessageHeaderByte(data[0]) {
 		log.Warn("BatchDelivered - data not DAS")
 		return nil, nil
 	}
@@ -417,7 +407,7 @@ type SyncingFallbackStorageService struct {
 
 func NewSyncingFallbackStorageService(ctx context.Context,
 	primary StorageService,
-	backup arbstate.DataAvailabilityReader,
+	backup daprovider.DASReader,
 	backupHealthChecker DataAvailabilityServiceHealthChecker,
 	l1Reader *headerreader.HeaderReader,
 	inboxAddr common.Address,

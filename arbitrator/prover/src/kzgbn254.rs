@@ -1,4 +1,4 @@
-use crate::utils::Bytes32;
+use crate::Bytes32;
 use ark_bn254::G2Affine;
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};

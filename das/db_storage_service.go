@@ -12,7 +12,7 @@ import (
 	badger "github.com/dgraph-io/badger/v4"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/offchainlabs/nitro/arbstate"
+	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/das/dastree"
 	"github.com/offchainlabs/nitro/util/pretty"
 	"github.com/offchainlabs/nitro/util/stopwaiter"
@@ -20,11 +20,9 @@ import (
 )
 
 type LocalDBStorageConfig struct {
-	Enable                 bool   `koanf:"enable"`
-	DataDir                string `koanf:"data-dir"`
-	DiscardAfterTimeout    bool   `koanf:"discard-after-timeout"`
-	SyncFromStorageService bool   `koanf:"sync-from-storage-service"`
-	SyncToStorageService   bool   `koanf:"sync-to-storage-service"`
+	Enable              bool   `koanf:"enable"`
+	DataDir             string `koanf:"data-dir"`
+	DiscardAfterTimeout bool   `koanf:"discard-after-timeout"`
 
 	// BadgerDB options
 	NumMemtables            int   `koanf:"num-memtables"`
@@ -38,11 +36,9 @@ type LocalDBStorageConfig struct {
 var badgerDefaultOptions = badger.DefaultOptions("")
 
 var DefaultLocalDBStorageConfig = LocalDBStorageConfig{
-	Enable:                 false,
-	DataDir:                "",
-	DiscardAfterTimeout:    false,
-	SyncFromStorageService: false,
-	SyncToStorageService:   false,
+	Enable:              false,
+	DataDir:             "",
+	DiscardAfterTimeout: false,
 
 	NumMemtables:            badgerDefaultOptions.NumMemtables,
 	NumLevelZeroTables:      badgerDefaultOptions.NumLevelZeroTables,
@@ -56,8 +52,6 @@ func LocalDBStorageConfigAddOptions(prefix string, f *flag.FlagSet) {
 	f.Bool(prefix+".enable", DefaultLocalDBStorageConfig.Enable, "enable storage/retrieval of sequencer batch data from a database on the local filesystem")
 	f.String(prefix+".data-dir", DefaultLocalDBStorageConfig.DataDir, "directory in which to store the database")
 	f.Bool(prefix+".discard-after-timeout", DefaultLocalDBStorageConfig.DiscardAfterTimeout, "discard data after its expiry timeout")
-	f.Bool(prefix+".sync-from-storage-service", DefaultLocalDBStorageConfig.SyncFromStorageService, "enable db storage to be used as a source for regular sync storage")
-	f.Bool(prefix+".sync-to-storage-service", DefaultLocalDBStorageConfig.SyncToStorageService, "enable db storage to be used as a sink for regular sync storage")
 
 	f.Int(prefix+".num-memtables", DefaultLocalDBStorageConfig.NumMemtables, "BadgerDB option: sets the maximum number of tables to keep in memory before stalling")
 	f.Int(prefix+".num-level-zero-tables", DefaultLocalDBStorageConfig.NumLevelZeroTables, "BadgerDB option: sets the maximum number of Level 0 tables before compaction starts")
@@ -158,13 +152,6 @@ func (dbs *DBStorageService) Put(ctx context.Context, data []byte, timeout uint6
 	})
 }
 
-func (dbs *DBStorageService) putKeyValue(ctx context.Context, key common.Hash, value []byte) error {
-	return dbs.db.Update(func(txn *badger.Txn) error {
-		e := badger.NewEntry(key.Bytes(), value)
-		return txn.SetEntry(e)
-	})
-}
-
 func (dbs *DBStorageService) Sync(ctx context.Context) error {
 	return dbs.db.Sync()
 }
@@ -173,11 +160,11 @@ func (dbs *DBStorageService) Close(ctx context.Context) error {
 	return dbs.stopWaiter.StopAndWait()
 }
 
-func (dbs *DBStorageService) ExpirationPolicy(ctx context.Context) (arbstate.ExpirationPolicy, error) {
+func (dbs *DBStorageService) ExpirationPolicy(ctx context.Context) (daprovider.ExpirationPolicy, error) {
 	if dbs.discardAfterTimeout {
-		return arbstate.DiscardAfterDataTimeout, nil
+		return daprovider.DiscardAfterDataTimeout, nil
 	}
-	return arbstate.KeepForever, nil
+	return daprovider.KeepForever, nil
 }
 
 func (dbs *DBStorageService) String() string {
