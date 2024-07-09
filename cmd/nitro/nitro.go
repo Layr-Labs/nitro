@@ -134,6 +134,7 @@ func closeDb(db io.Closer, name string) {
 }
 
 func main() {
+	println("Starting Arbitrum nitro node with eigenda integration")
 	os.Exit(mainImpl())
 }
 

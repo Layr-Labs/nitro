@@ -42,10 +42,7 @@ import (
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
-<<<<<<< HEAD
 	"github.com/offchainlabs/nitro/eigenda"
-=======
->>>>>>> 3ecd01ebcf768025ecadb96e50b90d89bc4c6bc5
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/util"
