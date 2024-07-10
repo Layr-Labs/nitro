@@ -166,7 +166,7 @@ func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eig
 	dataHash[0] = 1
 
 	hash := common.BytesToHash(dataHash)
-	println("Querying blob for hash: ", hash.String())
+	println("Reading EigenDA blob from preimage oracle: ", hash.String())
 
 	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, hash)
 	if err != nil {
@@ -313,7 +313,7 @@ func main() {
 			}
 		}
 
-		message := readMessage(false, true)
+		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee, chainConfig.ArbitrumChainParams.EigenDA)
 
 		chainContext := WavmChainContext{}
 		batchFetcher := func(batchNum uint64) ([]byte, error) {

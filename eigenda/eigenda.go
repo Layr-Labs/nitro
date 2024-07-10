@@ -17,7 +17,7 @@ const (
 
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
-	return hasBits(daprovider.EigenDAMessageHeaderFlag, header)
+	return hasBits(header, daprovider.EigenDAMessageHeaderFlag)
 }
 
 // hasBits returns true if `checking` has all `bits`

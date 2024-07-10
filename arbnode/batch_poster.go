@@ -1413,9 +1413,6 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 
 	var eigenDaBlobInfo *eigenda.EigenDABlobInfo
 	if b.eigenDAWriter != nil {
-		if !b.redisLock.AttemptLock(ctx) {
-			return false, errAttemptLockFailed
-		}
 
 		gotNonce, gotMeta, err := b.dataPoster.GetNextNonceAndMeta(ctx)
 		if err != nil {

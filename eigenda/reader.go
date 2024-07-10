@@ -36,7 +36,7 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	preimageRecorder daprovider.PreimageRecorder,
 	validateSeqMsg bool,
 ) ([]byte, error) {
-
+	println("RecoverPayloadFromBatch: ", hex.EncodeToString(sequencerMsg))
 	// offset sequencer message at 41 
 	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "polynomial")
 }

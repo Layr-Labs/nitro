@@ -528,6 +528,7 @@ func createNodeImpl(
 	var daReader das.DataAvailabilityServiceReader
 	var dasLifecycleManager *das.LifecycleManager
 	if config.DataAvailability.Enable {
+		log.Info("Data Availability enabled")
 		if config.BatchPoster.Enable {
 			daWriter, daReader, dasLifecycleManager, err = das.CreateBatchPosterDAS(ctx, &config.DataAvailability, dataSigner, l1client, deployInfo.SequencerInbox)
 			if err != nil {
@@ -551,6 +552,7 @@ func createNodeImpl(
 	} else if l2Config.ArbitrumChainParams.DataAvailabilityCommittee {
 		return nil, errors.New("a data availability service is required for this chain, but it was not configured")
 	} else if config.EigenDA.Enable {
+		log.Info("EigenDA enabled")
 		eigenDAService, err := eigenda.NewEigenDA(config.EigenDA.Rpc)
 		if err != nil {
 			return nil, err
