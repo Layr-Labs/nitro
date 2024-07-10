@@ -3,7 +3,6 @@ package eigenda
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"strings"
 
@@ -36,7 +35,6 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	preimageRecorder daprovider.PreimageRecorder,
 	validateSeqMsg bool,
 ) ([]byte, error) {
-	println("RecoverPayloadFromBatch: ", hex.EncodeToString(sequencerMsg))
 	// offset sequencer message at 41 
 	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "polynomial")
 }
@@ -48,7 +46,6 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	preimageRecoder daprovider.PreimageRecorder,
 	domain string,
 ) ([]byte, error) {
-	log.Info("Start recovering payload from eigenda: ", "data", hex.EncodeToString(sequencerMsg))
 
 	blobInfo, err := ParseSequencerMsg(sequencerMsg)
 	if err != nil {
@@ -69,14 +66,11 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 		return nil, err
 	}
 
-	println("kzgCommit: ", hex.EncodeToString(kzgCommit))
-
 	shaDataHash := sha256.New()
 	shaDataHash.Write(kzgCommit)
 	dataHash := shaDataHash.Sum([]byte{})
 	dataHash[0] = 1
 	if preimageRecoder != nil {
-		println("recording preimage for commitment: ", hex.EncodeToString(dataHash))
 		preimageRecoder(common.BytesToHash(dataHash), data, arbutil.EigenDaPreimageType)
 	}
 	return data, nil

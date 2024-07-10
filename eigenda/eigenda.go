@@ -51,9 +51,8 @@ func NewEigenDA(proxyServerRpc string) (*EigenDA, error) {
 	}, nil
 }
 
+// QueryBlob retrieves a blob from EigenDA using the provided EigenDABlobInfo
 func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFilter string) ([]byte, error) {
-	log.Info("Querying blob from EigenDA")
-
 	info, err := cert.ToDisperserBlobInfo()
 	if err != nil {
 		return nil, err

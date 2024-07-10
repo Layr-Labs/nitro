@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/arbutil"
@@ -169,20 +168,14 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 		return data, nil
 
 	case batchDataEigenDA:
-		// get the transaction data from the log
 		tx, err := arbutil.GetLogTransaction(ctx, client, m.rawLog)
 		if err != nil {
 			return nil, err
 		}
-		// get the input data from the transaction
-		// TODO: decide on if you want to parse it here or parse it upstream, I've decided to parse it upstream and include all of the calldata in the batch
+
 		calldata := tx.Data()
-		println("appending EigenDA message header flag to calldata")
-		// append the eigenDA header flag to the front
 		data := []byte{daprovider.EigenDAMessageHeaderFlag}
 		data = append(data, calldata[:]...)
-
-		println(fmt.Sprintf("Returning the following calldata: %s", hexutil.Encode(data)))
 		
 		return data, nil
 	default:

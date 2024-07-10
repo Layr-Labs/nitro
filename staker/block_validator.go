@@ -511,7 +511,6 @@ func (v *BlockValidator) readBatch(ctx context.Context, batchNum uint64) (bool, 
 	if err != nil {
 		return false, nil, common.Hash{}, 0, err
 	}
-	println("batchCount: ", batchCount)
 	if batchCount <= batchNum {
 		return false, nil, common.Hash{}, 0, nil
 	}
@@ -519,7 +518,6 @@ func (v *BlockValidator) readBatch(ctx context.Context, batchNum uint64) (bool, 
 	if err != nil {
 		return false, nil, common.Hash{}, 0, err
 	}
-	println("batchMsgCount: ", batchMsgCount)
 	batch, batchBlockHash, err := v.inboxReader.GetSequencerMessageBytes(ctx, batchNum)
 	if err != nil {
 		return false, nil, common.Hash{}, 0, err
