@@ -255,19 +255,6 @@ func DeployOnL1(ctx context.Context, parentChainReader *headerreader.HeaderReade
 		eigenDARollupManager = dummyRollupManager
 	}
 
-	if eigenDASvcManager == (common.Address{0x0}) {
-		log.Warn("No EigenDA Service Manager contract address specified, deploying dummy service manager instead")
-
-		dummySvcManager, tx, _, err := bridgegen.DeployDummyServiceManager(deployAuth, parentChainReader.Client())
-		err = andTxSucceeded(ctx, parentChainReader, tx, err)
-		if err != nil {
-			return nil, fmt.Errorf("dummy svc manager deploy error: %w", err)
-		}
-
-		log.Info("Dummy eigenda service manager", "address", dummySvcManager.String())
-		eigenDASvcManager = dummySvcManager
-
-	}
 	rollupCreator, _, validatorUtils, validatorWalletCreator, err := deployRollupCreator(ctx, parentChainReader, deployAuth, maxDataSize, isUsingFeeToken)
 	if err != nil {
 		return nil, fmt.Errorf("error deploying rollup creator: %w", err)
@@ -287,7 +274,6 @@ func DeployOnL1(ctx context.Context, parentChainReader *headerreader.HeaderReade
 		MaxFeePerGasForRetryables: big.NewInt(0), // needed when utility factories are deployed
 		BatchPosters:              batchPosters,
 		BatchPosterManager:        batchPosterManager,
-		EigenDAServiceManager:     eigenDASvcManager,
 		EigenDARollupManager:      eigenDARollupManager,
 	}
 

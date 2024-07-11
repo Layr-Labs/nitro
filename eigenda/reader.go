@@ -36,7 +36,7 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	validateSeqMsg bool,
 ) ([]byte, error) {
 	// offset sequencer message at 41 
-	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "polynomial")
+	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "binary")
 }
 
 
@@ -71,7 +71,12 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	dataHash := shaDataHash.Sum([]byte{})
 	dataHash[0] = 1
 	if preimageRecoder != nil {
-		preimageRecoder(common.BytesToHash(dataHash), data, arbutil.EigenDaPreimageType)
+		// iFFT the preimage data
+		preimage, err := EncodeBlob(data)
+		if err != nil {
+			return nil, err
+		}
+		preimageRecoder(common.BytesToHash(dataHash), preimage, arbutil.EigenDaPreimageType)
 	}
 	return data, nil
 }
@@ -111,4 +116,30 @@ func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
 		BlobHeader:            inboxPayload.BlobHeader,
 	}, nil
 
+}
+
+// NewReaderForEigenDA is generally meant to be only used by nitro.
+// DA Providers should implement methods in the Reader interface independently
+func NewBinaryReaderForEigenDA(reader EigenDAReader) *binaryReaderForEigenDA {
+	return &binaryReaderForEigenDA{readerEigenDA: reader}
+}
+
+type binaryReaderForEigenDA struct {
+	readerEigenDA EigenDAReader
+}
+
+func (d *binaryReaderForEigenDA) IsValidHeaderByte(headerByte byte) bool {
+	return IsEigenDAMessageHeaderByte(headerByte)
+}
+
+func (d *binaryReaderForEigenDA) RecoverPayloadFromBatch(
+	ctx context.Context,
+	batchNum uint64,
+	batchBlockHash common.Hash,
+	sequencerMsg []byte,
+	preimageRecorder daprovider.PreimageRecorder,
+	validateSeqMsg bool,
+) ([]byte, error) {
+	// offset sequencer message at 41 
+	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "binary")
 }

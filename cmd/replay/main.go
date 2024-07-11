@@ -154,6 +154,7 @@ type EigenDAPreimageReader struct{}
 // QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
 // certificate kzg commitment for identifying the preimage.
 func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
+	println("Querying EigenDA blob")
 	kzgCommit, err := cert.SerializeCommitment()
 	if err != nil {
 		return nil, err
@@ -180,6 +181,7 @@ func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eig
 		println("Error decoding blob: ", err)
 		return nil, err
 	}
+	
 	return decodedBlob, nil
 }
 
@@ -257,7 +259,7 @@ func main() {
 			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader))
 		}
 		if eigenDAReader != nil {
-			dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
+			dapReaders = append(dapReaders, eigenda.NewBinaryReaderForEigenDA(eigenDAReader))
 		}
 
 		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(&BlobPreimageReader{}))

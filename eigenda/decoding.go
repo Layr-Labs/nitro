@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 /*
@@ -90,4 +91,69 @@ func DecodeBlob(data []byte) ([]byte, error) {
 
 	return rawData, nil
 
+}
+
+
+func EncodeBlob(data []byte) ([]byte, error) {
+	var err error
+	data, err = encodeBlob(data)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding data: %w", err)
+	}
+
+	return IFFT(data)
+}
+
+
+
+func encodeBlob(rawData []byte) ([]byte, error) {
+	codecBlobHeader := make([]byte, 32)
+	// first byte is always 0 to ensure the codecBlobHeader is a valid bn254 element
+	// encode version byte
+	codecBlobHeader[1] = byte(0x0)
+
+	// encode length as uint32
+	binary.BigEndian.PutUint32(codecBlobHeader[2:6], uint32(len(rawData))) // uint32 should be more than enough to store the length (approx 4gb)
+
+	// encode raw data modulo bn254
+	rawDataPadded := codec.ConvertByPaddingEmptyByte(rawData)
+
+	// append raw data
+	encodedData := append(codecBlobHeader, rawDataPadded...)
+
+	return encodedData, nil
+}
+
+
+func IFFT(data []byte) ([]byte, error) {
+	// we now IFFT data regardless of the encoding type
+	// convert data to fr.Element
+	dataFr, err := rs.ToFrArray(data)
+	if err != nil {
+		return nil, fmt.Errorf("error converting data to fr.Element: %w", err)
+	}
+
+	dataFrLen := len(dataFr)
+	dataFrLenPow2 := encoding.NextPowerOf2(uint64(dataFrLen))
+
+	// expand data to the next power of 2
+	paddedDataFr := make([]fr.Element, dataFrLenPow2)
+	for i := 0; i < len(paddedDataFr); i++ {
+		if i < len(dataFr) {
+			paddedDataFr[i].Set(&dataFr[i])
+		} else {
+			paddedDataFr[i].SetZero()
+		}
+	}
+
+	maxScale := uint8(math.Log2(float64(dataFrLenPow2)))
+
+	// perform IFFT
+	fs := fft.NewFFTSettings(maxScale)
+	dataIFFTFr, err := fs.FFT(paddedDataFr, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform IFFT: %w", err)
+	}
+
+	return rs.ToByteArray(dataIFFTFr, dataFrLenPow2*encoding.BYTES_PER_SYMBOL), nil
 }
