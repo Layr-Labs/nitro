@@ -5,7 +5,6 @@ package staker
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"testing"
@@ -270,7 +269,6 @@ func (v *StatelessBlockValidator) ValidationEntryRecord(ctx context.Context, e *
 		for _, dapReader := range v.dapReaders {
 			if dapReader != nil && dapReader.IsValidHeaderByte(batch.Data[40]) {
 				preimageRecorder := daprovider.RecordPreimagesTo(e.Preimages)
-				println("Recovering payload from batch: ", batch.Number, " with data: ", hex.EncodeToString(batch.Data))
 				_, err := dapReader.RecoverPayloadFromBatch(ctx, batch.Number, batch.BlockHash, batch.Data, preimageRecorder, true)
 				if err != nil {
 					// Matches the way keyset validation was done inside DAS readers i.e logging the error

@@ -1068,7 +1068,6 @@ func (b *BatchPoster) encodeAddBatch(
 	}
 	fullCalldata := append([]byte{}, method.ID...)
 	fullCalldata = append(fullCalldata, calldata...)
-	println("Full calldata: %s", hexutil.Encode(fullCalldata))
 	return fullCalldata, kzgBlobs, nil
 }
 

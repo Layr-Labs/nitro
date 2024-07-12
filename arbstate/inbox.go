@@ -13,7 +13,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -78,12 +77,10 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 	// as these headers are validated by the sequencer inbox and not other DASs.
 	// We try to extract payload from the first occuring valid DA reader in the dapReaders list
 	if len(payload) > 0 {
-		println("looking for DA provider")
 		foundDA := false
 		var err error
 		for _, dapReader := range dapReaders {
 			if dapReader != nil && dapReader.IsValidHeaderByte(payload[0]) {
-				println(fmt.Sprintf("Data being sent for recovery: %s", hexutil.Encode(payload)))
 				payload, err = dapReader.RecoverPayloadFromBatch(ctx, batchNum, batchBlockHash, data, nil, keysetValidationMode != daprovider.KeysetDontValidate)
 				if err != nil {
 					// Matches the way keyset validation was done inside DAS readers i.e logging the error
@@ -196,7 +193,6 @@ const BatchSegmentKindAdvanceL1BlockNumber uint8 = 4
 // Pop returns the message from the top of the sequencer inbox and removes it from the queue.
 // Note: this does *not* return parse errors, those are transformed into invalid messages
 func (r *inboxMultiplexer) Pop(ctx context.Context) (*arbostypes.MessageWithMetadata, error) {
-	println("Popping message from sequencer inbox")
 	if r.cachedSequencerMessage == nil {
 		// Note: batchBlockHash will be zero in the replay binary, but that's fine
 		bytes, batchBlockHash, realErr := r.backend.PeekSequencerInbox()

@@ -1129,7 +1129,6 @@ const minWait = time.Second * 10
 func (p *DataPoster) Start(ctxIn context.Context) {
 	p.StopWaiter.Start(ctxIn, p)
 	p.CallIteratively(func(ctx context.Context) time.Duration {
-		println("Data poster CallIteratively")
 		p.mutex.Lock()
 		defer p.mutex.Unlock()
 		err := p.updateBalance(ctx)

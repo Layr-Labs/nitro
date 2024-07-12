@@ -2,7 +2,6 @@ package eigenda
 
 import (
 	"context"
-	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -53,6 +52,7 @@ func NewEigenDA(proxyServerRpc string) (*EigenDA, error) {
 
 // QueryBlob retrieves a blob from EigenDA using the provided EigenDABlobInfo
 func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFilter string) ([]byte, error) {
+	log.Info("Reading blob from EigenDA", "batchID", cert.BlobVerificationProof.BatchID)
 	info, err := cert.ToDisperserBlobInfo()
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDABlobInfo, domainFi
 
 // Store disperses a blob to EigenDA and returns the appropriate EigenDABlobInfo or certificate values
 func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDABlobInfo, error) {
-	log.Info("Dispersing blob to EigenDA", "data", hex.EncodeToString(data))
+	log.Info("Dispersing blob to EigenDA")
 	var blobInfo = &EigenDABlobInfo{}
 	cert, err := e.client.Put(ctx, data)
 	if err != nil {
