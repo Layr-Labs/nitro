@@ -4,11 +4,11 @@ use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::CanonicalSerialize;
 use eyre::{ensure, Result};
+use hex::encode;
 use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::{Digest, Sha256};
 use std::io::Write;
-use hex::encode;
 
 lazy_static::lazy_static! {
 
@@ -79,7 +79,10 @@ pub fn prove_kzg_preimage_bn254(
     let preimage_commitment = kzg.commit(&preimage_polynomial)?;
     let mut preimage_commitment_bytes = Vec::new();
     preimage_commitment.serialize_uncompressed(&mut preimage_commitment_bytes)?;
-    println!("preimage commitment: {}", encode(&preimage_commitment_bytes));
+    println!(
+        "preimage commitment: {}",
+        encode(&preimage_commitment_bytes)
+    );
 
     let mut proving_offset = offset;
 
@@ -120,10 +123,8 @@ pub fn prove_kzg_preimage_bn254(
         .clone();
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
-    let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(
-        &preimage_polynomial,
-        proving_offset as u64,
-    )?;
+    let kzg_proof =
+        kzg.compute_kzg_proof_with_roots_of_unity(&preimage_polynomial, proving_offset as u64)?;
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
     let xminusz_x1: BigUint = g2_tau_minus_g2_z.x.c1.into();

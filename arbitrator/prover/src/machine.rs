@@ -2440,18 +2440,18 @@ impl Machine {
                     };
 
                     let Some(preimage) =
-                    self.preimage_resolver.get(self.context, preimage_ty, hash)
-                else {
-                    eprintln!(
-                        "{} for hash {}",
-                        "Missing requested preimage".red(),
-                        hash.red(),
-                    );
-                    self.print_backtrace(true);
-                    bail!("missing requested preimage for hash {}", hash);
-                };
+                        self.preimage_resolver.get(self.context, preimage_ty, hash)
+                    else {
+                        eprintln!(
+                            "{} for hash {}",
+                            "Missing requested preimage".red(),
+                            hash.red(),
+                        );
+                        self.print_backtrace(true);
+                        bail!("missing requested preimage for hash {}", hash);
+                    };
 
-                if preimage_ty == PreimageType::EthVersionedHash
+                    if preimage_ty == PreimageType::EthVersionedHash
                         && preimage.len() != BYTES_PER_BLOB
                     {
                         bail!(
@@ -2462,21 +2462,20 @@ impl Machine {
                         );
                     }
 
-                if preimage_ty == PreimageType::EigenDAHash {
+                    if preimage_ty == PreimageType::EigenDAHash {
                         if !preimage.len().is_power_of_two() {
                             bail!("EigenDA hash preimage length should be a power of two but is instead {}", preimage.len());
                         }
 
                         println!("EIGENDA HASH PREIMAGE: {:?}", preimage);
                     }
-                
-                            let offset = usize::try_from(offset).unwrap();
-                            let len = std::cmp::min(32, preimage.len().saturating_sub(offset));
-                            let read = preimage.get(offset..(offset + len)).unwrap_or_default();
-                            let success = module.memory.store_slice_aligned(ptr.into(), read);
-                            assert!(success, "Failed to write to previously read memory");
-                            value_stack.push(Value::I32(len as u32));
-                    
+
+                    let offset = usize::try_from(offset).unwrap();
+                    let len = std::cmp::min(32, preimage.len().saturating_sub(offset));
+                    let read = preimage.get(offset..(offset + len)).unwrap_or_default();
+                    let success = module.memory.store_slice_aligned(ptr.into(), read);
+                    assert!(success, "Failed to write to previously read memory");
+                    value_stack.push(Value::I32(len as u32));
                 }
                 Opcode::ReadInboxMessage => {
                     let offset = value_stack.pop().unwrap().assume_u32();

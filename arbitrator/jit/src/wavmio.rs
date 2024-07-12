@@ -167,8 +167,11 @@ pub fn resolve_preimage_impl(
         .and_then(|m| m.get(&hash))
     else {
         let hash_hex = hex::encode(hash);
-        error!("Missing requested preimage for hash {hash_hex} in {name} for type {:?}", preimage_type)
-        };
+        error!(
+            "Missing requested preimage for hash {hash_hex} in {name} for type {:?}",
+            preimage_type
+        )
+    };
 
     // Check if preimage rehashes to the provided hash. Exclude blob preimages
     let calculated_hash: [u8; 32] = match preimage_type {
