@@ -86,7 +86,7 @@ pub fn prove_kzg_preimage_bn254(
 
     let mut proving_offset = offset;
 
-    let length_usize = preimage.len() as usize;
+    let length_usize = preimage_polynomial.len() as usize;
 
     // address proving past end edge case later
     let proving_past_end = offset as usize >= length_usize;
@@ -103,7 +103,7 @@ pub fn prove_kzg_preimage_bn254(
 
     let proven_y_fr = preimage_polynomial
         .get_at_index(proving_offset as usize)
-        .ok_or_else(|| eyre::eyre!("Index out of bounds"))?;
+        .ok_or_else(|| eyre::eyre!("Index ({}) out of bounds for preimage of length {} with data of size {}", proving_offset, length_usize, preimage_polynomial.len()))?;
 
     let z_fr = kzg
         .get_nth_root_of_unity(proving_offset as usize)
