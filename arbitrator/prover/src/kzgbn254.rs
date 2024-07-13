@@ -86,7 +86,7 @@ pub fn prove_kzg_preimage_bn254(
 
     let mut proving_offset = offset;
 
-    let length_usize = preimage_polynomial.len() as usize;
+    let length_usize = preimage.len() as usize;
 
     // address proving past end edge case later
     let proving_past_end = offset as usize >= length_usize;
@@ -102,10 +102,10 @@ pub fn prove_kzg_preimage_bn254(
         .copy_from_slice(&proving_offset_bytes);
 
     let proven_y_fr = preimage_polynomial
-        .get_at_index(proving_offset as usize)
+        .get_at_index(proving_offset as usize / 32)
         .ok_or_else(|| {
             eyre::eyre!(
-                "Index ({}) out of bounds for preimage of length {} with data of size {}",
+                "Index ({}) out of bounds for preimage of length {} with data of ({} field elements x 32 bytes)",
                 proving_offset,
                 length_usize,
                 preimage_polynomial.len()
@@ -113,7 +113,7 @@ pub fn prove_kzg_preimage_bn254(
         })?;
 
     let z_fr = kzg
-        .get_nth_root_of_unity(proving_offset as usize)
+        .get_nth_root_of_unity(proving_offset as usize / 32)
         .ok_or_else(|| eyre::eyre!("Failed to get nth root of unity"))?;
 
     let proven_y = proven_y_fr.into_bigint().to_bytes_be();
@@ -131,7 +131,7 @@ pub fn prove_kzg_preimage_bn254(
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
     let kzg_proof =
-        kzg.compute_kzg_proof_with_roots_of_unity(&preimage_polynomial, proving_offset as u64)?;
+        kzg.compute_kzg_proof_with_roots_of_unity(&preimage_polynomial, proving_offset as u64 / 32)?;
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
     let xminusz_x1: BigUint = g2_tau_minus_g2_z.x.c1.into();
