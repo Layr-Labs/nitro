@@ -130,8 +130,8 @@ pub fn prove_kzg_preimage_bn254(
         .clone();
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
-    let kzg_proof =
-        kzg.compute_kzg_proof_with_roots_of_unity(&preimage_polynomial, proving_offset as u64 / 32)?;
+    let kzg_proof = kzg
+        .compute_kzg_proof_with_roots_of_unity(&preimage_polynomial, proving_offset as u64 / 32)?;
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
     let xminusz_x1: BigUint = g2_tau_minus_g2_z.x.c1.into();
