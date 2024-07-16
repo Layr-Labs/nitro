@@ -44,6 +44,7 @@ func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *DisperserBlobInf
 		return nil, fmt.Errorf("failed to encode blob info: %w", err)
 	}
 
+	// TODO: support more strict versioning
 	commitWithVersion := append([]byte{0x0}, commitment...)
 
 	data, err := c.client.GetData(ctx, commitWithVersion, StrToDomainType(domainFilter))
@@ -88,7 +89,6 @@ func StrToDomainType(s string) DomainType {
 
 // TODO: Add support for custom http client option
 type Config struct {
-	Actor string
 	URL   string
 }
 
@@ -138,10 +138,6 @@ func (c *client) Health() error {
 // GetData fetches blob data associated with a DA certificate
 func (c *client) GetData(ctx context.Context, comm []byte, domain DomainType) ([]byte, error) {
 	url := fmt.Sprintf("%s/get/0x%x?domain=%s&commitment_mode=simple", c.cfg.URL, comm, domain.String())
-
-	if c.cfg.Actor != "" {
-		url = fmt.Sprintf("%s&actor=%s", url, c.cfg.Actor)
-	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

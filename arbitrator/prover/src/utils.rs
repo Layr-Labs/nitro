@@ -219,17 +219,14 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
             let blob = EigenDABlob::from_padded_bytes_unchecked(preimage);
 
             let blob_polynomial = blob
-                .to_polynomial(PolynomialFormat::InEvaluationForm)
-                .unwrap();
-            let blob_commitment = kzg_bn254.commit(&blob_polynomial).unwrap();
+                .to_polynomial(PolynomialFormat::InEvaluationForm)?;
+            let blob_commitment = kzg_bn254.commit(&blob_polynomial)?;
 
             let mut commitment_bytes = Vec::new();
             blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
 
             let mut commitment_hash: [u8; 32] = Sha256::digest(&commitment_bytes).into();
             commitment_hash[0] = 1;
-
-            println!("commitment_hash: {:?}", commitment_hash);
 
             Ok(commitment_hash)
         }

@@ -108,25 +108,19 @@ fn main() {
         
         let expected_len = 0;
 
-        // for i in 0..5{
-        //     let eigen_hash = hex!("011e229d75b13559dcb2d757ecae9b66fa579268e28e196789503322115c06e1");
-        //     bytebuffer = Bytes32(eigen_hash);
-
-        //     let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), i * 32);
-            
-        //     if i < 4 {
-        //         assert_eq!(actual_len, 32);
-        //     } else {
-        //         assert_eq!(actual_len, 0);
-        //     }
-        // }
-    
-             let eigen_hash = hex!("011e229d75b13559dcb2d757ecae9b66fa579268e28e196789503322115c06e1");
+        for i in 0..5{
+            let eigen_hash = hex!("011e229d75b13559dcb2d757ecae9b66fa579268e28e196789503322115c06e1");
             bytebuffer = Bytes32(eigen_hash);
-            
 
-        let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), 1);
-        assert_eq!(actual_len, 32);
+            let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), i * 32);
+            
+            if i < 4 {
+                assert_eq!(actual_len, 32);
+            } else {
+                assert_eq!(actual_len, 0);
+            }
+        }
     }
+    
     println!("Done!");
 }
