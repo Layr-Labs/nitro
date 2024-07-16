@@ -169,6 +169,9 @@ func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eig
 	hash := common.BytesToHash(dataHash)
 	println("Reading EigenDA blob from preimage oracle: ", hash.String())
 
+	// 128 byte preimage
+	// (1) READPREIMAGE -> hash, 0th offset
+	// (2) READPREIMAGE -> hash, 32 offset
 	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, hash)
 	if err != nil {
 		return nil, err

@@ -7,6 +7,7 @@ use eyre::{ensure, Result};
 use hex::encode;
 use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
+use num_traits::ToBytes;
 use sha2::{Digest, Sha256};
 use std::io::Write;
 
@@ -25,12 +26,6 @@ lazy_static::lazy_static! {
         3000
     ).unwrap();
 
-    // modulus for the underlying field F_r of the elliptic curve
-    // see https://docs.eigenlayer.xyz/eigenda/integrations-guides/dispersal/blob-serialization-requirements
-    pub static ref BLS_MODULUS: BigUint = "21888242871839275222246405745257275088548364400416034343698204186575808495617".parse().unwrap();
-
-    // (2*1024*1024)/32 = 65536
-    pub static ref FIELD_ELEMENTS_PER_BLOB: usize = 65536;
 }
 
 /// Creates a KZG preimage proof consumable by the point evaluation precompile.
@@ -86,21 +81,19 @@ pub fn prove_kzg_preimage_bn254(
 
     let mut proving_offset = offset;
 
-    let length_usize = preimage.len() as usize;
+    let length_usize = preimage.len() as u64;
+
+    assert!(length_usize / 32 == preimage_polynomial.len() as u64);
 
     // address proving past end edge case later
-    let proving_past_end = offset as usize >= length_usize;
+    let proving_past_end = offset as u64 >= length_usize;
     if proving_past_end {
         // Proving any offset proves the length which is all we need here,
         // because we're past the end of the preimage.
         proving_offset = 0;
     }
 
-    let proving_offset_bytes = proving_offset.to_be_bytes();
-    let mut padded_proving_offset_bytes: [u8; 32] = [0u8; 32];
-    padded_proving_offset_bytes[32 - proving_offset_bytes.len()..]
-        .copy_from_slice(&proving_offset_bytes);
-
+    // Y = ϕ(offset) --> evaluation point for computing quotient proof
     let proven_y_fr = preimage_polynomial
         .get_at_index(proving_offset as usize / 32)
         .ok_or_else(|| {
@@ -159,12 +152,18 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut proof_encoded_bytes, &proof_x_bigint);
     append_left_padded_biguint_be(&mut proof_encoded_bytes, &proof_y_bigint);
 
+    let mut length_bytes = Vec::with_capacity(32);
+    append_left_padded_biguint_be(&mut length_bytes, &BigUint::from(length_usize));
+
+    println!("length usize: {}", length_usize);
+    println!("length bytes: {}", encode(&length_bytes));
     out.write_all(&*hash)?; // hash [:32]
     out.write_all(&*z)?; // evaluation point [32:64]
     out.write_all(&*proven_y)?; // expected output [64:96]
     out.write_all(&xminusz_encoded_bytes)?; // g2TauMinusG2z [96:224]
     out.write_all(&*commitment_encoded_bytes)?; // kzg commitment [224:288]
     out.write_all(&proof_encoded_bytes)?; // proof [288:352]
+    out.write_all(&*length_bytes)?; // length of preimage [352:384]
 
     Ok(())
 }
