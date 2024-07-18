@@ -1021,32 +1021,37 @@ func (b *BatchPoster) encodeAddBatch(
 			return nil, nil, err
 		}
 
-		u256Type, err := abi.NewType("uint256", "", nil)
+		addressType, err := abi.NewType("address", "", nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		uint256Type, err := abi.NewType("uint256", "", nil)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// Create ABI arguments
 		arguments := abi.Arguments{
-			{Type: u256Type},
+			{Type: uint256Type},
 			{Type: blobVerificationProofType},
 			{Type: blobHeaderType},
-			{Type: u256Type},
-			{Type: u256Type},
-			{Type: u256Type},
+			{Type: addressType},
+			{Type: uint256Type},
+			{Type: uint256Type},
+			{Type: uint256Type},
 		}
 
 		// define values array
-		values := make([]interface{}, 6)
+		values := make([]interface{}, 7)
 		values[0] = seqNum
 		values[1] = eigenDaBlobInfo.BlobVerificationProof
 		values[2] = eigenDaBlobInfo.BlobHeader
-		values[3] = new(big.Int).SetUint64(delayedMsg)
-		values[4] = new(big.Int).SetUint64(uint64(prevMsgNum))
-		values[5] = new(big.Int).SetUint64(uint64(newMsgNum))
+		values[3] = b.config().gasRefunder
+		values[4] = new(big.Int).SetUint64(delayedMsg)
+		values[5] = new(big.Int).SetUint64(uint64(prevMsgNum))
+		values[6] = new(big.Int).SetUint64(uint64(newMsgNum))
 
-		// pack arguments
-		// Pack the BlobHeader
 		calldata, err = arguments.PackValues(values)
 
 		if err != nil {

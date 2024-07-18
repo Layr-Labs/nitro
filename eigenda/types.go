@@ -308,7 +308,7 @@ type InboxPayload struct {
 // Load ingest loads calldata to a payload struct which explicitly defines the parsed
 // calldata fields
 func (ip *InboxPayload) Load(callDataValues []interface{}) error {
-	if len(callDataValues) != 6 {
+	if len(callDataValues) != 7 {
 		return errors.New("calldata does not have the expected number of parameters")
 	}
 

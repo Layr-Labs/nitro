@@ -83,7 +83,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 
 // ParseSequencerMsg parses the inbox tx calldata into a structured EigenDABlobInfo
 func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
-
+	
 	if len(calldata) < 4 {
 		return nil, errors.New("calldata is shorter than expected method signature length")
 	}
