@@ -70,39 +70,39 @@ fn main() {
         assert_eq!(len, expected_preimage.len());
         assert_eq!(&bytebuffer.0[..len], expected_preimage);
 
-        // println!("kzg preimage");
-        // let eth_versioned_hash =
-        //     hex!("01c277af4074155da57fd0f1065fc8b2e1d475e6639371b7300a2f1fb46296fa");
+        println!("kzg preimage");
+        let eth_versioned_hash =
+            hex!("01c277af4074155da57fd0f1065fc8b2e1d475e6639371b7300a2f1fb46296fa");
 
-        // bytebuffer = Bytes32(eth_versioned_hash);
-        // let len = wavm_read_eth_versioned_hash_preimage(
-        //     bytebuffer.0.as_mut_ptr(),
-        //     FIELD_ELEMENTS_PER_BLOB * BYTES_PER_FIELD_ELEMENT,
-        // );
-        // assert_eq!(len, 0);
-        // let len = wavm_read_eth_versioned_hash_preimage(
-        //     bytebuffer.0.as_mut_ptr(),
-        //     (FIELD_ELEMENTS_PER_BLOB + 1) * BYTES_PER_FIELD_ELEMENT,
-        // );
-        // assert_eq!(len, 0);
+        bytebuffer = Bytes32(eth_versioned_hash);
+        let len = wavm_read_eth_versioned_hash_preimage(
+            bytebuffer.0.as_mut_ptr(),
+            FIELD_ELEMENTS_PER_BLOB * BYTES_PER_FIELD_ELEMENT,
+        );
+        assert_eq!(len, 0);
+        let len = wavm_read_eth_versioned_hash_preimage(
+            bytebuffer.0.as_mut_ptr(),
+            (FIELD_ELEMENTS_PER_BLOB + 1) * BYTES_PER_FIELD_ELEMENT,
+        );
+        assert_eq!(len, 0);
 
-        // for i in 0..FIELD_ELEMENTS_PER_BLOB {
-        //     bytebuffer = Bytes32(eth_versioned_hash);
-        //     let len = wavm_read_eth_versioned_hash_preimage(
-        //         bytebuffer.0.as_mut_ptr(),
-        //         i * BYTES_PER_FIELD_ELEMENT,
-        //     );
-        //     assert_eq!(len, BYTES_PER_FIELD_ELEMENT);
+        for i in 0..FIELD_ELEMENTS_PER_BLOB {
+            bytebuffer = Bytes32(eth_versioned_hash);
+            let len = wavm_read_eth_versioned_hash_preimage(
+                bytebuffer.0.as_mut_ptr(),
+                i * BYTES_PER_FIELD_ELEMENT,
+            );
+            assert_eq!(len, BYTES_PER_FIELD_ELEMENT);
 
-        //     let sha_input = i.to_string();
-        //     let sha512 = Sha512::digest(sha_input.as_bytes());
-        //     let mut scalar = BigUint::from_bytes_be(sha512.as_slice());
-        //     scalar %= &bls_modulus;
-        //     let scalar_bytes = scalar.to_bytes_be();
-        //     let mut expected_hash = [0u8; 32];
-        //     expected_hash[32-scalar_bytes.len()..].copy_from_slice(&scalar_bytes);
-        //     assert_eq!(bytebuffer.0, expected_hash);
-        // }
+            let sha_input = i.to_string();
+            let sha512 = Sha512::digest(sha_input.as_bytes());
+            let mut scalar = BigUint::from_bytes_be(sha512.as_slice());
+            scalar %= &bls_modulus;
+            let scalar_bytes = scalar.to_bytes_be();
+            let mut expected_hash = [0u8; 32];
+            expected_hash[32-scalar_bytes.len()..].copy_from_slice(&scalar_bytes);
+            assert_eq!(bytebuffer.0, expected_hash);
+        }
 
         println!("eigenda preimage");
         
