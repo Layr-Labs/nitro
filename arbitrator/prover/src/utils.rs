@@ -207,7 +207,6 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
             Ok(commitment_hash)
         }
         PreimageType::EigenDAHash => {
-            
             let kzg_bn254: KzgBN254 = KzgBN254::setup(
                 "./arbitrator/prover/src/mainnet-files/g1.point.65536",
                 "./arbitrator/prover/src/mainnet-files/g2.point.65536",

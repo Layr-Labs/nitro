@@ -25,7 +25,6 @@ lazy_static::lazy_static! {
         268435456,
         65536
     ).unwrap();
-    
 }
 
 /// Creates a KZG preimage proof consumable by the point evaluation precompile.
