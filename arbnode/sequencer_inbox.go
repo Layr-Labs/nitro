@@ -168,7 +168,6 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 		return data, nil
 
 	case batchDataEigenDA:
-		println("Getting batch data from EigenDA")
 		tx, err := arbutil.GetLogTransaction(ctx, client, m.rawLog)
 		if err != nil {
 			return nil, err
