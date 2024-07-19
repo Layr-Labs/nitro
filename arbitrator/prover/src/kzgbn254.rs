@@ -16,16 +16,16 @@ lazy_static::lazy_static! {
     // note that we are loading 3000 for testing purposes atm, but for production use these values:
     // g1 and g2 points from the operator setup guide
     // srs_order = 268435456
-    // srs_points_to_load = 131072
+    // srs_points_to_load = 131072 (65536 is enough)
 
     pub static ref KZG: Kzg = Kzg::setup(
-        "./arbitrator/prover/src/test-files/g1.point",
-        "./arbitrator/prover/src/test-files/g2.point",
-        "./arbitrator/prover/src/test-files/g2.point.powerOf2",
-        3000,
-        3000
+        "./arbitrator/prover/src/mainnet-files/g1.point.65536",
+        "./arbitrator/prover/src/mainnet-files/g2.point.65536",
+        "./arbitrator/prover/src/mainnet-files/g2.point.powerOf2",
+        268435456,
+        65536
     ).unwrap();
-
+    
 }
 
 /// Creates a KZG preimage proof consumable by the point evaluation precompile.
@@ -37,7 +37,8 @@ pub fn prove_kzg_preimage_bn254(
 ) -> Result<()> {
     let mut kzg = KZG.clone();
 
-    println!("preimage: {}", encode(&preimage));
+    println!("preimage: {} {}", preimage.len(), encode(&preimage));
+    println!("offset: {}", offset);
 
     // expand roots of unity
     kzg.calculate_roots_of_unity(preimage.len() as u64)?;
