@@ -51,7 +51,7 @@ pub fn prove_kzg_preimage_bn254(
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
     let mut commitment_bytes = Vec::new();
-    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
+    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?; // why uncompressed ? 
 
     let mut expected_hash: Bytes32 = Sha256::digest(&*commitment_bytes).into();
     expected_hash[0] = 1;
@@ -69,39 +69,29 @@ pub fn prove_kzg_preimage_bn254(
         offset,
     );
 
-    // retrieve commitment to preimage
-    let preimage_polynomial = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
-    let preimage_commitment = kzg.commit(&preimage_polynomial)?;
-    let mut preimage_commitment_bytes = Vec::new();
-    preimage_commitment.serialize_uncompressed(&mut preimage_commitment_bytes)?;
-    println!(
-        "preimage commitment: {}",
-        encode(&preimage_commitment_bytes)
-    );
-
     let mut proving_offset = offset;
-
     let length_usize = preimage.len() as u64;
 
-    assert!(length_usize / 32 == preimage_polynomial.len() as u64);
+    assert!(length_usize / 32 == blob_polynomial_evaluation_form.len() as u64);
 
     // address proving past end edge case later
     let proving_past_end = offset as u64 >= length_usize;
     if proving_past_end {
         // Proving any offset proves the length which is all we need here,
         // because we're past the end of the preimage.
-        proving_offset = 0;
+        proving_offset = 0; // why 0? shouldn't this fail immediately ?
     }
 
     // Y = ϕ(offset) --> evaluation point for computing quotient proof
-    let proven_y_fr = preimage_polynomial
+    // confirming if this is actually ok ?
+    let proven_y_fr = blob_polynomial_evaluation_form
         .get_at_index(proving_offset as usize / 32)
         .ok_or_else(|| {
             eyre::eyre!(
                 "Index ({}) out of bounds for preimage of length {} with data of ({} field elements x 32 bytes)",
                 proving_offset,
                 length_usize,
-                preimage_polynomial.len()
+                blob_polynomial_evaluation_form.len()
             )
         })?;
 
@@ -112,6 +102,7 @@ pub fn prove_kzg_preimage_bn254(
     let proven_y = proven_y_fr.into_bigint().to_bytes_be();
     let z = z_fr.into_bigint().to_bytes_be();
 
+    // probably should be a constant on the contract.
     let g2_generator = G2Affine::generator();
     let z_g2 = (g2_generator * z_fr).into_affine();
 
@@ -124,7 +115,7 @@ pub fn prove_kzg_preimage_bn254(
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
     let kzg_proof = kzg
-        .compute_kzg_proof_with_roots_of_unity(&preimage_polynomial, proving_offset as u64 / 32)?;
+        .compute_kzg_proof_with_roots_of_unity(&blob_polynomial_evaluation_form, proving_offset as u64 / 32)?;
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
     let xminusz_x1: BigUint = g2_tau_minus_g2_z.x.c1.into();
@@ -139,8 +130,8 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut xminusz_encoded_bytes, &xminusz_y0);
 
     // encode the commitment
-    let commitment_x_bigint: BigUint = preimage_commitment.x.into();
-    let commitment_y_bigint: BigUint = preimage_commitment.y.into();
+    let commitment_x_bigint: BigUint = blob_commitment.x.into();
+    let commitment_y_bigint: BigUint = blob_commitment.y.into();
     let mut commitment_encoded_bytes = Vec::with_capacity(32);
     append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
     append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
