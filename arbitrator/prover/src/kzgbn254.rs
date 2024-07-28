@@ -116,6 +116,16 @@ pub fn prove_kzg_preimage_bn254(
 
     let kzg_proof = kzg
         .compute_kzg_proof_with_roots_of_unity(&blob_polynomial_evaluation_form, proving_offset as u64 / 32)?;
+    
+    // This should cause failure when proving past offset.
+    if !proving_past_end {
+        // This is required, but confirming what is the right way.
+        // ensure!(
+        //     *proven_y == preimage[offset_usize..offset_usize + 32],
+        //     "KZG proof produced wrong preimage for offset {}",
+        //     offset,
+        // );
+    }
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
     let xminusz_x1: BigUint = g2_tau_minus_g2_z.x.c1.into();
