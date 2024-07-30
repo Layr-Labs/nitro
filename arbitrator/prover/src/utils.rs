@@ -208,11 +208,11 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
         }
         PreimageType::EigenDAHash => {
             let kzg_bn254: KzgBN254 = KzgBN254::setup(
-                "./arbitrator/prover/src/test-files/g1.point",
-                "./arbitrator/prover/src/test-files/g2.point",
-                "./arbitrator/prover/src/test-files/g2.point.powerOf2",
-                3000,
-                3000,
+                "./arbitrator/prover/src/mainnet-files/g1.point.65536",
+                "./arbitrator/prover/src/mainnet-files/g2.point.65536",
+                "./arbitrator/prover/src/mainnet-files/g2.point.powerOf2",
+                268435456,
+                65536,
             )
             .unwrap();
 
