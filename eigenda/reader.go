@@ -2,7 +2,7 @@ package eigenda
 
 import (
 	"context"
-	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"strings"
 
@@ -59,24 +59,19 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 		return nil, err
 	}
 
-	// record preimage data for EigenDA using the hash of the commitment
-	// for lookups in the replay script
-	kzgCommit, err := blobInfo.SerializeCommitment()
+	hash, err := blobInfo.PreimageHash()
 	if err != nil {
 		return nil, err
 	}
 
-	shaDataHash := sha256.New()
-	shaDataHash.Write(kzgCommit)
-	dataHash := shaDataHash.Sum([]byte{})
-	dataHash[0] = 1
+
 	if preimageRecoder != nil {
 		// iFFT the preimage data
 		preimage, err := EncodeBlob(data)
 		if err != nil {
 			return nil, err
 		}
-		preimageRecoder(common.BytesToHash(dataHash), preimage, arbutil.EigenDaPreimageType)
+		preimageRecoder(*hash, preimage, arbutil.EigenDaPreimageType)
 	}
 	return data, nil
 }
@@ -116,6 +111,12 @@ func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
 		BlobHeader:            inboxPayload.BlobHeader,
 	}, nil
 
+}
+
+func uint32ToBytes(n uint32) []byte {
+    bytes := make([]byte, 4)
+    binary.BigEndian.PutUint32(bytes, n)
+    return bytes
 }
 
 // NewReaderForEigenDA is generally meant to be only used by nitro.

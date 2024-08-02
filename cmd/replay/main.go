@@ -6,7 +6,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -154,18 +153,12 @@ type EigenDAPreimageReader struct{}
 // QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
 // certificate kzg commitment for identifying the preimage.
 func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
-	kzgCommit, err := cert.SerializeCommitment()
+	hash, err := cert.PreimageHash()
 	if err != nil {
 		return nil, err
 	}
-
-	shaDataHash := sha256.New()
-	shaDataHash.Write(kzgCommit)
-	dataHash := shaDataHash.Sum([]byte{})
-	dataHash[0] = 1
-
-	hash := common.BytesToHash(dataHash)
-	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, hash)
+	
+	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, *hash)
 	if err != nil {
 		return nil, err
 	}

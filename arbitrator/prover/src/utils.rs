@@ -223,6 +223,7 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
 
             let mut commitment_bytes = Vec::new();
             blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
+            commitment_bytes.extend(preimage.len().to_be_bytes());
 
             let mut commitment_hash: [u8; 32] = Sha256::digest(&commitment_bytes).into();
             commitment_hash[0] = 1;

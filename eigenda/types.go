@@ -1,11 +1,13 @@
 package eigenda
 
 import (
+	"crypto/sha256"
 	"errors"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -18,6 +20,23 @@ import (
 type EigenDABlobInfo struct {
 	BlobHeader            BlobHeader            `json:"blobHeader"`
 	BlobVerificationProof BlobVerificationProof `json:"blobVerificationProof"`
+}
+
+func (e *EigenDABlobInfo) PreimageHash() (*common.Hash, error) {
+	kzgCommit, err := e.SerializeCommitment()
+	if err != nil {
+		return nil, err
+	}
+
+	shaDataHash := sha256.New()
+	digest := append(kzgCommit, uint32ToBytes(e.BlobHeader.DataLength)...)
+	shaDataHash.Write(digest)
+	dataHash := shaDataHash.Sum([]byte{})
+	dataHash[0] = 1
+
+	h := common.BytesToHash(dataHash)
+
+	return &h, nil
 }
 
 type BlobHeader struct {

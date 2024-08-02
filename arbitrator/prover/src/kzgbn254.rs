@@ -53,7 +53,10 @@ pub fn prove_kzg_preimage_bn254(
     let mut commitment_bytes = Vec::new();
     blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
 
-    let mut expected_hash: Bytes32 = Sha256::digest(&*commitment_bytes).into();
+
+    commitment_bytes.extend(preimage.len().to_be_bytes());
+
+    let mut expected_hash: Bytes32 = Sha256::digest(&commitment_bytes).into();
     expected_hash[0] = 1;
 
     ensure!(
