@@ -7,7 +7,6 @@ use eyre::{ensure, Result};
 use hex::encode;
 use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
-use num_traits::ToBytes;
 use sha2::{Digest, Sha256};
 use std::io::Write;
 
