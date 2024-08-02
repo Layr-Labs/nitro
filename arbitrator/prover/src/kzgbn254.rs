@@ -51,7 +51,7 @@ pub fn prove_kzg_preimage_bn254(
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
     let mut commitment_bytes = Vec::new();
-    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?; // why uncompressed ? 
+    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?; // why uncompressed ?
 
     let mut expected_hash: Bytes32 = Sha256::digest(&*commitment_bytes).into();
     expected_hash[0] = 1;
@@ -114,9 +114,11 @@ pub fn prove_kzg_preimage_bn254(
         .clone();
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
-    let kzg_proof = kzg
-        .compute_kzg_proof_with_roots_of_unity(&blob_polynomial_evaluation_form, proving_offset as u64 / 32)?;
-    
+    let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(
+        &blob_polynomial_evaluation_form,
+        proving_offset as u64 / 32,
+    )?;
+
     // This should cause failure when proving past offset.
     if !proving_past_end {
         // This is required, but confirming what is the right way.
