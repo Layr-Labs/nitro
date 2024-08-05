@@ -28,7 +28,7 @@ env:
 jobs:
   arbitrator:
     name: Run Arbitrator tests
-    runs-on: linux-xl
+    runs-on: linux-2xl
     steps:
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
