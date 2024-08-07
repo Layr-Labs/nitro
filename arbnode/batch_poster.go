@@ -239,7 +239,6 @@ var DefaultBatchPosterConfig = BatchPosterConfig{
 	DisableDapFallbackStoreDataOnChain: false,
 	// This default is overridden for L3 chains in applyChainParameters in cmd/nitro/nitro.go
 	MaxSize: 100000,
-	// (VALIDATE) Since this value is 2x'd in the compressed buffer length and we only want to support 2MB blobs.
 	MaxEigenDABatchSize: 2_000_000,
 	// Try to fill 3 blobs per batch
 	Max4844BatchSize:               blobs.BlobEncodableData*(params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob)/2 - 2000,
