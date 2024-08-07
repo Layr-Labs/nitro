@@ -51,6 +51,7 @@ import (
 	"github.com/offchainlabs/nitro/cmd/genericconf"
 	"github.com/offchainlabs/nitro/cmd/util"
 	"github.com/offchainlabs/nitro/cmd/util/confighelpers"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution/gethexec"
 	_ "github.com/offchainlabs/nitro/execution/nodeInterface"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
@@ -598,6 +599,13 @@ func mainImpl() int {
 	if nodeConfig.Node.BatchPoster.Enable && !nodeConfig.Node.DataAvailability.Enable {
 		if nodeConfig.Node.BatchPoster.MaxSize > seqInboxMaxDataSize-10000 {
 			log.Error("batchPoster's MaxSize is too large")
+			return 1
+		}
+	}
+
+	if nodeConfig.Node.BatchPoster.Enable && nodeConfig.Node.EigenDA.Enable {
+		if nodeConfig.Node.BatchPoster.MaxEigenDABatchSize > eigenda.MaxBatchSize {
+			log.Error("batchPoster's MaxEigenDABatchSize too large")
 			return 1
 		}
 	}
