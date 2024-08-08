@@ -218,7 +218,7 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
 
             let blob = EigenDABlob::from_padded_bytes_unchecked(preimage);
 
-            let blob_polynomial = blob.to_polynomial(PolynomialFormat::InEvaluationForm)?;
+            let blob_polynomial = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
             let blob_commitment = kzg_bn254.commit(&blob_polynomial)?;
 
             let mut commitment_bytes = Vec::new();

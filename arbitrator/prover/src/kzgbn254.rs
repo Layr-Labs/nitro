@@ -35,15 +35,11 @@ pub fn prove_kzg_preimage_bn254(
 ) -> Result<()> {
     let mut kzg = KZG.clone();
 
-    println!("preimage: {} {}", preimage.len(), encode(&preimage));
-    println!("offset: {}", offset);
-
     // expand roots of unity
     kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 
-    // preimage is already padded and is expected to be in data domain i.e, this is the actual data but padded
-    // to power of 2
-    let blob = Blob::from_padded_bytes_unchecked(preimage);
+    // preimage is already padded and is the actual blob data, NOT the IFFT'd form.
+    let blob = Blob::from_padded_bytes_unchecked(&preimage);
 
     let blob_polynomial_evaluation_form = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
@@ -52,6 +48,7 @@ pub fn prove_kzg_preimage_bn254(
     blob_commitment.serialize_uncompressed(&mut commitment_bytes)?; // why uncompressed ?
 
     let mut expected_hash: Bytes32 = Sha256::digest(&*commitment_bytes).into();
+
     expected_hash[0] = 1;
 
     ensure!(
@@ -117,14 +114,14 @@ pub fn prove_kzg_preimage_bn254(
         proving_offset as u64 / 32,
     )?;
 
+    let offset_usize = proving_offset as usize;
     // This should cause failure when proving past offset.
     if !proving_past_end {
-        // This is required, but confirming what is the right way.
-        // ensure!(
-        //     *proven_y == preimage[offset_usize..offset_usize + 32],
-        //     "KZG proof produced wrong preimage for offset {}",
-        //     offset,
-        // );
+        ensure!(
+            *proven_y == preimage[offset_usize..offset_usize + 32],
+            "KZG proof produced wrong preimage for offset {}",
+            offset,
+        );
     }
 
     let xminusz_x0: BigUint = g2_tau_minus_g2_z.x.c0.into();
