@@ -78,7 +78,7 @@ pub fn prove_kzg_preimage_bn254(
     if proving_past_end {
         // Proving any offset proves the length which is all we need here,
         // because we're past the end of the preimage.
-        proving_offset = 0; // why 0? shouldn't this fail immediately ?
+        proving_offset = 0;
     }
 
     // Y = ϕ(offset) --> evaluation point for computing quotient proof
