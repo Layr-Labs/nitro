@@ -210,10 +210,10 @@ func main() {
 			panic(fmt.Sprintf("expected blob element %v to be %v but got %v", i, hex.EncodeToString(expectedElement), hex.EncodeToString(gotElement)))
 		}
 	}
-	// EIGENDA COMMIT HASH
-	_, err = wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.HexToHash("01605220b6928163676612ca50bbe5e0c595052876796dbedeae8ef597c9fdcf"))
+	// Ensure 2MB padded iFFT bytes (2^21) of data can be resolved
+	_, err = wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.HexToHash("004f3a0db52c6f708ec9bde76570c1fcf3c0eefdf4841b7686d2aa13c38232a9"))
 	if err != nil {
-		panic(fmt.Sprintf("failed to resolve eigenda preimage: %v", err))
+		panic(fmt.Sprintf("failed to resolve eigenda preimage #1: %v", err))
 	}
 
 	println("verified preimage resolution!\n")

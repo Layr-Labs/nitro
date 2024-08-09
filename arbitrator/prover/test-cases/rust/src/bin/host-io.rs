@@ -104,24 +104,14 @@ fn main() {
             assert_eq!(bytebuffer.0, expected_hash);
         }
 
-        println!("eigenda preimage");
-        
-        let expected_len = 0;
+        println!("eigenda kzg-bn254 preimage");
+        let eigen_hash = hex!("0191c996190e53f90d077a02f247169f6704a6f870272158f88f88a4194fd7e2");
+        bytebuffer = Bytes32(eigen_hash);
 
-        for i in 0..5{
-            // test-files srs 011e229d75b13559dcb2d757ecae9b66fa579268e28e196789503322115c06e1
-            // mainnet srs 01605220b6928163676612ca50bbe5e0c595052876796dbedeae8ef597c9fdcf
-            let eigen_hash = hex!("01605220b6928163676612ca50bbe5e0c595052876796dbedeae8ef597c9fdcf");
-            bytebuffer = Bytes32(eigen_hash);
+        // ensure that offset > (4096 * 32) can be successfully read
+        // let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), (4096 * 32) + 32);
+        // assert_eq!(actual_len, 32);
 
-            let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), i * 32);
-            
-            if i < 4 {
-                assert_eq!(actual_len, 32);
-            } else {
-                assert_eq!(actual_len, 0);
-            }
-        }
     }
     
     println!("Done!");

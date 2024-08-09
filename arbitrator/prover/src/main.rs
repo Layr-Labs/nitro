@@ -120,6 +120,8 @@ const DELAYED_HEADER_LEN: usize = 112; // also in test-case's host-io.rs & contr
 
 #[cfg(feature = "native")]
 fn main() -> Result<()> {
+    use arbutil::crypto::keccak;
+
     let opts = Opts::from_args();
 
     let mut inbox_contents = HashMap::default();
@@ -170,6 +172,11 @@ fn main() -> Result<()> {
             file.read_exact(&mut buf)?;
 
             let hash = hash_preimage(&buf, preimage_ty)?;
+
+            println!(
+                "read preimage of type {:?} with hash 0x{} and size {}",
+                preimage_ty, hex::encode(hash), size
+            );
             preimages
                 .entry(preimage_ty)
                 .or_default()
