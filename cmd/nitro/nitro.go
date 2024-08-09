@@ -605,8 +605,8 @@ func mainImpl() int {
 
 	// NOTE: since the SRS is stored within the arbitrator and predetermines the max batch size
 	// supported for proving stateless execution - it could be possible to read from dynamically
-	// otherwise it maybe best to expose the max supported batch size from the disperser directly 
-	// to ensure dynamically adaptability within the rollup. 
+	// otherwise it maybe best to expose the max supported batch size from the disperser directly
+	// to ensure dynamically adaptability within the rollup.
 	if nodeConfig.Node.BatchPoster.Enable && nodeConfig.Node.EigenDA.Enable {
 		if nodeConfig.Node.BatchPoster.MaxEigenDABatchSize > eigenda.MaxBatchSize {
 			log.Error("batchPoster's MaxEigenDABatchSize too large.", "MaxEigenDABatchSize", eigenda.MaxBatchSize)

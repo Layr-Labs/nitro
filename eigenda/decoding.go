@@ -93,7 +93,6 @@ func DecodeBlob(data []byte) ([]byte, error) {
 
 }
 
-
 func EncodeBlob(data []byte) ([]byte, error) {
 	var err error
 	data, err = encodeBlob(data)
@@ -103,8 +102,6 @@ func EncodeBlob(data []byte) ([]byte, error) {
 
 	return IFFT(data)
 }
-
-
 
 func encodeBlob(rawData []byte) ([]byte, error) {
 	codecBlobHeader := make([]byte, 32)
@@ -118,12 +115,12 @@ func encodeBlob(rawData []byte) ([]byte, error) {
 	// encode raw data modulo bn254
 	rawDataPadded := codec.ConvertByPaddingEmptyByte(rawData)
 
-	// append raw data
-	encodedData := append(codecBlobHeader, rawDataPadded...)
+	// append raw data; reassgin avoids copying
+	encodedData := codecBlobHeader
+	encodedData = append(encodedData, rawDataPadded...)
 
 	return encodedData, nil
 }
-
 
 func IFFT(data []byte) ([]byte, error) {
 	// we now IFFT data regardless of the encoding type

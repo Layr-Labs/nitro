@@ -109,11 +109,11 @@ type BatchPoster struct {
 	dapWriter          daprovider.Writer
 	// This deviates from the DA spec but is necessary for the batch poster to work efficiently
 	// since we need to an extended method on the SequencerInbox contract
-	eigenDAWriter      eigenda.EigenDAWriter
-	dataPoster         *dataposter.DataPoster
-	redisLock          *redislock.Simple
-	messagesPerBatch   *arbmath.MovingAverage[uint64]
-	non4844BatchCount  int // Count of consecutive non-4844 batches posted
+	eigenDAWriter     eigenda.EigenDAWriter
+	dataPoster        *dataposter.DataPoster
+	redisLock         *redislock.Simple
+	messagesPerBatch  *arbmath.MovingAverage[uint64]
+	non4844BatchCount int // Count of consecutive non-4844 batches posted
 	// This is an atomic variable that should only be accessed atomically.
 	// An estimate of the number of batches we want to post but haven't yet.
 	// This doesn't include batches which we don't want to post yet due to the L1 bounds.
@@ -238,7 +238,7 @@ var DefaultBatchPosterConfig = BatchPosterConfig{
 	Enable:                             false,
 	DisableDapFallbackStoreDataOnChain: false,
 	// This default is overridden for L3 chains in applyChainParameters in cmd/nitro/nitro.go
-	MaxSize: 100000,
+	MaxSize:             100000,
 	MaxEigenDABatchSize: 2_000_000,
 	// Try to fill 3 blobs per batch
 	Max4844BatchSize:               blobs.BlobEncodableData*(params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob)/2 - 2000,
@@ -274,7 +274,7 @@ var TestBatchPosterConfig = BatchPosterConfig{
 	Enable:                         true,
 	MaxSize:                        100000,
 	Max4844BatchSize:               DefaultBatchPosterConfig.Max4844BatchSize,
-	MaxEigenDABatchSize: 		  DefaultBatchPosterConfig.MaxEigenDABatchSize,
+	MaxEigenDABatchSize:            DefaultBatchPosterConfig.MaxEigenDABatchSize,
 	PollInterval:                   time.Millisecond * 10,
 	ErrorDelay:                     time.Millisecond * 10,
 	MaxDelay:                       0,
@@ -298,7 +298,7 @@ var EigenDABatchPosterConfig = BatchPosterConfig{
 	Enable:                         true,
 	MaxSize:                        100000,
 	Max4844BatchSize:               DefaultBatchPosterConfig.Max4844BatchSize,
-	MaxEigenDABatchSize: 		  DefaultBatchPosterConfig.MaxEigenDABatchSize,
+	MaxEigenDABatchSize:            DefaultBatchPosterConfig.MaxEigenDABatchSize,
 	PollInterval:                   time.Millisecond * 10,
 	ErrorDelay:                     time.Millisecond * 10,
 	MaxDelay:                       0,
@@ -710,7 +710,7 @@ type buildingBatch struct {
 	msgCount          arbutil.MessageIndex
 	haveUsefulMessage bool
 	use4844           bool
-	useEigenDA 	  bool
+	useEigenDA        bool
 }
 
 func newBatchSegments(firstDelayed uint64, config *BatchPosterConfig, backlog uint64, use4844 bool, useEigenDA bool) *batchSegments {
