@@ -41,7 +41,8 @@ pub fn prove_kzg_preimage_bn254(
     // preimage is already padded and is the actual blob data, NOT the IFFT'd form.
     let blob = Blob::from_padded_bytes_unchecked(&preimage);
 
-    let blob_polynomial_evaluation_form = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
+    let blob_polynomial_evaluation_form =
+        blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
     let mut commitment_bytes = Vec::new();
