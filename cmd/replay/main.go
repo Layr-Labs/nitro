@@ -124,6 +124,7 @@ func (dasReader *PreimageDASReader) ExpirationPolicy(ctx context.Context) (dapro
 }
 
 type BlobPreimageReader struct{}
+
 func (r *BlobPreimageReader) GetBlobs(
 	ctx context.Context,
 	batchBlockHash common.Hash,
@@ -149,8 +150,8 @@ func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 	return nil
 }
 
-
 type EigenDAPreimageReader struct{}
+
 // QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
 // certificate kzg commitment for identifying the preimage.
 func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
@@ -177,11 +178,9 @@ func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eig
 		println("Error decoding blob: ", err)
 		return nil, err
 	}
-	
+
 	return decodedBlob, nil
 }
-
-
 
 // To generate:
 // key, _ := crypto.HexToECDSA("0000000000000000000000000000000000000000000000000000000000000001")

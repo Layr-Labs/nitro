@@ -15,10 +15,9 @@ type EigenDAProxyClient struct {
 	client ProxyClient
 }
 
-func NewEigenDAProxyClient(RPCUrl string) *EigenDAProxyClient {
-
+func NewEigenDAProxyClient(rpcUrl string) *EigenDAProxyClient {
 	c := New(&Config{
-		URL: RPCUrl,
+		URL: rpcUrl,
 	})
 	return &EigenDAProxyClient{client: c}
 }
@@ -89,7 +88,7 @@ func StrToDomainType(s string) DomainType {
 
 // TODO: Add support for custom http client option
 type Config struct {
-	URL   string
+	URL string
 }
 
 // ProxyClient is an interface for communicating with the EigenDA proxy server
@@ -141,7 +140,7 @@ func (c *client) GetData(ctx context.Context, comm []byte, domain DomainType) ([
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct http request: %e", err)
+		return nil, fmt.Errorf("failed to construct http request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/octet-stream")
