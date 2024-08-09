@@ -175,7 +175,9 @@ fn main() -> Result<()> {
 
             println!(
                 "read preimage of type {:?} with hash 0x{} and size {}",
-                preimage_ty, hex::encode(hash), size
+                preimage_ty,
+                hex::encode(hash),
+                size
             );
             preimages
                 .entry(preimage_ty)

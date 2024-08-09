@@ -38,9 +38,8 @@ pub fn prove_kzg_preimage_bn254(
     kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 
     // preimage is already padded and is the actual blob data, NOT the IFFT'd form.
-    let blob_polynomial =
-        Blob::from_padded_bytes_unchecked(&preimage).
-        to_polynomial(PolynomialFormat::InCoefficientForm)?;
+    let blob_polynomial = Blob::from_padded_bytes_unchecked(&preimage)
+        .to_polynomial(PolynomialFormat::InCoefficientForm)?;
     let blob_commitment = kzg.commit(&blob_polynomial)?;
 
     let mut commitment_bytes = Vec::new();
@@ -113,10 +112,8 @@ pub fn prove_kzg_preimage_bn254(
         .clone();
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
-    let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(
-        &blob_polynomial,
-        proving_offset as u64 / 32,
-    )?;
+    let kzg_proof =
+        kzg.compute_kzg_proof_with_roots_of_unity(&blob_polynomial, proving_offset as u64 / 32)?;
 
     let offset_usize = proving_offset as usize;
     // This should cause failure when proving past offset.
