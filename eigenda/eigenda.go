@@ -16,7 +16,6 @@ const (
 	MaxBatchSize = 2_000_000 // 2MB
 )
 
-
 func IsEigenDAMessageHeaderByte(header byte) bool {
 	return hasBits(header, daprovider.EigenDAMessageHeaderFlag)
 }
@@ -44,8 +43,11 @@ type EigenDA struct {
 	client *EigenDAProxyClient
 }
 
-func NewEigenDA(proxyServerRpc string) (*EigenDA, error) {
-	client := NewEigenDAProxyClient(proxyServerRpc)
+func NewEigenDA(config *EigenDAConfig) (*EigenDA, error) {
+	if !config.Enable {
+		panic("EigenDA is not enabled")
+	}
+	client := NewEigenDAProxyClient(config.Rpc)
 
 	return &EigenDA{
 		client: client,

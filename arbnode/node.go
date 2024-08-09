@@ -553,7 +553,7 @@ func createNodeImpl(
 		return nil, errors.New("a data availability service is required for this chain, but it was not configured")
 	} else if config.EigenDA.Enable {
 		log.Info("EigenDA enabled")
-		eigenDAService, err := eigenda.NewEigenDA(config.EigenDA.Rpc)
+		eigenDAService, err := eigenda.NewEigenDA(&config.EigenDA)
 		if err != nil {
 			return nil, err
 		}
@@ -702,7 +702,7 @@ func createNodeImpl(
 		if daWriter != nil {
 			dapWriter = daprovider.NewWriterForDAS(daWriter)
 		}
-		
+
 		batchPoster, err = NewBatchPoster(ctx, &BatchPosterOpts{
 			DataPosterDB:  rawdb.NewTable(arbDb, storage.BatchPosterPrefix),
 			L1Reader:      l1Reader,
