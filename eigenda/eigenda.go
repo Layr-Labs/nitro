@@ -2,6 +2,7 @@ package eigenda
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -45,7 +46,7 @@ type EigenDA struct {
 
 func NewEigenDA(config *EigenDAConfig) (*EigenDA, error) {
 	if !config.Enable {
-		panic("EigenDA is not enabled")
+		return nil, errors.New("EigenDA is not enabled")
 	}
 	client := NewEigenDAProxyClient(config.Rpc)
 
