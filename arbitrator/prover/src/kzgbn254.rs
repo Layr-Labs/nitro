@@ -75,7 +75,6 @@ pub fn prove_kzg_preimage_bn254(
         proving_offset = 0;
     }
 
-    println!("offset / 32: {}", proving_offset / 32);
     // Y = ϕ(offset) --> evaluation point for computing quotient proof
     // confirming if this is actually ok ?
     let y_fr = blob_polynomial
@@ -89,15 +88,11 @@ pub fn prove_kzg_preimage_bn254(
             )
         })?;
 
-    println!("y_fr: {:?}", y_fr);
-
     let z_fr = kzg
         .get_nth_root_of_unity(proving_offset as usize / 32)
         .ok_or_else(|| eyre::eyre!("Failed to get nth root of unity"))?;
 
     let y = y_fr.into_bigint().to_bytes_be();
-    println!("y: {:?}", y_fr);
-
     let z = z_fr.into_bigint().to_bytes_be();
 
     // probably should be a constant on the contract.
@@ -118,8 +113,6 @@ pub fn prove_kzg_preimage_bn254(
     let offset_usize = proving_offset as usize;
     // This should cause failure when proving past offset.
     if !proving_past_end {
-        println!("y {:?}", y);
-        println!("preimage {:?}", &preimage[0..32]);
         ensure!(
             *y == preimage[offset_usize..offset_usize + 32],
             "KZG proof produced wrong preimage for offset {}",

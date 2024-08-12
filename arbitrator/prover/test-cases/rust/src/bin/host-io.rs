@@ -104,15 +104,37 @@ fn main() {
             assert_eq!(bytebuffer.0, expected_hash);
         }
 
-        println!("eigenda kzg-bn254 preimage");
+        println!("eigenda 2MB kzg-bn254 preimage");
         let eigen_hash = hex!("0191c996190e53f90d077a02f247169f6704a6f870272158f88f88a4194fd7e2");
         bytebuffer = Bytes32(eigen_hash);
 
-        // ensure that offset > (4096 * 32) can be successfully read
-        // let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), (4096 * 32) + 32);
-        // assert_eq!(actual_len, 32);
+        // ensure that offset > 127KB can be successfully read
+        // we only read a singe 32 byte piece of this large preimage given a bug
+        // where multiple kzg-bn254 read_preimage proof serializations within the same execution cause
+        // failures. This is ok though given that a proof is only serialized for a single instruction at the
+        // final stage of dispute resolution.
+        let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), (4096 * 32) + 32);
+        assert_eq!(actual_len, 32);
 
-    }
-    
+
+
+        println!("eigenda 128b preimage");
+
+        let expected_len = 0;
+
+        for i in 0..5{
+            let eigen_hash = hex!("01605220b6928163676612ca50bbe5e0c595052876796dbedeae8ef597c9fdcf");
+            bytebuffer = Bytes32(eigen_hash);
+
+            let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), i * 32);
+
+            if i < 4 {
+                assert_eq!(actual_len, 32);
+            } else {
+                assert_eq!(actual_len, 0);
+            }
+
+        }
+    }    
     println!("Done!");
 }

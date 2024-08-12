@@ -25,13 +25,19 @@ def kzg_test_data():
         data.extend(h)
     return bytes(data)
 
-def kzg_bn254_test_data():
+def kzg_bn254_2mb_test_data():
     # load 2MB padded blob from file
     # 01bc9203a3f91276750f5fdc7241e7b09c94ae58f7f189aa292858a040bd7858
     with open("scripts/eigenda_large_blob.txt", "r") as file:
         data = file.read().strip()
         # decode hex string to bytes
         return bytes.fromhex(data[2:])
+
+def kzg_bn254_128b_test_data():
+    # 00bca02094eb78126a517b206a88c73cfa9ec6f704c7030d18212cace820f025
+    data = bytes([0 ,0 ,0 ,0 ,0 ,64 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,48 ,48 ,98 ,99 ,97 ,48 ,50 ,48 ,57 ,52 ,101 ,98 ,55 ,56 ,49 ,50 ,54 ,97 ,53 ,49 ,55 ,98 ,50 ,48 ,54 ,97 ,56 ,56 ,99 ,55 ,51 ,0 ,99 ,102 ,97 ,57 ,101 ,99 ,54 ,102 ,55 ,48 ,52 ,99 ,55 ,48 ,51 ,48 ,100 ,49 ,56 ,50 ,49 ,50 ,99 ,97 ,99 ,101 ,56 ,50 ,48 ,102 ,48 ,0 ,50 ,53 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0])
+
+    return data
 
 if len(sys.argv) < 2:
     print("Usage: python3 create-test-preimages.py <filename>")
@@ -43,7 +49,8 @@ preimages = [
     (0, b'hello world'),
     (1, b'hello world'),
     (2, kzg_test_data()),
-    (3, kzg_bn254_test_data()),
+    (3, kzg_bn254_2mb_test_data()),
+    (3, kzg_bn254_128b_test_data()),
 ]
 
 write_data_to_file(filename, preimages)
