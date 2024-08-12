@@ -955,8 +955,7 @@ func (b *BatchPoster) encodeAddBatch(
 	methodName := sequencerBatchPostMethodName
 	if use4844 {
 		methodName = sequencerBatchPostWithBlobsMethodName
-	}
-	if useEigenDA {
+	} else if useEigenDA {
 		methodName = sequencerBatchPostWithEigendaMethodName
 	}
 	method, ok := b.seqInboxABI.Methods[methodName]
@@ -966,122 +965,120 @@ func (b *BatchPoster) encodeAddBatch(
 	var calldata []byte
 	var kzgBlobs []kzg4844.Blob
 	var err error
-	if use4844 {
-		kzgBlobs, err = blobs.EncodeBlobs(l2MessageData)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to encode blobs: %w", err)
+	switch {
+	case use4844:
+		{
+			kzgBlobs, err = blobs.EncodeBlobs(l2MessageData)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to encode blobs: %w", err)
+			}
+			// EIP4844 transactions to the sequencer inbox will not use transaction calldata for L2 info.
+			calldata, err = method.Inputs.Pack(
+				seqNum,
+				new(big.Int).SetUint64(delayedMsg),
+				b.config().gasRefunder,
+				new(big.Int).SetUint64(uint64(prevMsgNum)),
+				new(big.Int).SetUint64(uint64(newMsgNum)),
+			)
 		}
-		// EIP4844 transactions to the sequencer inbox will not use transaction calldata for L2 info.
-		calldata, err = method.Inputs.Pack(
-			seqNum,
-			new(big.Int).SetUint64(delayedMsg),
-			b.config().gasRefunder,
-			new(big.Int).SetUint64(uint64(prevMsgNum)),
-			new(big.Int).SetUint64(uint64(newMsgNum)),
-		)
-	} else if useEigenDA {
-
-		blobVerificationProofType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-			{Name: "batchID", Type: "uint32"},
-			{Name: "blobIndex", Type: "uint32"},
-			{Name: "batchMetadata", Type: "tuple",
-				Components: []abi.ArgumentMarshaling{
-					{Name: "batchHeader", Type: "tuple",
-						Components: []abi.ArgumentMarshaling{
-							{Name: "blobHeadersRoot", Type: "bytes32"},
-							{Name: "quorumNumbers", Type: "bytes"},
-							{Name: "signedStakeForQuorums", Type: "bytes"},
-							{Name: "referenceBlockNumber", Type: "uint32"},
-						},
-					},
-					{Name: "signatoryRecordHash", Type: "bytes32"},
-					{Name: "confirmationBlockNumber", Type: "uint32"},
-				},
-			},
-			{
-				Name: "inclusionProof",
-				Type: "bytes",
-			},
-			{
-				Name: "quorumIndices",
-				Type: "bytes",
-			},
-		})
-
-		if err != nil {
-			return nil, nil, err
+	case useEigenDA:
+		{
+			calldata, err = b.encodeEigenDABatch(seqNum, prevMsgNum, newMsgNum, delayedMsg, eigenDaBlobInfo)
 		}
-
-		blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-			{Name: "commitment", Type: "tuple", Components: []abi.ArgumentMarshaling{
-				{Name: "X", Type: "uint256"},
-				{Name: "Y", Type: "uint256"},
-			}},
-			{Name: "dataLength", Type: "uint32"},
-			{Name: "quorumBlobParams", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
-				{Name: "quorumNumber", Type: "uint8"},
-				{Name: "adversaryThresholdPercentage", Type: "uint8"},
-				{Name: "confirmationThresholdPercentage", Type: "uint8"},
-				{Name: "chunkLength", Type: "uint32"},
-			}},
-		})
-		if err != nil {
-			return nil, nil, err
+	default:
+		{
+			calldata, err = method.Inputs.Pack(
+				seqNum,
+				l2MessageData,
+				new(big.Int).SetUint64(delayedMsg),
+				b.config().gasRefunder,
+				new(big.Int).SetUint64(uint64(prevMsgNum)),
+				new(big.Int).SetUint64(uint64(newMsgNum)),
+			)
 		}
-
-		addressType, err := abi.NewType("address", "", nil)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		uint256Type, err := abi.NewType("uint256", "", nil)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Create ABI arguments
-		arguments := abi.Arguments{
-			{Type: uint256Type},
-			{Type: blobVerificationProofType},
-			{Type: blobHeaderType},
-			{Type: addressType},
-			{Type: uint256Type},
-			{Type: uint256Type},
-			{Type: uint256Type},
-		}
-
-		// define values array
-		values := make([]interface{}, 7)
-		values[0] = seqNum
-		values[1] = eigenDaBlobInfo.BlobVerificationProof
-		values[2] = eigenDaBlobInfo.BlobHeader
-		values[3] = b.config().gasRefunder
-		values[4] = new(big.Int).SetUint64(delayedMsg)
-		values[5] = new(big.Int).SetUint64(uint64(prevMsgNum))
-		values[6] = new(big.Int).SetUint64(uint64(newMsgNum))
-
-		calldata, err = arguments.PackValues(values)
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-	} else {
-		calldata, err = method.Inputs.Pack(
-			seqNum,
-			l2MessageData,
-			new(big.Int).SetUint64(delayedMsg),
-			b.config().gasRefunder,
-			new(big.Int).SetUint64(uint64(prevMsgNum)),
-			new(big.Int).SetUint64(uint64(newMsgNum)),
-		)
 	}
+
 	if err != nil {
 		return nil, nil, err
 	}
 	fullCalldata := append([]byte{}, method.ID...)
 	fullCalldata = append(fullCalldata, calldata...)
 	return fullCalldata, kzgBlobs, nil
+}
+
+func (b *BatchPoster) encodeEigenDABatch(seqNum *big.Int, prevMsgNum, newMsgNum arbutil.MessageIndex, delayedMsg uint64, eigenDaBlobInfo *eigenda.EigenDABlobInfo) ([]byte, error) {
+	blobVerificationProofType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "batchID", Type: "uint32"},
+		{Name: "blobIndex", Type: "uint32"},
+		{Name: "batchMetadata", Type: "tuple",
+			Components: []abi.ArgumentMarshaling{
+				{Name: "batchHeader", Type: "tuple",
+					Components: []abi.ArgumentMarshaling{
+						{Name: "blobHeadersRoot", Type: "bytes32"},
+						{Name: "quorumNumbers", Type: "bytes"},
+						{Name: "signedStakeForQuorums", Type: "bytes"},
+						{Name: "referenceBlockNumber", Type: "uint32"},
+					},
+				},
+				{Name: "signatoryRecordHash", Type: "bytes32"},
+				{Name: "confirmationBlockNumber", Type: "uint32"},
+			},
+		},
+		{Name: "inclusionProof", Type: "bytes"},
+		{Name: "quorumIndices", Type: "bytes"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "commitment", Type: "tuple", Components: []abi.ArgumentMarshaling{
+			{Name: "X", Type: "uint256"},
+			{Name: "Y", Type: "uint256"},
+		}},
+		{Name: "dataLength", Type: "uint32"},
+		{Name: "quorumBlobParams", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
+			{Name: "quorumNumber", Type: "uint8"},
+			{Name: "adversaryThresholdPercentage", Type: "uint8"},
+			{Name: "confirmationThresholdPercentage", Type: "uint8"},
+			{Name: "chunkLength", Type: "uint32"},
+		}},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	addressType, err := abi.NewType("address", "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	uint256Type, err := abi.NewType("uint256", "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	arguments := abi.Arguments{
+		{Type: uint256Type},
+		{Type: blobVerificationProofType},
+		{Type: blobHeaderType},
+		{Type: addressType},
+		{Type: uint256Type},
+		{Type: uint256Type},
+		{Type: uint256Type},
+	}
+
+	values := []interface{}{
+		seqNum,
+		eigenDaBlobInfo.BlobVerificationProof,
+		eigenDaBlobInfo.BlobHeader,
+		b.config().gasRefunder,
+		new(big.Int).SetUint64(delayedMsg),
+		new(big.Int).SetUint64(uint64(prevMsgNum)),
+		new(big.Int).SetUint64(uint64(newMsgNum)),
+	}
+
+	return arguments.PackValues(values)
 }
 
 var ErrNormalGasEstimationFailed = errors.New("normal gas estimation failed")
@@ -1143,6 +1140,7 @@ func (b *BatchPoster) estimateGas(ctx context.Context, sequencerMessage []byte, 
 	// However, we set nextMsgNum to 1 because it is necessary for a correct estimation for the final to be non-zero.
 	// Because we're likely estimating against older state, this might not be the actual next message,
 	// but the gas used should be the same.
+	//TODO: better determination of batch type (4844, EigenDA, etc)
 	data, kzgBlobs, err := b.encodeAddBatch(abi.MaxUint256, 0, 1, sequencerMessage, delayedMessages, len(realBlobs) > 0, eigenDaBlobInfo != nil, eigenDaBlobInfo)
 	if err != nil {
 		return 0, err
