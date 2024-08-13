@@ -1,4 +1,4 @@
-use crate::Bytes32;
+use crate::{Bytes32, utils::append_left_padded_biguint_be};
 use ark_bn254::G2Affine;
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
@@ -46,18 +46,21 @@ pub fn prove_kzg_preimage_bn254(
         blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
-    //  This is serialized in little endian format.
-    let mut commitment_bytes = Vec::new();
-    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
-    let mut expected_hash: Bytes32 = Sha256::digest(&*commitment_bytes).into();
+    let commitment_x_bigint: BigUint = blob_commitment.x.into();
+    let commitment_y_bigint: BigUint = blob_commitment.y.into();
+    let mut commitment_encoded_bytes = Vec::with_capacity(32);
+    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
+    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
 
-    expected_hash[0] = 1;
+    let mut keccak256_hasher = Keccak256::new();
+    keccak256_hasher.update(&commitment_encoded_bytes);
+    let commitment_hash: Bytes32 = keccak256_hasher.finalize().into();
 
     ensure!(
-        hash == expected_hash,
+        hash == commitment_hash,
         "Trying to prove versioned hash {} preimage but recomputed hash {}",
         hash,
-        expected_hash,
+        commitment_hash,
     );
 
     ensure!(
@@ -138,13 +141,6 @@ pub fn prove_kzg_preimage_bn254(
     append_left_padded_biguint_be(&mut xminusz_encoded_bytes, &xminusz_y1);
     append_left_padded_biguint_be(&mut xminusz_encoded_bytes, &xminusz_y0);
 
-    // encode the commitment
-    let commitment_x_bigint: BigUint = blob_commitment.x.into();
-    let commitment_y_bigint: BigUint = blob_commitment.y.into();
-    let mut commitment_encoded_bytes = Vec::with_capacity(32);
-    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
-    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
-
     // encode the proof
     let proof_x_bigint: BigUint = kzg_proof.x.into();
     let proof_y_bigint: BigUint = kzg_proof.y.into();
@@ -155,16 +151,7 @@ pub fn prove_kzg_preimage_bn254(
     let mut length_bytes = Vec::with_capacity(32);
     append_left_padded_biguint_be(&mut length_bytes, &BigUint::from(length_usize));
 
-    // This does a keccak to achieve equivalence with 4844 commitment hash check.
-    // It adds the sha2 data as well so that the 'leafContents' variable in the OneStepProverHostIo.sol 
-    // file can be used as well.
-    let mut to_be_hashed_data = commitment_encoded_bytes.to_vec();
-    to_be_hashed_data.extend(expected_hash);
-    let mut keccak256_hasher = Keccak256::new();
-    keccak256_hasher.update(&*to_be_hashed_data);
-    let keccak256_result: [u8; 32] = keccak256_hasher.finalize().into();
-
-    out.write_all(&keccak256_result)?; // hash [:32]
+    out.write_all(&commitment_hash.to_vec())?; // hash [:32]
     out.write_all(&*z)?; // evaluation point [32:64]
     out.write_all(&*proven_y)?; // expected output [64:96]
     out.write_all(&xminusz_encoded_bytes)?; // g2TauMinusG2z [96:224]
@@ -175,10 +162,3 @@ pub fn prove_kzg_preimage_bn254(
     Ok(())
 }
 
-// Helper function to append BigUint bytes into the vector with padding; left padded big endian bytes to 32
-fn append_left_padded_biguint_be(vec: &mut Vec<u8>, biguint: &BigUint) {
-    let bytes = biguint.to_bytes_be();
-    let padding = 32 - bytes.len();
-    vec.extend(std::iter::repeat(0).take(padding));
-    vec.extend_from_slice(&bytes);
-}
