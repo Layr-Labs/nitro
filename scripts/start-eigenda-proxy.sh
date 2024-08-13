@@ -11,7 +11,7 @@ docker run -d --name eigenda-proxy-nitro-test \
   -e EIGENDA_PROXY_ADDR=0.0.0.0 \
   -e EIGENDA_PROXY_PORT=6666 \
   -e MEMSTORE_ENABLED=true \
-  -e MEMSTORE_EXPIRATION=5s \
+  -e MEMSTORE_EXPIRATION=1m \
   -e EIGENDA_PROXY_TARGET_URL=http://localhost:3000 \
   eigenda-proxy-nitro-test
 
