@@ -220,7 +220,8 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
 
             let blob_polynomial = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
             let blob_commitment = kzg_bn254.commit(&blob_polynomial)?;
-
+            
+            //  This is serialized in little endian format.
             let mut commitment_bytes = Vec::new();
             blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
 

@@ -4,11 +4,12 @@ use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::CanonicalSerialize;
 use eyre::{ensure, Result};
-use hex::encode;
 use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::{Digest, Sha256};
 use std::io::Write;
+use sha3::Keccak256;
+
 
 lazy_static::lazy_static! {
 
@@ -45,9 +46,9 @@ pub fn prove_kzg_preimage_bn254(
         blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
+    //  This is serialized in little endian format.
     let mut commitment_bytes = Vec::new();
-    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?; // why uncompressed ?
-
+    blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
     let mut expected_hash: Bytes32 = Sha256::digest(&*commitment_bytes).into();
 
     expected_hash[0] = 1;
@@ -154,9 +155,16 @@ pub fn prove_kzg_preimage_bn254(
     let mut length_bytes = Vec::with_capacity(32);
     append_left_padded_biguint_be(&mut length_bytes, &BigUint::from(length_usize));
 
-    println!("length usize: {}", length_usize);
-    println!("length bytes: {}", encode(&length_bytes));
-    out.write_all(&*hash)?; // hash [:32]
+    // This does a keccak to achieve equivalence with 4844 commitment hash check.
+    // It adds the sha2 data as well so that the 'leafContents' variable in the OneStepProverHostIo.sol 
+    // file can be used as well.
+    let mut to_be_hashed_data = commitment_encoded_bytes.to_vec();
+    to_be_hashed_data.extend(expected_hash);
+    let mut keccak256_hasher = Keccak256::new();
+    keccak256_hasher.update(&*to_be_hashed_data);
+    let keccak256_result: [u8; 32] = keccak256_hasher.finalize().into();
+
+    out.write_all(&keccak256_result)?; // hash [:32]
     out.write_all(&*z)?; // evaluation point [32:64]
     out.write_all(&*proven_y)?; // expected output [64:96]
     out.write_all(&xminusz_encoded_bytes)?; // g2TauMinusG2z [96:224]
@@ -171,6 +179,6 @@ pub fn prove_kzg_preimage_bn254(
 fn append_left_padded_biguint_be(vec: &mut Vec<u8>, biguint: &BigUint) {
     let bytes = biguint.to_bytes_be();
     let padding = 32 - bytes.len();
-    vec.extend_from_slice(&vec![0; padding]);
+    vec.extend(std::iter::repeat(0).take(padding));
     vec.extend_from_slice(&bytes);
 }
