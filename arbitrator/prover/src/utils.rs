@@ -10,12 +10,12 @@ use c_kzg::{Blob, KzgCommitment};
 use digest::Digest;
 use eyre::{eyre, Result};
 use kzgbn254::{blob::Blob as EigenDABlob, kzg::Kzg as KzgBN254, polynomial::PolynomialFormat};
+use num::BigUint;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sha3::Keccak256;
 use std::{borrow::Borrow, convert::TryInto, fmt, fs::File, io::Read, ops::Deref, path::Path};
 use wasmparser::{RefType, TableType};
-use num::BigUint;
 
 /// A Vec<u8> allocated with libc::malloc
 pub struct CBytes {
@@ -201,10 +201,8 @@ pub fn append_left_padded_biguint_be(vec: &mut Vec<u8>, biguint: &BigUint) {
     vec.extend_from_slice(&bytes);
 }
 
-
 #[cfg(feature = "native")]
 pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
-
     match ty {
         PreimageType::Keccak256 => Ok(Keccak256::digest(preimage).into()),
         PreimageType::Sha2_256 => Ok(Sha256::digest(preimage).into()),
@@ -231,7 +229,7 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
 
             let blob_polynomial = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
             let blob_commitment = kzg_bn254.commit(&blob_polynomial)?;
-            
+
             let commitment_x_bigint: BigUint = blob_commitment.x.into();
             let commitment_y_bigint: BigUint = blob_commitment.y.into();
             let mut commitment_encoded_bytes = Vec::with_capacity(32);

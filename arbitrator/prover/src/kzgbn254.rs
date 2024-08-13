@@ -1,4 +1,4 @@
-use crate::{Bytes32, utils::append_left_padded_biguint_be};
+use crate::{utils::append_left_padded_biguint_be, Bytes32};
 use ark_bn254::G2Affine;
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
@@ -7,9 +7,8 @@ use eyre::{ensure, Result};
 use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::{Digest, Sha256};
-use std::io::Write;
 use sha3::Keccak256;
-
+use std::io::Write;
 
 lazy_static::lazy_static! {
 
@@ -161,4 +160,3 @@ pub fn prove_kzg_preimage_bn254(
 
     Ok(())
 }
-
