@@ -144,6 +144,9 @@ jobs:
           echo "GOMEMLIMIT=6GiB" >> "$GITHUB_ENV"
           echo "GOGC=80" >> "$GITHUB_ENV"
 
+      - name: Spinup eigenda-proxy test dependency
+        run: ./scripts/spinup-proxy.sh
+
       - name: run tests without race detection
         if: matrix.test-mode == 'defaults'
         run: |
