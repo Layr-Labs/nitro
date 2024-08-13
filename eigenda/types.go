@@ -254,9 +254,9 @@ func (e *EigenDABlobInfo) ToDisperserBlobInfo() (*DisperserBlobInfo, error) {
 
 	// Convert BlobVerificationProof
 	var disperserBlobVerificationProof DisperserBlobVerificationProof
-	if &e.BlobVerificationProof != nil {
+	if !e.BlobVerificationProof.IsEmpty() {
 		var disperserBatchMetadata DisperserBatchMetadata
-		if &e.BlobVerificationProof.BatchMetadata != nil {
+		if !e.BlobVerificationProof.BatchMetadata.IsEmpty() {
 			metadata := e.BlobVerificationProof.BatchMetadata
 			quorumNumbers := metadata.BatchHeader.QuorumNumbers
 			quorumSignedPercentages := metadata.BatchHeader.SignedStakeForQuorums
@@ -394,4 +394,30 @@ func (ip *InboxPayload) Load(callDataValues []interface{}) error {
 
 	*ip = payload
 	return nil
+}
+
+// IsEmpty checks if BlobVerificationProof is effectively empty
+func (b BlobVerificationProof) IsEmpty() bool {
+	return b.BatchID == 0 &&
+		b.BlobIndex == 0 &&
+		b.BatchMetadata.IsEmpty() &&
+		len(b.InclusionProof) == 0 &&
+		len(b.QuorumIndices) == 0
+}
+
+// IsEmpty checks if BatchMetadata is effectively empty
+func (bm BatchMetadata) IsEmpty() bool {
+	return bm.BatchHeader.IsEmpty() &&
+		len(bm.Fee) == 0 &&
+		bm.SignatoryRecordHash == [32]byte{} &&
+		bm.ConfirmationBlockNumber == 0 &&
+		len(bm.BatchHeaderHash) == 0
+}
+
+// IsEmpty checks if BatchHeader is effectively empty
+func (bh BatchHeader) IsEmpty() bool {
+	return bh.BlobHeadersRoot == [32]byte{} &&
+		len(bh.QuorumNumbers) == 0 &&
+		len(bh.SignedStakeForQuorums) == 0 &&
+		bh.ReferenceBlockNumber == 0
 }

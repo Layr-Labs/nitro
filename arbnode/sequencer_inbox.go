@@ -175,8 +175,8 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 
 		calldata := tx.Data()
 		data := []byte{daprovider.EigenDAMessageHeaderFlag}
-		data = append(data, calldata[:]...)
-		
+		data = append(data, calldata...)
+
 		return data, nil
 	default:
 		return nil, fmt.Errorf("batch has invalid data location %v", m.dataLocation)
