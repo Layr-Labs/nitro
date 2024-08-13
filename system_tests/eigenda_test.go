@@ -26,7 +26,7 @@ func TestEigenDAProxyBatchPosting(t *testing.T) {
 	initTest(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {	
+	defer func() {
 		cancel()
 	}()
 
@@ -57,7 +57,6 @@ func TestEigenDAProxyBatchPosting(t *testing.T) {
 		execA, err := gethexec.CreateExecutionNode(ctx, l2stackA, l2chainDb, l2blockchain, l1client, gethexec.ConfigDefaultTest)
 		Require(t, err)
 
-
 		l2Cfg := l2blockchain.Config()
 		l2Cfg.ArbitrumChainParams.DataAvailabilityCommittee = false
 		l2Cfg.ArbitrumChainParams.EigenDA = true
@@ -69,8 +68,6 @@ func TestEigenDAProxyBatchPosting(t *testing.T) {
 		l1NodeConfigB.BlockValidator.Enable = false
 		l1NodeConfigB.EigenDA.Enable = true
 		l1NodeConfigB.EigenDA.Rpc = proxyURL
-		
-		
 
 		l2clientB, nodeB := Create2ndNodeWithConfig(t, ctx, nodeA, l1stack, l1info, &l2info.ArbInitData, l1NodeConfigB, nil, nil)
 		checkEigenDABatchPosting(t, ctx, l1client, l2clientA, l1info, l2info, big.NewInt(1e12), l2clientB)
