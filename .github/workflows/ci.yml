@@ -145,7 +145,7 @@ jobs:
           echo "GOGC=80" >> "$GITHUB_ENV"
 
       - name: Spinup eigenda-proxy test dependency
-        run: ./scripts/spinup-proxy.sh
+        run: ./scripts/start-eigenda-proxy.sh
 
       - name: run tests without race detection
         if: matrix.test-mode == 'defaults'
