@@ -111,7 +111,7 @@ fn main() {
         for i in 0..5{
             // test-files srs 011e229d75b13559dcb2d757ecae9b66fa579268e28e196789503322115c06e1
             // mainnet srs 01605220b6928163676612ca50bbe5e0c595052876796dbedeae8ef597c9fdcf
-            let eigen_hash = hex!("01865756f6ea42caedc00784c02b1b74676301f835a65cea5bcdea736f430e71");
+            let eigen_hash = hex!("13bbacb54f9aa9896af97156ca4dfc626e94031c5ed78fea68659e4ec9c9c55a");
             bytebuffer = Bytes32(eigen_hash);
 
             let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), i * 32);

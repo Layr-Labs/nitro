@@ -32,7 +32,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-          ssh-key: ${{ secrets.SSH_KEY }}
 
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y wabt gotestsum
@@ -67,15 +66,17 @@ jobs:
         id: install-rust-nightly
         with:
           profile: minimal
-          toolchain: "nightly"
-
+          toolchain: "nightly-2024-07-30"
+      
       - name: Install rust wasm targets
         run: rustup target add wasm32-wasi wasm32-unknown-unknown
 
       - name: Install nightly wasm targets
         run: |
-          rustup component add rust-src --toolchain nightly
-          rustup target add wasm32-unknown-unknown --toolchain nightly
+          nightly_toolchain='nightly-2024-07-30'
+          echo 'STYLUS_NIGHTLY_VER=+'"$nightly_toolchain" >> "$GITHUB_ENV"
+          rustup component add rust-src --toolchain "$nightly_toolchain"
+          rustup target add wasm32-unknown-unknown --toolchain "$nightly_toolchain"
 
       - name: Cache Build Products
         uses: actions/cache@v3
@@ -126,14 +127,14 @@ jobs:
       - name: Build all lint dependencies
         run: make -j build-node-deps
 
-      # - name: Lint
-      #   uses: golangci/golangci-lint-action@v3
-      #   with:
-      #     version: latest
-      #     skip-pkg-cache: true
-      # - name: Custom Lint
-      #   run: |
-      #     go run ./linters ./...
+      - name: Lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          skip-pkg-cache: true
+      - name: Custom Lint
+        run: |
+          go run ./linters ./...
 
       - name: Set environment variables
         run: |
@@ -141,6 +142,9 @@ jobs:
           echo "TMPDIR=$(pwd)/target/tmp/deadbeefbee" >> "$GITHUB_ENV"
           echo "GOMEMLIMIT=6GiB" >> "$GITHUB_ENV"
           echo "GOGC=80" >> "$GITHUB_ENV"
+
+      - name: Spinup eigenda-proxy test dependency
+        run: ./scripts/start-eigenda-proxy.sh
 
       - name: run tests without race detection
         if: matrix.test-mode == 'defaults'

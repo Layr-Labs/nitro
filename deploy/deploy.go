@@ -245,7 +245,7 @@ func DeployOnL1(ctx context.Context, parentChainReader *headerreader.HeaderReade
 	if eigenDARollupManager == (common.Address{0x0}) {
 		log.Warn("No EigenDA Rollup Manager contract address specified, deploying dummy rollup manager instead")
 
-		dummyRollupManager, tx, _, err := bridgegen.DeployEigenDADummyManager(deployAuth, parentChainReader.Client())
+		dummyRollupManager, tx, _, err := bridgegen.DeployEigenDABlobVerifierL2(deployAuth, parentChainReader.Client())
 		err = andTxSucceeded(ctx, parentChainReader, tx, err)
 		if err != nil {
 			return nil, fmt.Errorf("dummy manager deploy error: %w", err)

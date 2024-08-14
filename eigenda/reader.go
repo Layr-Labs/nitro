@@ -23,6 +23,8 @@ type readerForEigenDA struct {
 	readerEigenDA EigenDAReader
 }
 
+const sequencerMsgOffset = 41
+
 func (d *readerForEigenDA) IsValidHeaderByte(headerByte byte) bool {
 	return IsEigenDAMessageHeaderByte(headerByte)
 }
@@ -35,10 +37,8 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	preimageRecorder daprovider.PreimageRecorder,
 	validateSeqMsg bool,
 ) ([]byte, error) {
-	// offset sequencer message at 41 
-	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "binary")
+	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder, "binary")
 }
-
 
 func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	sequencerMsg []byte,
@@ -78,7 +78,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 
 // ParseSequencerMsg parses the inbox tx calldata into a structured EigenDABlobInfo
 func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
-	
+
 	if len(calldata) < 4 {
 		return nil, errors.New("calldata is shorter than expected method signature length")
 	}
@@ -141,6 +141,5 @@ func (d *binaryReaderForEigenDA) RecoverPayloadFromBatch(
 	preimageRecorder daprovider.PreimageRecorder,
 	validateSeqMsg bool,
 ) ([]byte, error) {
-	// offset sequencer message at 41 
-	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "binary")
+	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder, "binary")
 }
