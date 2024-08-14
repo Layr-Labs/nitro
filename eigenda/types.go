@@ -1,9 +1,10 @@
 package eigenda
 
 import (
-	"crypto/sha256"
 	"errors"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -31,14 +32,10 @@ func (e *EigenDABlobInfo) PreimageHash() (*common.Hash, error) {
 		return nil, err
 	}
 
-	shaDataHash := sha256.New()
-	digest := append(kzgCommit, uint32ToBytes(e.BlobHeader.DataLength)...)
-	shaDataHash.Write(digest)
-	dataHash := shaDataHash.Sum([]byte{})
+	data := append(kzgCommit, uint32ToBytes(e.BlobHeader.DataLength)...)
+	dataHash := crypto.Keccak256Hash(data)
 
-	h := common.BytesToHash(dataHash)
-
-	return &h, nil
+	return &dataHash, nil
 }
 
 type BlobHeader struct {

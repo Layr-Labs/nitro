@@ -245,7 +245,7 @@ func main() {
 			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader))
 		}
 		if eigenDAReader != nil {
-			dapReaders = append(dapReaders, eigenda.NewBinaryReaderForEigenDA(eigenDAReader))
+			dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
 		}
 
 		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(&BlobPreimageReader{}))

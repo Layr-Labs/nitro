@@ -11,8 +11,6 @@ import (
 	"github.com/offchainlabs/nitro/arbutil"
 )
 
-// NewReaderForEigenDA is generally meant to be only used by nitro.
-// DA Providers should implement methods in the Reader interface independently
 func NewReaderForEigenDA(reader EigenDAReader) *readerForEigenDA {
 	return &readerForEigenDA{readerEigenDA: reader}
 }
@@ -109,29 +107,4 @@ func uint32ToBytes(n uint32) []byte {
     bytes := make([]byte, 4)
     binary.BigEndian.PutUint32(bytes, n)
     return bytes
-}
-
-// NewReaderForEigenDA is generally meant to be only used by nitro.
-// DA Providers should implement methods in the Reader interface independently
-func NewBinaryReaderForEigenDA(reader EigenDAReader) *binaryReaderForEigenDA {
-	return &binaryReaderForEigenDA{readerEigenDA: reader}
-}
-
-type binaryReaderForEigenDA struct {
-	readerEigenDA EigenDAReader
-}
-
-func (d *binaryReaderForEigenDA) IsValidHeaderByte(headerByte byte) bool {
-	return IsEigenDAMessageHeaderByte(headerByte)
-}
-
-func (d *binaryReaderForEigenDA) RecoverPayloadFromBatch(
-	ctx context.Context,
-	batchNum uint64,
-	batchBlockHash common.Hash,
-	sequencerMsg []byte,
-	preimageRecorder daprovider.PreimageRecorder,
-	validateSeqMsg bool,
-) ([]byte, error) {
-	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder, "binary")
 }
