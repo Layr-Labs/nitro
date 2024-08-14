@@ -220,7 +220,7 @@ func newApiClosures(
 		if suberr != nil {
 			addr = zeroAddr
 		}
-		if !errors.Is(vm.ErrExecutionReverted, suberr) {
+		if !errors.Is(vm.ErrExecutionReverted, suberr) { //nolint:all
 			res = nil // returnData is only provided in the revert case (opCreate)
 		}
 		interpreter.SetReturnData(res)
