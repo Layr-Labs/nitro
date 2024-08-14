@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/offchainlabs/nitro/arbstate/daprovider"
@@ -23,7 +21,6 @@ type readerForEigenDA struct {
 	readerEigenDA EigenDAReader
 }
 
-const sequencerMsgOffset = 41
 
 func (d *readerForEigenDA) IsValidHeaderByte(headerByte byte) bool {
 	return IsEigenDAMessageHeaderByte(headerByte)
@@ -67,7 +64,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 
 	if preimageRecoder != nil {
 		// iFFT the preimage data
-		preimage, err := EncodeBlob(data)
+		preimage, err := GenericEncodeBlob(data)
 		if err != nil {
 			return nil, err
 		}
@@ -79,17 +76,12 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 // ParseSequencerMsg parses the inbox tx calldata into a structured EigenDABlobInfo
 func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
 
+	// this should never happen, but just in case
 	if len(calldata) < 4 {
 		return nil, errors.New("calldata is shorter than expected method signature length")
 	}
 
-	// TODO: Construct the ABI struct at node initialization
-	abi, err := abi.JSON(strings.NewReader(sequencerInboxABI))
-	if err != nil {
-		return nil, err
-	}
-
-	method, err := abi.MethodById(calldata[0:4])
+	method, err := sequencerInboxABI.MethodById(calldata[0:4])
 	if err != nil {
 		return nil, err
 	}

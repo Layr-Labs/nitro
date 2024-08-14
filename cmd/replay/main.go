@@ -164,9 +164,7 @@ func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eig
 		return nil, err
 	}
 
-	// since the preimage is in encoded co-efficient form, we need to decode it to get the actual blob
-	// i.e,polynomial -> FFT -> length decode -> inverse onec -> blob
-	decodedBlob, err := eigenda.DecodeiFFTBlob(preimage)
+	decodedBlob, err := eigenda.GenericDecodeBlob(preimage)
 	if err != nil {
 		println("Error decoding blob: ", err)
 		return nil, err

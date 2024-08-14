@@ -232,12 +232,18 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
 
             let commitment_x_bigint: BigUint = blob_commitment.x.into();
             let commitment_y_bigint: BigUint = blob_commitment.y.into();
-            let mut commitment_encoded_bytes = Vec::with_capacity(32);
-            append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
-            append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
+            let length_bigint: BigUint = blob.len().into();
+            // 32 bytes per each commitment coordinate (64 bytes)
+            // 25 bits for length considering 32mb blobs padded to nearest power of 2 (2^25)
+            // pad to 32 bits or 4 bytes so 68 bytes total
+            let mut commitment_length_encoded_bytes = Vec::with_capacity(68);
+            append_left_padded_biguint_be(&mut commitment_length_encoded_bytes, &commitment_x_bigint);
+            append_left_padded_biguint_be(&mut commitment_length_encoded_bytes, &commitment_y_bigint);
+            append_left_padded_biguint_be(&mut commitment_length_encoded_bytes, &length_bigint);
+            
 
             let mut keccak256_hasher = Keccak256::new();
-            keccak256_hasher.update(&commitment_encoded_bytes);
+            keccak256_hasher.update(&commitment_length_encoded_bytes);
             let commitment_hash: [u8; 32] = keccak256_hasher.finalize().into();
 
             Ok(commitment_hash)

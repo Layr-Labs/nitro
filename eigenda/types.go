@@ -22,6 +22,9 @@ type EigenDABlobInfo struct {
 	BlobVerificationProof BlobVerificationProof `json:"blobVerificationProof"`
 }
 
+/*
+	Unlike 4844 there's no need to inject a version byte into the 0th offset of the hash
+*/
 func (e *EigenDABlobInfo) PreimageHash() (*common.Hash, error) {
 	kzgCommit, err := e.SerializeCommitment()
 	if err != nil {
@@ -32,7 +35,6 @@ func (e *EigenDABlobInfo) PreimageHash() (*common.Hash, error) {
 	digest := append(kzgCommit, uint32ToBytes(e.BlobHeader.DataLength)...)
 	shaDataHash.Write(digest)
 	dataHash := shaDataHash.Sum([]byte{})
-	dataHash[0] = 1
 
 	h := common.BytesToHash(dataHash)
 

@@ -211,7 +211,7 @@ func main() {
 		}
 	}
 	// EIGENDA COMMIT HASH
-	_, err = wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.HexToHash("13bbacb54f9aa9896af97156ca4dfc626e94031c5ed78fea68659e4ec9c9c55a"))
+	_, err = wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, common.HexToHash("12deeb4e7b4288fcab2d46116afdd708f606e2e44157d0c423a5a0d310f88483"))
 	if err != nil {
 		panic(fmt.Sprintf("failed to resolve eigenda preimage: %v", err))
 	}

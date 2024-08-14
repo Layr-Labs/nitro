@@ -45,14 +45,18 @@ pub fn prove_kzg_preimage_bn254(
         blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
+
     let commitment_x_bigint: BigUint = blob_commitment.x.into();
     let commitment_y_bigint: BigUint = blob_commitment.y.into();
-    let mut commitment_encoded_bytes = Vec::with_capacity(32);
-    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
-    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
+    let length_bigint: BigUint = blob.len().into();
+
+    let mut commitment_encoded_length_bytes = Vec::with_capacity(69);
+    append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &commitment_x_bigint);
+    append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &commitment_y_bigint);
+    append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &length_bigint);
 
     let mut keccak256_hasher = Keccak256::new();
-    keccak256_hasher.update(&commitment_encoded_bytes);
+    keccak256_hasher.update(&commitment_encoded_length_bytes);
     let commitment_hash: Bytes32 = keccak256_hasher.finalize().into();
 
     ensure!(
@@ -68,6 +72,11 @@ pub fn prove_kzg_preimage_bn254(
         offset,
     );
 
+    let mut commitment_encoded_bytes = Vec::with_capacity(64);
+
+    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
+    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
+
     let mut proving_offset = offset;
     let length_usize = preimage.len() as u64;
 
@@ -81,8 +90,7 @@ pub fn prove_kzg_preimage_bn254(
         proving_offset = 0;
     }
 
-    // Y = ϕ(offset) --> evaluation point for computing quotient proof
-    // confirming if this is actually ok ?
+    // Y = ϕ(offset)
     let proven_y_fr = blob_polynomial_evaluation_form
         .get_at_index(proving_offset as usize / 32)
         .ok_or_else(|| {
