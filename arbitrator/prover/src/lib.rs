@@ -363,6 +363,14 @@ unsafe fn handle_preimage_resolution(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn arbitrator_get_opcode(mach: *mut Machine) -> u16 {
+    match (*mach).get_next_instruction() {
+        Some(instruction) => return instruction.opcode.repr(),
+        None => panic!("Failed to get next opcode for Machine"),
+    }
+}
+
+#[no_mangle]
 #[cfg(feature = "native")]
 pub unsafe extern "C" fn arbitrator_set_preimage_resolver(
     mach: *mut Machine,

@@ -237,10 +237,15 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
             // 25 bits for length considering 32mb blobs padded to nearest power of 2 (2^25)
             // pad to 32 bits or 4 bytes so 68 bytes total
             let mut commitment_length_encoded_bytes = Vec::with_capacity(68);
-            append_left_padded_biguint_be(&mut commitment_length_encoded_bytes, &commitment_x_bigint);
-            append_left_padded_biguint_be(&mut commitment_length_encoded_bytes, &commitment_y_bigint);
+            append_left_padded_biguint_be(
+                &mut commitment_length_encoded_bytes,
+                &commitment_x_bigint,
+            );
+            append_left_padded_biguint_be(
+                &mut commitment_length_encoded_bytes,
+                &commitment_y_bigint,
+            );
             append_left_padded_biguint_be(&mut commitment_length_encoded_bytes, &length_bigint);
-            
 
             let mut keccak256_hasher = Keccak256::new();
             keccak256_hasher.update(&commitment_length_encoded_bytes);

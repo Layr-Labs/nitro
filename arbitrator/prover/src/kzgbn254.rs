@@ -45,12 +45,11 @@ pub fn prove_kzg_preimage_bn254(
         blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
     let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
 
-
     let commitment_x_bigint: BigUint = blob_commitment.x.into();
     let commitment_y_bigint: BigUint = blob_commitment.y.into();
     let length_bigint: BigUint = blob.len().into();
 
-    let mut commitment_encoded_length_bytes = Vec::with_capacity(69);
+    let mut commitment_encoded_length_bytes = Vec::with_capacity(68);
     append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &commitment_x_bigint);
     append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &commitment_y_bigint);
     append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &length_bigint);
