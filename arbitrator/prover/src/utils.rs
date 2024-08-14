@@ -10,6 +10,7 @@ use c_kzg::{Blob, KzgCommitment};
 use digest::Digest;
 use eyre::{eyre, Result};
 use kzgbn254::{blob::Blob as EigenDABlob, kzg::Kzg as KzgBN254, polynomial::PolynomialFormat};
+use num::BigUint;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sha3::Keccak256;
@@ -192,6 +193,14 @@ pub fn split_import(qualified: &str) -> Result<(&str, &str)> {
     Ok((module, name))
 }
 
+// Helper function to append BigUint bytes into the vector with padding; left padded big endian bytes to 32
+pub fn append_left_padded_biguint_be(vec: &mut Vec<u8>, biguint: &BigUint) {
+    let bytes = biguint.to_bytes_be();
+    let padding = 32 - bytes.len();
+    vec.extend(std::iter::repeat(0).take(padding));
+    vec.extend_from_slice(&bytes);
+}
+
 #[cfg(feature = "native")]
 pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
     match ty {
@@ -218,14 +227,18 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
 
             let blob = EigenDABlob::from_padded_bytes_unchecked(preimage);
 
-            let blob_polynomial = blob.to_polynomial(PolynomialFormat::InEvaluationForm)?;
+            let blob_polynomial = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
             let blob_commitment = kzg_bn254.commit(&blob_polynomial)?;
 
-            let mut commitment_bytes = Vec::new();
-            blob_commitment.serialize_uncompressed(&mut commitment_bytes)?;
+            let commitment_x_bigint: BigUint = blob_commitment.x.into();
+            let commitment_y_bigint: BigUint = blob_commitment.y.into();
+            let mut commitment_encoded_bytes = Vec::with_capacity(32);
+            append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
+            append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
 
-            let mut commitment_hash: [u8; 32] = Sha256::digest(&commitment_bytes).into();
-            commitment_hash[0] = 1;
+            let mut keccak256_hasher = Keccak256::new();
+            keccak256_hasher.update(&commitment_encoded_bytes);
+            let commitment_hash: [u8; 32] = keccak256_hasher.finalize().into();
 
             Ok(commitment_hash)
         }
