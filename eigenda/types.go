@@ -27,13 +27,13 @@ type EigenDABlobInfo struct {
 Unlike 4844 there's no need to inject a version byte into the 0th offset of the hash
 */
 func (e *EigenDABlobInfo) PreimageHash() (*common.Hash, error) {
-	kzgCommit, err := e.SerializeCommitment()
+	bytes, err := e.SerializeCommitment()
 	if err != nil {
 		return nil, err
 	}
 
-	data := append(kzgCommit, uint32ToBytes(e.BlobHeader.DataLength)...)
-	dataHash := crypto.Keccak256Hash(data)
+	bytes = append(bytes, uint32ToBytes(e.BlobHeader.DataLength)...)
+	dataHash := crypto.Keccak256Hash(bytes)
 
 	return &dataHash, nil
 }
