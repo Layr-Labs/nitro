@@ -29,6 +29,7 @@ import (
 	"github.com/offchainlabs/nitro/arbstate"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution/gethexec"
 	"github.com/offchainlabs/nitro/solgen/go/challengegen"
 	"github.com/offchainlabs/nitro/solgen/go/mocksgen"
@@ -183,6 +184,96 @@ func makeBatch(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, b
 	Require(t, err, "failed to get batch metadata after adding batch:")
 }
 
+func makeBatchEigenDA(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, backend *ethclient.Client, sequencer *bind.TransactOpts, seqInbox *mocksgen.SequencerInboxStub, seqInboxAddr common.Address, modStep int64) {
+	ctx := context.Background()
+
+	batchBuffer := bytes.NewBuffer([]byte{})
+	for i := int64(0); i < makeBatch_MsgsPerBatch; i++ {
+		value := i
+		if i == modStep {
+			value++
+		}
+		err := writeTxToBatch(batchBuffer, l2Info.PrepareTx("Owner", "Destination", 1000000, big.NewInt(value), []byte{}))
+		Require(t, err)
+	}
+	compressed, err := arbcompress.CompressWell(batchBuffer.Bytes())
+	Require(t, err)
+	message := append([]byte{0}, compressed...)
+
+	seqNum := new(big.Int).Lsh(common.Big1, 256)
+	seqNum.Sub(seqNum, common.Big1)
+
+
+	// disperse batch to eigenda-proxy 
+
+	eigenDA, err := eigenda.NewEigenDA(&eigenda.EigenDAConfig{
+		Enable: true,
+		Rpc:    "http://localhost:4242",
+	})
+
+	Require(t, err)
+
+	blobInfo, err := eigenDA.Store(ctx, message)
+	Require(t, err)
+
+	bh := mocksgen.IEigenDAServiceManagerBatchHeader{
+		BlobHeadersRoot: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.BlobHeadersRoot,
+		QuorumNumbers:  blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.QuorumNumbers,
+		SignedStakeForQuorums: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.SignedStakeForQuorums,
+		ReferenceBlockNumber: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber,
+	}
+
+	bm := mocksgen.IEigenDAServiceManagerBatchMetadata{
+		BatchHeader: bh,
+		SignatoryRecordHash: blobInfo.BlobVerificationProof.BatchMetadata.SignatoryRecordHash,
+		ConfirmationBlockNumber: blobInfo.BlobVerificationProof.BatchMetadata.ConfirmationBlockNumber,
+	}
+
+	bvp := mocksgen.EigenDARollupUtilsBlobVerificationProof{
+		BatchId: blobInfo.BlobVerificationProof.BatchID,
+		BlobIndex: blobInfo.BlobVerificationProof.BlobIndex,
+		BatchMetadata: bm,
+		InclusionProof: blobInfo.BlobVerificationProof.InclusionProof,
+		QuorumIndices: blobInfo.BlobVerificationProof.QuorumIndices,
+	}
+
+	solQps := make([]mocksgen.IEigenDAServiceManagerQuorumBlobParam, len(blobInfo.BlobHeader.QuorumBlobParams))
+	for _, qp := range blobInfo.BlobHeader.QuorumBlobParams {
+		solQps = append(solQps, mocksgen.IEigenDAServiceManagerQuorumBlobParam{
+			QuorumNumber: qp.QuorumNumber,
+			AdversaryThresholdPercentage: qp.AdversaryThresholdPercentage,
+			ConfirmationThresholdPercentage: qp.ConfirmationThresholdPercentage,
+			ChunkLength: qp.ChunkLength,
+		})
+	}
+
+	blobHeader := mocksgen.IEigenDAServiceManagerBlobHeader{
+		Commitment: mocksgen.BN254G1Point{
+			X: blobInfo.BlobHeader.Commitment.X,
+			Y: blobInfo.BlobHeader.Commitment.Y,
+		},
+		DataLength: blobInfo.BlobHeader.DataLength,
+		QuorumBlobParams: solQps,
+	}
+
+	tx, err := seqInbox.AddSequencerL2BatchFromEigenDA(sequencer, seqNum, bvp, blobHeader, common.Address{}, big.NewInt(1), big.NewInt(0), big.NewInt(0))
+	Require(t, err)
+	receipt, err := EnsureTxSucceeded(ctx, backend, tx)
+	Require(t, err)
+
+	nodeSeqInbox, err := arbnode.NewSequencerInbox(backend, seqInboxAddr, 0)
+	Require(t, err)
+	batches, err := nodeSeqInbox.LookupBatchesInRange(ctx, receipt.BlockNumber, receipt.BlockNumber)
+	Require(t, err)
+	if len(batches) == 0 {
+		Fatal(t, "batch not found after AddSequencerL2BatchFromOrigin")
+	}
+	err = l2Node.InboxTracker.AddSequencerBatches(ctx, backend, batches)
+	Require(t, err)
+	_, err = l2Node.InboxTracker.GetBatchMetadata(0)
+	Require(t, err, "failed to get batch metadata after adding batch:")
+}
+
 func confirmLatestBlock(ctx context.Context, t *testing.T, l1Info *BlockchainTestInfo, backend arbutil.L1Interface) {
 	t.Helper()
 	// With SimulatedBeacon running in on-demand block production mode, the
@@ -212,12 +303,6 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 		FutureSeconds: big.NewInt(10000),
 	}
 
-	// Require(t, err)
-	// _, err = EnsureTxSucceeded(ctx, l1Client, tx)
-
-	// DeploySequencerInbox(auth, client, maxDataSize, reader4844, dummyManager, dummyManager, isUsingFeeToken)
-	// func DeploySequencerInboxStub(auth *bind.TransactOpts, backend bind.ContractBackend, bridge_ common.Address, sequencer_ common.Address, maxTimeVariation_ ISequencerInboxMaxTimeVariation, maxDataSize_ *big.Int, reader4844_ common.Address, eigenDAServiceManager_ common.Address, eigenDARollupManager_ common.Address, isUsingFeeToken_ bool) (common.Address, *types.Transaction, *SequencerInboxStub, error) {
-
 	seqInboxAddr, tx, seqInbox, err := mocksgen.DeploySequencerInboxStub(
 		&txOpts,
 		l1Client,
@@ -238,11 +323,31 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 	tx, err = bridge.SetDelayedInbox(&txOpts, seqInboxAddr, true)
 	Require(t, err)
 	_, err = EnsureTxSucceeded(ctx, l1Client, tx)
-	Require(t, err)
-	tx, err = seqInbox.AddInitMessage(&txOpts, chainConfig.ChainID)
-	Require(t, err)
-	_, err = EnsureTxSucceeded(ctx, l1Client, tx)
-	Require(t, err)
+
+	if chainConfig.ArbitrumChainParams.EigenDA {
+		println("Deploying RollupManagerStub")
+
+		time.Sleep(5 * time.Second)
+		managerAddr, tx, _, err := mocksgen.DeployRollupManagerStub(&txOpts, l1Client)
+		Require(t, err)
+		_, err = EnsureTxSucceeded(ctx, l1Client, tx)
+		Require(t, err)
+
+
+		tx, err = seqInbox.AddInitMessage(&txOpts, chainConfig.ChainID, managerAddr)
+		Require(t, err)
+		_, err = EnsureTxSucceeded(ctx, l1Client, tx)
+		Require(t, err)
+
+	} else {
+		Require(t, err)
+		tx, err = seqInbox.AddInitMessage(&txOpts, chainConfig.ChainID, common.Address{})
+		Require(t, err)
+		_, err = EnsureTxSucceeded(ctx, l1Client, tx)
+		Require(t, err)
+	}
+
+
 	return bridgeAddr, seqInbox, seqInboxAddr
 }
 
@@ -256,7 +361,7 @@ func createL2Nodes(t *testing.T, ctx context.Context, conf *arbnode.Config, chai
 	return consensusNode, execNode
 }
 
-func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, challengeMsgIdx int64) {
+func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, challengeMsgIdx int64, useEigenDA bool) {
 	glogger := log.NewGlogHandler(
 		log.NewTerminalHandler(io.Writer(os.Stderr), false))
 	glogger.Verbosity(log.LvlInfo)
@@ -271,13 +376,22 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 	l1Info.GenerateGenesisAccount("asserter", initialBalance)
 	l1Info.GenerateGenesisAccount("challenger", initialBalance)
 	l1Info.GenerateGenesisAccount("sequencer", initialBalance)
-
+	
 	chainConfig := params.ArbitrumDevTestChainConfig()
 	l1Info, l1Backend, _, _ := createTestL1BlockChain(t, l1Info)
 	conf := arbnode.ConfigDefaultL1Test()
 	conf.BlockValidator.Enable = false
 	conf.BatchPoster.Enable = false
 	conf.InboxReader.CheckDelay = time.Second
+
+	if useEigenDA {
+		chainConfig = params.ArbitrumDevTestEigenDAConfig()
+		chainConfig.ArbitrumChainParams.EigenDA = true
+		conf.EigenDA = eigenda.EigenDAConfig{
+			Enable: true,
+			Rpc:    "http://localhost:4242",
+		}
+	}
 
 	var valStack *node.Node
 	var mockSpawn *mockSpawner
@@ -321,17 +435,32 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 		Fatal(t, "challengeMsgIdx illegal")
 	}
 
-	// seqNum := common.Big2
-	makeBatch(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
-	makeBatch(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-1)
+	if useEigenDA {
+		// seqNum := common.Big2
+		makeBatchEigenDA(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDA(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-1)
 
-	// seqNum.Add(seqNum, common.Big1)
-	makeBatch(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
-	makeBatch(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch-1)
+		// seqNum.Add(seqNum, common.Big1)
+		makeBatchEigenDA(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDA(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch-1)
 
-	// seqNum.Add(seqNum, common.Big1)
-	makeBatch(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
-	makeBatch(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch*2-1)
+		// seqNum.Add(seqNum, common.Big1)
+		makeBatchEigenDA(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDA(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch*2-1)
+	} else {
+
+		// seqNum := common.Big2
+		makeBatch(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatch(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-1)
+
+		// seqNum.Add(seqNum, common.Big1)
+		makeBatch(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatch(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch-1)
+
+		// seqNum.Add(seqNum, common.Big1)
+		makeBatch(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatch(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch*2-1)
+	}
 
 	trueSeqInboxAddr := challengerSeqInboxAddr
 	trueDelayedBridge := challengerBridgeAddr

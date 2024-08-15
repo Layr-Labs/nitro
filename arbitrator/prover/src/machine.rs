@@ -2448,7 +2448,7 @@ impl Machine {
                             hash.red(),
                         );
                         self.print_backtrace(true);
-                        bail!("missing requested preimage for hash {}", hash);
+                        bail!("missing requested preimage for hash when stepping machine forward {}", hash);
                     };
 
                     if preimage_ty == PreimageType::EthVersionedHash
@@ -3031,7 +3031,7 @@ impl Machine {
                             self.preimage_resolver
                                 .get_const(self.context, preimage_ty, hash)
                         else {
-                            panic!("Missing requested preimage for hash {}", hash)
+                            panic!("Missing requested preimage for hash when trying to serialize proof {}", hash)
                         };
                         data.push(0); // preimage proof type
                         match preimage_ty {

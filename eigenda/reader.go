@@ -53,6 +53,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 		return nil, err
 	}
 
+	println("Inserting data into preimage recorder")
 	hash, err := blobInfo.PreimageHash()
 	if err != nil {
 		return nil, err
