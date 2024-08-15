@@ -2,7 +2,6 @@ package eigenda
 
 import "testing"
 
-
 func Test_EncodeDecodeBlob(t *testing.T) {
 	rawBlob := []byte("optimistic nihilism")
 

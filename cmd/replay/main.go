@@ -158,7 +158,7 @@ func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eig
 	if err != nil {
 		return nil, err
 	}
-	
+
 	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, *hash)
 	if err != nil {
 		return nil, err

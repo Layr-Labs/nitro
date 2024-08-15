@@ -19,7 +19,6 @@ type readerForEigenDA struct {
 	readerEigenDA EigenDAReader
 }
 
-
 func (d *readerForEigenDA) IsValidHeaderByte(headerByte byte) bool {
 	return IsEigenDAMessageHeaderByte(headerByte)
 }
@@ -58,7 +57,6 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-
 
 	if preimageRecoder != nil {
 		// iFFT the preimage data
@@ -104,7 +102,7 @@ func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
 }
 
 func uint32ToBytes(n uint32) []byte {
-    bytes := make([]byte, 4)
-    binary.BigEndian.PutUint32(bytes, n)
-    return bytes
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, n)
+	return bytes
 }

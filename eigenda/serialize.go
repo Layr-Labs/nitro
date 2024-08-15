@@ -16,7 +16,6 @@ import (
 	- https://github.com/Layr-Labs/eigenda/blob/44569ec461c9a1dd1191e7999a72e63bd1e7aba9/api/clients/codecs/ifft_codec.go#L27-L38
 */
 
-
 func GenericDecodeBlob(data []byte) ([]byte, error) {
 	if len(data) <= 32 {
 		return nil, fmt.Errorf("data is not of length greater than 32 bytes: %d", len(data))

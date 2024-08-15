@@ -25,7 +25,7 @@ func init() {
 
 const (
 	sequencerMsgOffset = 41
-	MaxBatchSize = 2_000_000 // 2MB
+	MaxBatchSize       = 2_000_000 // 2MB
 )
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
