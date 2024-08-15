@@ -1,4 +1,0 @@
-mkdir -p `dirname target/machines/latest/replay.wasm`
-GOOS=wasip1 GOARCH=wasm go build -o target/machines/latest/replay.wasm ./cmd/replay/...
-target/bin/prover target/machines/latest/replay.wasm --generate-binaries target/machines/latest \
-	-l target/machines/latest/forward.wasm -l target/machines/latest/soft-float.wasm -l target/machines/latest/wasi_stub.wasm -l target/machines/latest/host_io.wasm -l target/machines/latest/user_host.wasm -l target/machines/latest/arbcompress.wasm -l target/machines/latest/program_exec.wasm
