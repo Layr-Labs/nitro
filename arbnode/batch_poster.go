@@ -955,10 +955,10 @@ func (b *BatchPoster) encodeAddBatch(
 	methodName := sequencerBatchPostMethodName
 	if use4844 {
 		methodName = sequencerBatchPostWithBlobsMethodName
-	}
-	if useEigenDA {
+	} else if useEigenDA {
 		methodName = sequencerBatchPostWithEigendaMethodName
 	}
+
 	method, ok := b.seqInboxABI.Methods[methodName]
 	if !ok {
 		return nil, nil, errors.New("failed to find add batch method")
@@ -981,54 +981,6 @@ func (b *BatchPoster) encodeAddBatch(
 		)
 	} else if useEigenDA {
 
-		blobVerificationProofType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-			{Name: "batchID", Type: "uint32"},
-			{Name: "blobIndex", Type: "uint32"},
-			{Name: "batchMetadata", Type: "tuple",
-				Components: []abi.ArgumentMarshaling{
-					{Name: "batchHeader", Type: "tuple",
-						Components: []abi.ArgumentMarshaling{
-							{Name: "blobHeadersRoot", Type: "bytes32"},
-							{Name: "quorumNumbers", Type: "bytes"},
-							{Name: "signedStakeForQuorums", Type: "bytes"},
-							{Name: "referenceBlockNumber", Type: "uint32"},
-						},
-					},
-					{Name: "signatoryRecordHash", Type: "bytes32"},
-					{Name: "confirmationBlockNumber", Type: "uint32"},
-				},
-			},
-			{
-				Name: "inclusionProof",
-				Type: "bytes",
-			},
-			{
-				Name: "quorumIndices",
-				Type: "bytes",
-			},
-		})
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-			{Name: "commitment", Type: "tuple", Components: []abi.ArgumentMarshaling{
-				{Name: "X", Type: "uint256"},
-				{Name: "Y", Type: "uint256"},
-			}},
-			{Name: "dataLength", Type: "uint32"},
-			{Name: "quorumBlobParams", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
-				{Name: "quorumNumber", Type: "uint8"},
-				{Name: "adversaryThresholdPercentage", Type: "uint8"},
-				{Name: "confirmationThresholdPercentage", Type: "uint8"},
-				{Name: "chunkLength", Type: "uint32"},
-			}},
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-
 		addressType, err := abi.NewType("address", "", nil)
 		if err != nil {
 			return nil, nil, err
@@ -1042,23 +994,20 @@ func (b *BatchPoster) encodeAddBatch(
 		// Create ABI arguments
 		arguments := abi.Arguments{
 			{Type: uint256Type},
-			{Type: blobVerificationProofType},
-			{Type: blobHeaderType},
+			{Type: eigenda.DACertTypeABI},
 			{Type: addressType},
 			{Type: uint256Type},
 			{Type: uint256Type},
 			{Type: uint256Type},
 		}
 
-		// define values array
-		values := make([]interface{}, 7)
+		values := make([]interface{}, 6)
 		values[0] = seqNum
-		values[1] = eigenDaBlobInfo.BlobVerificationProof
-		values[2] = eigenDaBlobInfo.BlobHeader
-		values[3] = b.config().gasRefunder
-		values[4] = new(big.Int).SetUint64(delayedMsg)
-		values[5] = new(big.Int).SetUint64(uint64(prevMsgNum))
-		values[6] = new(big.Int).SetUint64(uint64(newMsgNum))
+		values[1] = eigenDaBlobInfo
+		values[2] = b.config().gasRefunder
+		values[3] = new(big.Int).SetUint64(delayedMsg)
+		values[4] = new(big.Int).SetUint64(uint64(prevMsgNum))
+		values[5] = new(big.Int).SetUint64(uint64(newMsgNum))
 
 		calldata, err = arguments.PackValues(values)
 

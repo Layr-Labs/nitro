@@ -2448,7 +2448,7 @@ impl Machine {
                             hash.red(),
                         );
                         self.print_backtrace(true);
-                        bail!("missing requested preimage for hash when stepping machine forward {}", hash);
+                        bail!("missing requested preimage for hash {}", hash);
                     };
 
                     if preimage_ty == PreimageType::EthVersionedHash

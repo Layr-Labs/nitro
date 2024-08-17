@@ -8,22 +8,40 @@ use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::{Digest, Sha256};
 use sha3::Keccak256;
+use std::env;
 use std::io::Write;
+use std::path::PathBuf;
 
 lazy_static::lazy_static! {
-
-    // note that we are loading 3000 for testing purposes atm, but for production use these values:
-    // g1 and g2 points from the operator setup guide
-    // srs_order = 268435456
     // srs_points_to_load = 131072 (65536 is enough)
 
-    pub static ref KZG: Kzg = Kzg::setup(
-        "./arbitrator/prover/src/mainnet-files/g1.point.65536",
-        "./arbitrator/prover/src/mainnet-files/g2.point.65536",
-        "./arbitrator/prover/src/mainnet-files/g2.point.powerOf2",
+    pub static ref KZG_BN254_SETTINGS: Kzg = Kzg::setup(
+        &load_directory_with_prefix("src/mainnet-files/g1.point.65536"),
+        &load_directory_with_prefix("src/mainnet-files/g2.point.65536"),
+        &load_directory_with_prefix("src/mainnet-files/g2.point.powerOf2"),
         268435456,
         65536
     ).unwrap();
+}
+
+// Necessary helper function for understanding if srs is being loaded for normal node operation
+// or for challenge testing.
+fn load_directory_with_prefix(directory_name: &str) -> String {
+    let cwd = env::current_dir().expect("Failed to get current directory");
+    return match cwd {
+        cwd if cwd.ends_with("system_tests") => {
+            return PathBuf::from("../arbitrator/prover/")
+                .join(directory_name)
+                .to_string_lossy()
+                .into_owned();
+        }
+        _ => {
+            return PathBuf::from("./arbitrator/prover/")
+                .join(directory_name)
+                .to_string_lossy()
+                .into_owned();
+        }
+    };
 }
 
 /// Creates a KZG preimage proof consumable by the point evaluation precompile.
@@ -33,8 +51,7 @@ pub fn prove_kzg_preimage_bn254(
     offset: u32,
     out: &mut impl Write,
 ) -> Result<()> {
-    let mut kzg = KZG.clone();
-
+    let mut kzg = KZG_BN254_SETTINGS.clone();
     // expand roots of unity
     kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 

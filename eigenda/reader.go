@@ -3,7 +3,7 @@ package eigenda
 import (
 	"context"
 	"encoding/binary"
-	"errors"
+	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -53,7 +53,6 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 		return nil, err
 	}
 
-	println("Inserting data into preimage recorder")
 	hash, err := blobInfo.PreimageHash()
 	if err != nil {
 		return nil, err
@@ -70,35 +69,39 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	return data, nil
 }
 
-// ParseSequencerMsg parses the inbox tx calldata into a structured EigenDABlobInfo
+func interfaceToBytesJSON(data interface{}) ([]byte, error) {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
+// ParseSequencerMsg parses the certificate from the inbox message
 func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
 
-	// this should never happen, but just in case
-	if len(calldata) < 4 {
-		return nil, errors.New("calldata is shorter than expected method signature length")
-	}
+	spoofedFunc := certDecodeABI.Methods["decodeCert"]
 
-	method, err := sequencerInboxABI.MethodById(calldata[0:4])
+	m := make(map[string]interface{})
+	err := spoofedFunc.Inputs.UnpackIntoMap(m, calldata)
 	if err != nil {
 		return nil, err
 	}
 
-	callDataValues, err := method.Inputs.Unpack(calldata[4:])
+	b, err := interfaceToBytesJSON(m["cert"])
 	if err != nil {
 		return nil, err
 	}
 
-	inboxPayload := &InboxPayload{}
+	// decode to EigenDABlobInfo
+	var blobInfo EigenDABlobInfo
+	err = json.Unmarshal(b, &blobInfo)
 
-	err = inboxPayload.Load(callDataValues)
 	if err != nil {
 		return nil, err
 	}
 
-	return &EigenDABlobInfo{
-		BlobVerificationProof: inboxPayload.BlobVerificationProof,
-		BlobHeader:            inboxPayload.BlobHeader,
-	}, nil
+	return &blobInfo, nil
 
 }
 

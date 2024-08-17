@@ -4,16 +4,20 @@
 
 package arbtest
 
-// func TestMockChallengeManagerAsserterIncorrect(t *testing.T) {
-// 	t.Parallel()
-// 	for i := int64(1); i <= makeBatch_MsgsPerBatch*3; i++ {
-// 		RunChallengeTest(t, false, true, i)
-// 	}
-// }
+import "testing"
 
-// func TestMockChallengeManagerAsserterCorrect(t *testing.T) {
-// 	t.Parallel()
-// 	for i := int64(1); i <= makeBatch_MsgsPerBatch*3; i++ {
-// 		RunChallengeTest(t, true, true, i)
-// 	}
-// }
+func TestMockChallengeManagerAsserterIncorrect(t *testing.T) {
+	t.Parallel()
+	for i := int64(1); i <= makeBatch_MsgsPerBatch*3; i++ {
+		RunChallengeTest(t, false, true, i, false)
+		RunChallengeTest(t, false, true, i, true)
+	}
+}
+
+func TestMockChallengeManagerAsserterCorrect(t *testing.T) {
+	t.Parallel()
+	for i := int64(1); i <= makeBatch_MsgsPerBatch*3; i++ {
+		RunChallengeTest(t, true, true, i, false)
+		RunChallengeTest(t, true, true, i, true)
+	}
+}
