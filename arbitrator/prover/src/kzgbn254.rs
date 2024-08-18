@@ -1,3 +1,4 @@
+use crate::utils::append_left_padded_uint32_be;
 use crate::{utils::append_left_padded_biguint_be, Bytes32};
 use ark_bn254::G2Affine;
 use ark_ec::{AffineRepr, CurveGroup};
@@ -64,12 +65,12 @@ pub fn prove_kzg_preimage_bn254(
 
     let commitment_x_bigint: BigUint = blob_commitment.x.into();
     let commitment_y_bigint: BigUint = blob_commitment.y.into();
-    let length_bigint: BigUint = blob.len().into();
+    let length_uint32: u32 = blob.len() as u32;
 
     let mut commitment_encoded_length_bytes = Vec::with_capacity(68);
     append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &commitment_x_bigint);
     append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &commitment_y_bigint);
-    append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &length_bigint);
+    append_left_padded_uint32_be(&mut commitment_encoded_length_bytes, &length_uint32);
 
     let mut keccak256_hasher = Keccak256::new();
     keccak256_hasher.update(&commitment_encoded_length_bytes);

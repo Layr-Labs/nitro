@@ -78,12 +78,12 @@ func interfaceToBytesJSON(data interface{}) ([]byte, error) {
 }
 
 // ParseSequencerMsg parses the certificate from the inbox message
-func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
+func ParseSequencerMsg(abiEncodedCert []byte) (*EigenDABlobInfo, error) {
 
 	spoofedFunc := certDecodeABI.Methods["decodeCert"]
 
 	m := make(map[string]interface{})
-	err := spoofedFunc.Inputs.UnpackIntoMap(m, calldata)
+	err := spoofedFunc.Inputs.UnpackIntoMap(m, abiEncodedCert)
 	if err != nil {
 		return nil, err
 	}

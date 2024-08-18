@@ -126,7 +126,8 @@ func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-// SetData writes raw byte data to DA and returns the respective certificate
+// SetData writes raw byte data to DA and returns the associated certificate
+// which should be verified within the proxy
 func (c *client) SetData(ctx context.Context, b []byte) ([]byte, error) {
 	url := fmt.Sprintf("%s/put/?commitment_mode=simple", c.cfg.URL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))

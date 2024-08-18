@@ -12,7 +12,7 @@ import (
 )
 
 /*
-	These decodings are translated directly from core EigenDA client codec:
+	These decodings are translated directly from core EigenDA default client codec:
 	- https://github.com/Layr-Labs/eigenda/blob/44569ec461c9a1dd1191e7999a72e63bd1e7aba9/api/clients/codecs/ifft_codec.go#L27-L38
 */
 
@@ -79,9 +79,8 @@ func encodeBlob(rawData []byte) ([]byte, error) {
 	return encodedData, nil
 }
 
+// pad data to the next power of 2
 func padPow2(data []byte) ([]byte, error) {
-	// we now IFFT data regardless of the encoding type
-	// convert data to fr.Element
 	dataFr, err := rs.ToFrArray(data)
 	if err != nil {
 		return nil, fmt.Errorf("error converting data to fr.Element: %w", err)
