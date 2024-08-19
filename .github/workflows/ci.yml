@@ -146,9 +146,6 @@ jobs:
       - name: spinup eigenda-proxy
         run: ./scripts/start-eigenda-proxy.sh
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
-
       - name: run tests without race detection
         if: matrix.test-mode == 'defaults'
         run: |
