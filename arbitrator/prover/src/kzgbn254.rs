@@ -1,3 +1,4 @@
+use crate::utils::append_left_padded_uint32_be;
 use crate::{utils::append_left_padded_biguint_be, Bytes32};
 use ark_bn254::G2Affine;
 use ark_ec::{AffineRepr, CurveGroup};
@@ -8,22 +9,40 @@ use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::{Digest, Sha256};
 use sha3::Keccak256;
+use std::env;
 use std::io::Write;
+use std::path::PathBuf;
 
 lazy_static::lazy_static! {
-
-    // note that we are loading 3000 for testing purposes atm, but for production use these values:
-    // g1 and g2 points from the operator setup guide
-    // srs_order = 268435456
     // srs_points_to_load = 131072 (65536 is enough)
 
-    pub static ref KZG: Kzg = Kzg::setup(
-        "./arbitrator/prover/src/mainnet-files/g1.point.65536",
-        "./arbitrator/prover/src/mainnet-files/g2.point.65536",
-        "./arbitrator/prover/src/mainnet-files/g2.point.powerOf2",
+    pub static ref KZG_BN254_SETTINGS: Kzg = Kzg::setup(
+        &load_directory_with_prefix("src/mainnet-files/g1.point.65536"),
+        &load_directory_with_prefix("src/mainnet-files/g2.point.65536"),
+        &load_directory_with_prefix("src/mainnet-files/g2.point.powerOf2"),
         268435456,
         65536
     ).unwrap();
+}
+
+// Necessary helper function for understanding if srs is being loaded for normal node operation
+// or for challenge testing.
+fn load_directory_with_prefix(directory_name: &str) -> String {
+    let cwd = env::current_dir().expect("Failed to get current directory");
+    return match cwd {
+        cwd if cwd.ends_with("system_tests") => {
+            return PathBuf::from("../arbitrator/prover/")
+                .join(directory_name)
+                .to_string_lossy()
+                .into_owned();
+        }
+        _ => {
+            return PathBuf::from("./arbitrator/prover/")
+                .join(directory_name)
+                .to_string_lossy()
+                .into_owned();
+        }
+    };
 }
 
 /// Creates a KZG preimage proof consumable by the point evaluation precompile.
@@ -33,8 +52,7 @@ pub fn prove_kzg_preimage_bn254(
     offset: u32,
     out: &mut impl Write,
 ) -> Result<()> {
-    let mut kzg = KZG.clone();
-
+    let mut kzg = KZG_BN254_SETTINGS.clone();
     // expand roots of unity
     kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 
@@ -47,12 +65,15 @@ pub fn prove_kzg_preimage_bn254(
 
     let commitment_x_bigint: BigUint = blob_commitment.x.into();
     let commitment_y_bigint: BigUint = blob_commitment.y.into();
-    let mut commitment_encoded_bytes = Vec::with_capacity(32);
-    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
-    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
+    let length_uint32: u32 = blob.len() as u32;
+
+    let mut commitment_encoded_length_bytes = Vec::with_capacity(68);
+    append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &commitment_x_bigint);
+    append_left_padded_biguint_be(&mut commitment_encoded_length_bytes, &commitment_y_bigint);
+    append_left_padded_uint32_be(&mut commitment_encoded_length_bytes, &length_uint32);
 
     let mut keccak256_hasher = Keccak256::new();
-    keccak256_hasher.update(&commitment_encoded_bytes);
+    keccak256_hasher.update(&commitment_encoded_length_bytes);
     let commitment_hash: Bytes32 = keccak256_hasher.finalize().into();
 
     ensure!(
@@ -68,6 +89,11 @@ pub fn prove_kzg_preimage_bn254(
         offset,
     );
 
+    let mut commitment_encoded_bytes = Vec::with_capacity(64);
+
+    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_x_bigint);
+    append_left_padded_biguint_be(&mut commitment_encoded_bytes, &commitment_y_bigint);
+
     let mut proving_offset = offset;
     let length_usize = preimage.len() as u64;
 
@@ -81,8 +107,7 @@ pub fn prove_kzg_preimage_bn254(
         proving_offset = 0;
     }
 
-    // Y = ϕ(offset) --> evaluation point for computing quotient proof
-    // confirming if this is actually ok ?
+    // Y = ϕ(offset)
     let proven_y_fr = blob_polynomial_evaluation_form
         .get_at_index(proving_offset as usize / 32)
         .ok_or_else(|| {

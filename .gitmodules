@@ -16,7 +16,7 @@
 [submodule "contracts"]
 	path = contracts
 	url = https://github.com/Layr-Labs/nitro-contracts.git
-	branch = new-osp-fixes-v3.0.3
+	branch = epociask--length-fixes-v3.0.3
 [submodule "nitro-testnode"]
 	path = nitro-testnode
 	url = https://github.com/Layr-Labs/nitro-testnode.git

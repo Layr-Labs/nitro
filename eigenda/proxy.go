@@ -37,7 +37,7 @@ func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) (*disperser.B
 	return &blobInfo, nil
 }
 
-func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *DisperserBlobInfo, domainFilter string) ([]byte, error) {
+func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *DisperserBlobInfo) ([]byte, error) {
 	commitment, err := rlp.EncodeToBytes(blobInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode blob info: %w", err)
@@ -46,44 +46,12 @@ func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *DisperserBlobInf
 	// TODO: support more strict versioning
 	commitWithVersion := append([]byte{0x0}, commitment...)
 
-	data, err := c.client.GetData(ctx, commitWithVersion, StrToDomainType(domainFilter))
+	data, err := c.client.GetData(ctx, commitWithVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data: %w", err)
 	}
 
 	return data, nil
-}
-
-// DomainType is a enumeration type for the different data domains for which a
-// blob can exist between
-type DomainType uint8
-
-const (
-	BinaryDomain DomainType = iota
-	PolyDomain
-	UnknownDomain
-)
-
-func (d DomainType) String() string {
-	switch d {
-	case BinaryDomain:
-		return "binary"
-	case PolyDomain:
-		return "polynomial"
-	default:
-		return "unknown"
-	}
-}
-
-func StrToDomainType(s string) DomainType {
-	switch s {
-	case "binary":
-		return BinaryDomain
-	case "polynomial":
-		return PolyDomain
-	default:
-		return UnknownDomain
-	}
 }
 
 // TODO: Add support for custom http client option
@@ -94,7 +62,7 @@ type Config struct {
 // ProxyClient is an interface for communicating with the EigenDA proxy server
 type ProxyClient interface {
 	Health() error
-	GetData(ctx context.Context, cert []byte, domain DomainType) ([]byte, error)
+	GetData(ctx context.Context, cert []byte) ([]byte, error)
 	SetData(ctx context.Context, b []byte) ([]byte, error)
 }
 
@@ -135,8 +103,8 @@ func (c *client) Health() error {
 }
 
 // GetData fetches blob data associated with a DA certificate
-func (c *client) GetData(ctx context.Context, comm []byte, domain DomainType) ([]byte, error) {
-	url := fmt.Sprintf("%s/get/0x%x?domain=%s&commitment_mode=simple", c.cfg.URL, comm, domain.String())
+func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
+	url := fmt.Sprintf("%s/get/0x%x?commitment_mode=simple", c.cfg.URL, comm)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -158,7 +126,8 @@ func (c *client) GetData(ctx context.Context, comm []byte, domain DomainType) ([
 	return io.ReadAll(resp.Body)
 }
 
-// SetData writes raw byte data to DA and returns the respective certificate
+// SetData writes raw byte data to DA and returns the associated certificate
+// which should be verified within the proxy
 func (c *client) SetData(ctx context.Context, b []byte) ([]byte, error) {
 	url := fmt.Sprintf("%s/put/?commitment_mode=simple", c.cfg.URL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))

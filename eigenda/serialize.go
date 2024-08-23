@@ -4,63 +4,24 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 /*
-	These decodings are translated directly from core EigenDA client codec:
+	These decodings are translated directly from core EigenDA default client codec:
 	- https://github.com/Layr-Labs/eigenda/blob/44569ec461c9a1dd1191e7999a72e63bd1e7aba9/api/clients/codecs/ifft_codec.go#L27-L38
 */
-
-func FFT(data []byte) ([]byte, error) {
-	dataFr, err := rs.ToFrArray(data)
-	if err != nil {
-		return nil, fmt.Errorf("error converting data to fr.Element: %w", err)
-	}
-	dataFrLen := uint64(len(dataFr))
-	dataFrLenPow2 := encoding.NextPowerOf2(dataFrLen)
-
-	if dataFrLenPow2 != dataFrLen {
-		return nil, fmt.Errorf("data length %d is not a power of 2", dataFrLen)
-	}
-
-	maxScale := uint8(math.Log2(float64(dataFrLenPow2)))
-
-	fs := fft.NewFFTSettings(maxScale)
-
-	dataFFTFr, err := fs.FFT(dataFr, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to perform FFT: %w", err)
-	}
-
-	return rs.ToByteArray(dataFFTFr, dataFrLenPow2*encoding.BYTES_PER_SYMBOL), nil
-}
-
-func DecodeiFFTBlob(data []byte) ([]byte, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("blob has length 0, meaning it is malformed")
-	}
-	var err error
-	data, err = FFT(data)
-	if err != nil {
-		return nil, fmt.Errorf("error FFTing data: %w", err)
-	}
-
-	return GenericDecodeBlob(data)
-}
 
 func GenericDecodeBlob(data []byte) ([]byte, error) {
 	if len(data) <= 32 {
 		return nil, fmt.Errorf("data is not of length greater than 32 bytes: %d", len(data))
 	}
 
-	data, err := DecodeBlob(data)
+	data, err := decodeBlob(data)
 	if err != nil {
 		return nil, err
 	}
@@ -68,11 +29,7 @@ func GenericDecodeBlob(data []byte) ([]byte, error) {
 	return data, nil
 }
 
-func DecodeBlob(data []byte) ([]byte, error) {
-	if len(data) < 32 {
-		return nil, fmt.Errorf("blob does not contain 32 header bytes, meaning it is malformed")
-	}
-
+func decodeBlob(data []byte) ([]byte, error) {
 	length := binary.BigEndian.Uint32(data[2:6])
 
 	// decode raw data modulo bn254
@@ -93,14 +50,14 @@ func DecodeBlob(data []byte) ([]byte, error) {
 
 }
 
-func EncodeBlob(data []byte) ([]byte, error) {
+func GenericEncodeBlob(data []byte) ([]byte, error) {
 	var err error
 	data, err = encodeBlob(data)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding data: %w", err)
 	}
 
-	return IFFT(data)
+	return padPow2(data)
 }
 
 func encodeBlob(rawData []byte) ([]byte, error) {
@@ -122,9 +79,8 @@ func encodeBlob(rawData []byte) ([]byte, error) {
 	return encodedData, nil
 }
 
-func IFFT(data []byte) ([]byte, error) {
-	// we now IFFT data regardless of the encoding type
-	// convert data to fr.Element
+// pad data to the next power of 2
+func padPow2(data []byte) ([]byte, error) {
 	dataFr, err := rs.ToFrArray(data)
 	if err != nil {
 		return nil, fmt.Errorf("error converting data to fr.Element: %w", err)
@@ -143,14 +99,5 @@ func IFFT(data []byte) ([]byte, error) {
 		}
 	}
 
-	maxScale := uint8(math.Log2(float64(dataFrLenPow2)))
-
-	// perform IFFT
-	fs := fft.NewFFTSettings(maxScale)
-	dataIFFTFr, err := fs.FFT(paddedDataFr, true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to perform IFFT: %w", err)
-	}
-
-	return rs.ToByteArray(dataIFFTFr, dataFrLenPow2*encoding.BYTES_PER_SYMBOL), nil
+	return rs.ToByteArray(paddedDataFr, dataFrLenPow2*encoding.BYTES_PER_SYMBOL), nil
 }
