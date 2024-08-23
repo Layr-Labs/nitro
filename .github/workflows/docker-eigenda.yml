@@ -1,5 +1,6 @@
 name: Build nitro-eigenda Docker Image
 on:
+  workflow_dispatch:
   push:
     tags: ['*']
 
