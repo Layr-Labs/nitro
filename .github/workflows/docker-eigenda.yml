@@ -69,3 +69,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           file: ${{ matrix.dockerfile }}
           provenance: false
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Clear cache on failure
+        if: failure()
+        run: |
+          keys=(${{ runner.os }}-buildx- ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile') }})
+          for key in "${keys[@]}"; do
+            curl -X DELETE -H "Accept: application/vnd.github.v3+json" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/actions/caches/$key"
+          done
