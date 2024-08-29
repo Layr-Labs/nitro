@@ -57,11 +57,9 @@ pub fn prove_kzg_preimage_bn254(
     kzg.calculate_roots_of_unity(preimage.len() as u64)?;
 
     // preimage is already padded and is the actual blob data, NOT the IFFT'd form.
-    let blob = Blob::from_padded_bytes_unchecked(&preimage);
-
-    let blob_polynomial_evaluation_form =
-        blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
-    let blob_commitment = kzg.commit(&blob_polynomial_evaluation_form)?;
+    let blob_polynomial = Blob::from_padded_bytes_unchecked(&preimage)
+        .to_polynomial(PolynomialFormat::InCoefficientForm)?;
+    let blob_commitment = kzg.commit(&blob_polynomial)?;
 
     let commitment_x_bigint: BigUint = blob_commitment.x.into();
     let commitment_y_bigint: BigUint = blob_commitment.y.into();
@@ -97,7 +95,7 @@ pub fn prove_kzg_preimage_bn254(
     let mut proving_offset = offset;
     let length_usize = preimage.len() as u64;
 
-    assert!(length_usize / 32 == blob_polynomial_evaluation_form.len() as u64);
+    assert!(length_usize / 32 == blob_polynomial.len() as u64);
 
     // address proving past end edge case later
     let proving_past_end = offset as u64 >= length_usize;
@@ -115,7 +113,7 @@ pub fn prove_kzg_preimage_bn254(
                 "Index ({}) out of bounds for preimage of length {} with data of ({} field elements x 32 bytes)",
                 proving_offset,
                 length_usize,
-                blob_polynomial_evaluation_form.len()
+                blob_polynomial.len()
             )
         })?;
 
@@ -123,7 +121,7 @@ pub fn prove_kzg_preimage_bn254(
         .get_nth_root_of_unity(proving_offset as usize / 32)
         .ok_or_else(|| eyre::eyre!("Failed to get nth root of unity"))?;
 
-    let proven_y = proven_y_fr.into_bigint().to_bytes_be();
+    let y = y_fr.into_bigint().to_bytes_be();
     let z = z_fr.into_bigint().to_bytes_be();
 
     // probably should be a constant on the contract.
@@ -138,16 +136,14 @@ pub fn prove_kzg_preimage_bn254(
         .clone();
     let g2_tau_minus_g2_z = (g2_tau - z_g2).into_affine();
 
-    let kzg_proof = kzg.compute_kzg_proof_with_roots_of_unity(
-        &blob_polynomial_evaluation_form,
-        proving_offset as u64 / 32,
-    )?;
+    let kzg_proof =
+        kzg.compute_kzg_proof_with_roots_of_unity(&blob_polynomial, proving_offset as u64 / 32)?;
 
     let offset_usize = proving_offset as usize;
     // This should cause failure when proving past offset.
     if !proving_past_end {
         ensure!(
-            *proven_y == preimage[offset_usize..offset_usize + 32],
+            *y == preimage[offset_usize..offset_usize + 32],
             "KZG proof produced wrong preimage for offset {}",
             offset,
         );
@@ -177,7 +173,7 @@ pub fn prove_kzg_preimage_bn254(
 
     out.write_all(&commitment_hash.to_vec())?; // hash [:32]
     out.write_all(&*z)?; // evaluation point [32:64]
-    out.write_all(&*proven_y)?; // expected output [64:96]
+    out.write_all(&*y)?; // expected output [64:96]
     out.write_all(&xminusz_encoded_bytes)?; // g2TauMinusG2z [96:224]
     out.write_all(&*commitment_encoded_bytes)?; // kzg commitment [224:288]
     out.write_all(&proof_encoded_bytes)?; // proof [288:352]

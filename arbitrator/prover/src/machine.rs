@@ -3044,7 +3044,6 @@ impl Machine {
                                     .expect("Failed to generate KZG preimage proof");
                             }
                             PreimageType::EigenDAHash => {
-                                println!("Generating proof for EigenDA preimage");
                                 prove_kzg_preimage_bn254(hash, &preimage, offset, &mut data)
                                     .expect("Failed to generate eigenDA KZG preimage proof");
                             }
