@@ -7,14 +7,7 @@ on:
 jobs:
   docker:
     runs-on: linux-2xl
-    strategy:
-      matrix:
-        include:
-          - name: build and push nitro-eigenda
-            image: nitro-eigenda
-            dockerfile: Dockerfile
-            context: .
-            buildargs: ''
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,15 +53,14 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=match,pattern=^(v\d+\.\d+\.\d+-\w*)\..*$,value=$1,enable={{is_default_branch}}
 
-      - name: ${{ matrix.name }}
+      - name: "Build and push"
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
+          target: nitro-node
+          context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          file: ${{ matrix.dockerfile }}
-          provenance: false
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
