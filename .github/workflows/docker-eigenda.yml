@@ -56,7 +56,7 @@ jobs:
       - name: "Build and push"
         uses: docker/build-push-action@v5
         with:
-          target: nitro-node
+          target: nitro-node-dev
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
