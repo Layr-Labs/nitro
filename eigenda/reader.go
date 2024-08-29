@@ -2,19 +2,15 @@ package eigenda
 
 import (
 	"context"
-	"crypto/sha256"
-	"errors"
-	"strings"
+	"encoding/binary"
+	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/arbutil"
 )
 
-// NewReaderForEigenDA is generally meant to be only used by nitro.
-// DA Providers should implement methods in the Reader interface independently
 func NewReaderForEigenDA(reader EigenDAReader) *readerForEigenDA {
 	return &readerForEigenDA{readerEigenDA: reader}
 }
@@ -35,10 +31,8 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	preimageRecorder daprovider.PreimageRecorder,
 	validateSeqMsg bool,
 ) ([]byte, error) {
-	// offset sequencer message at 41 
-	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "binary")
+	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder, "binary")
 }
-
 
 func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	sequencerMsg []byte,
@@ -59,87 +53,60 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 		return nil, err
 	}
 
-	// record preimage data for EigenDA using the hash of the commitment
-	// for lookups in the replay script
-	kzgCommit, err := blobInfo.SerializeCommitment()
+	hash, err := blobInfo.PreimageHash()
 	if err != nil {
 		return nil, err
 	}
 
-	shaDataHash := sha256.New()
-	shaDataHash.Write(kzgCommit)
-	dataHash := shaDataHash.Sum([]byte{})
-	dataHash[0] = 1
 	if preimageRecoder != nil {
 		// iFFT the preimage data
-		preimage, err := EncodeBlob(data)
+		preimage, err := GenericEncodeBlob(data)
 		if err != nil {
 			return nil, err
 		}
-		preimageRecoder(common.BytesToHash(dataHash), preimage, arbutil.EigenDaPreimageType)
+		preimageRecoder(*hash, preimage, arbutil.EigenDaPreimageType)
 	}
 	return data, nil
 }
 
-// ParseSequencerMsg parses the inbox tx calldata into a structured EigenDABlobInfo
-func ParseSequencerMsg(calldata []byte) (*EigenDABlobInfo, error) {
-	
-	if len(calldata) < 4 {
-		return nil, errors.New("calldata is shorter than expected method signature length")
+func interfaceToBytesJSON(data interface{}) ([]byte, error) {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
 	}
+	return bytes, nil
+}
 
-	// TODO: Construct the ABI struct at node initialization
-	abi, err := abi.JSON(strings.NewReader(sequencerInboxABI))
+// ParseSequencerMsg parses the certificate from the inbox message
+func ParseSequencerMsg(abiEncodedCert []byte) (*EigenDABlobInfo, error) {
+
+	spoofedFunc := certDecodeABI.Methods["decodeCert"]
+
+	m := make(map[string]interface{})
+	err := spoofedFunc.Inputs.UnpackIntoMap(m, abiEncodedCert)
 	if err != nil {
 		return nil, err
 	}
 
-	method, err := abi.MethodById(calldata[0:4])
+	b, err := interfaceToBytesJSON(m["cert"])
 	if err != nil {
 		return nil, err
 	}
 
-	callDataValues, err := method.Inputs.Unpack(calldata[4:])
+	// decode to EigenDABlobInfo
+	var blobInfo EigenDABlobInfo
+	err = json.Unmarshal(b, &blobInfo)
+
 	if err != nil {
 		return nil, err
 	}
 
-	inboxPayload := &InboxPayload{}
-
-	err = inboxPayload.Load(callDataValues)
-	if err != nil {
-		return nil, err
-	}
-
-	return &EigenDABlobInfo{
-		BlobVerificationProof: inboxPayload.BlobVerificationProof,
-		BlobHeader:            inboxPayload.BlobHeader,
-	}, nil
+	return &blobInfo, nil
 
 }
 
-// NewReaderForEigenDA is generally meant to be only used by nitro.
-// DA Providers should implement methods in the Reader interface independently
-func NewBinaryReaderForEigenDA(reader EigenDAReader) *binaryReaderForEigenDA {
-	return &binaryReaderForEigenDA{readerEigenDA: reader}
-}
-
-type binaryReaderForEigenDA struct {
-	readerEigenDA EigenDAReader
-}
-
-func (d *binaryReaderForEigenDA) IsValidHeaderByte(headerByte byte) bool {
-	return IsEigenDAMessageHeaderByte(headerByte)
-}
-
-func (d *binaryReaderForEigenDA) RecoverPayloadFromBatch(
-	ctx context.Context,
-	batchNum uint64,
-	batchBlockHash common.Hash,
-	sequencerMsg []byte,
-	preimageRecorder daprovider.PreimageRecorder,
-	validateSeqMsg bool,
-) ([]byte, error) {
-	// offset sequencer message at 41 
-	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[41:], d.readerEigenDA, preimageRecorder, "binary")
+func uint32ToBytes(n uint32) []byte {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, n)
+	return bytes
 }

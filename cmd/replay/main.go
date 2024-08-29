@@ -6,7 +6,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -124,6 +123,7 @@ func (dasReader *PreimageDASReader) ExpirationPolicy(ctx context.Context) (dapro
 }
 
 type BlobPreimageReader struct{}
+
 func (r *BlobPreimageReader) GetBlobs(
 	ctx context.Context,
 	batchBlockHash common.Hash,
@@ -149,39 +149,29 @@ func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 	return nil
 }
 
-
 type EigenDAPreimageReader struct{}
+
 // QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
 // certificate kzg commitment for identifying the preimage.
 func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
-	kzgCommit, err := cert.SerializeCommitment()
+	hash, err := cert.PreimageHash()
 	if err != nil {
 		return nil, err
 	}
 
-	shaDataHash := sha256.New()
-	shaDataHash.Write(kzgCommit)
-	dataHash := shaDataHash.Sum([]byte{})
-	dataHash[0] = 1
-
-	hash := common.BytesToHash(dataHash)
-	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, hash)
+	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, *hash)
 	if err != nil {
 		return nil, err
 	}
 
-	// since the preimage is in encoded co-efficient form, we need to decode it to get the actual blob
-	// i.e,polynomial -> FFT -> length decode -> inverse onec -> blob
-	decodedBlob, err := eigenda.DecodeiFFTBlob(preimage)
+	decodedBlob, err := eigenda.GenericDecodeBlob(preimage)
 	if err != nil {
 		println("Error decoding blob: ", err)
 		return nil, err
 	}
-	
+
 	return decodedBlob, nil
 }
-
-
 
 // To generate:
 // key, _ := crypto.HexToECDSA("0000000000000000000000000000000000000000000000000000000000000001")
@@ -255,7 +245,7 @@ func main() {
 			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader))
 		}
 		if eigenDAReader != nil {
-			dapReaders = append(dapReaders, eigenda.NewBinaryReaderForEigenDA(eigenDAReader))
+			dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
 		}
 
 		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(&BlobPreimageReader{}))

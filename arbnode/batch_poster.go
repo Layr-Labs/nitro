@@ -109,11 +109,11 @@ type BatchPoster struct {
 	dapWriter          daprovider.Writer
 	// This deviates from the DA spec but is necessary for the batch poster to work efficiently
 	// since we need to an extended method on the SequencerInbox contract
-	eigenDAWriter      eigenda.EigenDAWriter
-	dataPoster         *dataposter.DataPoster
-	redisLock          *redislock.Simple
-	messagesPerBatch   *arbmath.MovingAverage[uint64]
-	non4844BatchCount  int // Count of consecutive non-4844 batches posted
+	eigenDAWriter     eigenda.EigenDAWriter
+	dataPoster        *dataposter.DataPoster
+	redisLock         *redislock.Simple
+	messagesPerBatch  *arbmath.MovingAverage[uint64]
+	non4844BatchCount int // Count of consecutive non-4844 batches posted
 	// This is an atomic variable that should only be accessed atomically.
 	// An estimate of the number of batches we want to post but haven't yet.
 	// This doesn't include batches which we don't want to post yet due to the L1 bounds.
@@ -150,6 +150,8 @@ type BatchPosterConfig struct {
 	MaxSize int `koanf:"max-size" reload:"hot"`
 	// Maximum 4844 blob enabled batch size.
 	Max4844BatchSize int `koanf:"max-4844-batch-size" reload:"hot"`
+	// Maximum EigenDA blob enabled batch size.
+	MaxEigenDABatchSize int `koanf:"max-eigenda-batch-size" reload:"hot"`
 	// Max batch post delay.
 	MaxDelay time.Duration `koanf:"max-delay" reload:"hot"`
 	// Wait for max BatchPost delay.
@@ -210,6 +212,7 @@ func BatchPosterConfigAddOptions(prefix string, f *pflag.FlagSet) {
 	f.Bool(prefix+".disable-dap-fallback-store-data-on-chain", DefaultBatchPosterConfig.DisableDapFallbackStoreDataOnChain, "If unable to batch to DA provider, disable fallback storing data on chain")
 	f.Int(prefix+".max-size", DefaultBatchPosterConfig.MaxSize, "maximum batch size")
 	f.Int(prefix+".max-4844-batch-size", DefaultBatchPosterConfig.Max4844BatchSize, "maximum 4844 blob enabled batch size")
+	f.Int(prefix+".max-eigenda-batch-size", DefaultBatchPosterConfig.MaxEigenDABatchSize, "maximum EigenDA blob enabled batch size")
 	f.Duration(prefix+".max-delay", DefaultBatchPosterConfig.MaxDelay, "maximum batch posting delay")
 	f.Bool(prefix+".wait-for-max-delay", DefaultBatchPosterConfig.WaitForMaxDelay, "wait for the max batch delay, even if the batch is full")
 	f.Duration(prefix+".poll-interval", DefaultBatchPosterConfig.PollInterval, "how long to wait after no batches are ready to be posted before checking again")
@@ -235,7 +238,8 @@ var DefaultBatchPosterConfig = BatchPosterConfig{
 	Enable:                             false,
 	DisableDapFallbackStoreDataOnChain: false,
 	// This default is overridden for L3 chains in applyChainParameters in cmd/nitro/nitro.go
-	MaxSize: 100000,
+	MaxSize:             100000,
+	MaxEigenDABatchSize: 2_000_000,
 	// Try to fill 3 blobs per batch
 	Max4844BatchSize:               blobs.BlobEncodableData*(params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob)/2 - 2000,
 	PollInterval:                   time.Second * 10,
@@ -270,6 +274,7 @@ var TestBatchPosterConfig = BatchPosterConfig{
 	Enable:                         true,
 	MaxSize:                        100000,
 	Max4844BatchSize:               DefaultBatchPosterConfig.Max4844BatchSize,
+	MaxEigenDABatchSize:            DefaultBatchPosterConfig.MaxEigenDABatchSize,
 	PollInterval:                   time.Millisecond * 10,
 	ErrorDelay:                     time.Millisecond * 10,
 	MaxDelay:                       0,
@@ -293,6 +298,7 @@ var EigenDABatchPosterConfig = BatchPosterConfig{
 	Enable:                         true,
 	MaxSize:                        100000,
 	Max4844BatchSize:               DefaultBatchPosterConfig.Max4844BatchSize,
+	MaxEigenDABatchSize:            DefaultBatchPosterConfig.MaxEigenDABatchSize,
 	PollInterval:                   time.Millisecond * 10,
 	ErrorDelay:                     time.Millisecond * 10,
 	MaxDelay:                       0,
@@ -704,13 +710,15 @@ type buildingBatch struct {
 	msgCount          arbutil.MessageIndex
 	haveUsefulMessage bool
 	use4844           bool
-	useEigenDA 	  bool
+	useEigenDA        bool
 }
 
-func newBatchSegments(firstDelayed uint64, config *BatchPosterConfig, backlog uint64, use4844 bool) *batchSegments {
+func newBatchSegments(firstDelayed uint64, config *BatchPosterConfig, backlog uint64, use4844 bool, useEigenDA bool) *batchSegments {
 	maxSize := config.MaxSize
 	if use4844 {
 		maxSize = config.Max4844BatchSize
+	} else if useEigenDA {
+		maxSize = config.MaxEigenDABatchSize
 	} else {
 		if maxSize <= 40 {
 			panic("Maximum batch size too small")
@@ -947,10 +955,10 @@ func (b *BatchPoster) encodeAddBatch(
 	methodName := sequencerBatchPostMethodName
 	if use4844 {
 		methodName = sequencerBatchPostWithBlobsMethodName
-	}
-	if useEigenDA {
+	} else if useEigenDA {
 		methodName = sequencerBatchPostWithEigendaMethodName
 	}
+
 	method, ok := b.seqInboxABI.Methods[methodName]
 	if !ok {
 		return nil, nil, errors.New("failed to find add batch method")
@@ -973,54 +981,6 @@ func (b *BatchPoster) encodeAddBatch(
 		)
 	} else if useEigenDA {
 
-		blobVerificationProofType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-			{Name: "batchID", Type: "uint32"},
-			{Name: "blobIndex", Type: "uint32"},
-			{Name: "batchMetadata", Type: "tuple",
-				Components: []abi.ArgumentMarshaling{
-					{Name: "batchHeader", Type: "tuple",
-						Components: []abi.ArgumentMarshaling{
-							{Name: "blobHeadersRoot", Type: "bytes32"},
-							{Name: "quorumNumbers", Type: "bytes"},
-							{Name: "signedStakeForQuorums", Type: "bytes"},
-							{Name: "referenceBlockNumber", Type: "uint32"},
-						},
-					},
-					{Name: "signatoryRecordHash", Type: "bytes32"},
-					{Name: "confirmationBlockNumber", Type: "uint32"},
-				},
-			},
-			{
-				Name: "inclusionProof",
-				Type: "bytes",
-			},
-			{
-				Name: "quorumIndices",
-				Type: "bytes",
-			},
-		})
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-			{Name: "commitment", Type: "tuple", Components: []abi.ArgumentMarshaling{
-				{Name: "X", Type: "uint256"},
-				{Name: "Y", Type: "uint256"},
-			}},
-			{Name: "dataLength", Type: "uint32"},
-			{Name: "quorumBlobParams", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
-				{Name: "quorumNumber", Type: "uint8"},
-				{Name: "adversaryThresholdPercentage", Type: "uint8"},
-				{Name: "confirmationThresholdPercentage", Type: "uint8"},
-				{Name: "chunkLength", Type: "uint32"},
-			}},
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-
 		addressType, err := abi.NewType("address", "", nil)
 		if err != nil {
 			return nil, nil, err
@@ -1034,23 +994,20 @@ func (b *BatchPoster) encodeAddBatch(
 		// Create ABI arguments
 		arguments := abi.Arguments{
 			{Type: uint256Type},
-			{Type: blobVerificationProofType},
-			{Type: blobHeaderType},
+			{Type: eigenda.DACertTypeABI},
 			{Type: addressType},
 			{Type: uint256Type},
 			{Type: uint256Type},
 			{Type: uint256Type},
 		}
 
-		// define values array
-		values := make([]interface{}, 7)
+		values := make([]interface{}, 6)
 		values[0] = seqNum
-		values[1] = eigenDaBlobInfo.BlobVerificationProof
-		values[2] = eigenDaBlobInfo.BlobHeader
-		values[3] = b.config().gasRefunder
-		values[4] = new(big.Int).SetUint64(delayedMsg)
-		values[5] = new(big.Int).SetUint64(uint64(prevMsgNum))
-		values[6] = new(big.Int).SetUint64(uint64(newMsgNum))
+		values[1] = eigenDaBlobInfo
+		values[2] = b.config().gasRefunder
+		values[3] = new(big.Int).SetUint64(delayedMsg)
+		values[4] = new(big.Int).SetUint64(uint64(prevMsgNum))
+		values[5] = new(big.Int).SetUint64(uint64(newMsgNum))
 
 		calldata, err = arguments.PackValues(values)
 
@@ -1236,7 +1193,7 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 		}
 
 		b.building = &buildingBatch{
-			segments:      newBatchSegments(batchPosition.DelayedMessageCount, b.config(), b.GetBacklogEstimate(), use4844),
+			segments:      newBatchSegments(batchPosition.DelayedMessageCount, b.config(), b.GetBacklogEstimate(), use4844, useEigenDA),
 			msgCount:      batchPosition.MessageCount,
 			startMsgCount: batchPosition.MessageCount,
 			use4844:       use4844,
