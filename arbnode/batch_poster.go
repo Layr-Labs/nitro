@@ -111,7 +111,7 @@ type BatchPoster struct {
 	// This deviates from the DA spec but is necessary for the batch poster to work efficiently
 	// since we need to an extended method on the SequencerInbox contract
 	eigenDAWriter     eigenda.EigenDAWriter
-	dapReaders         []daprovider.Reader
+	dapReaders        []daprovider.Reader
 	dataPoster        *dataposter.DataPoster
 	redisLock         *redislock.Simple
 	messagesPerBatch  *arbmath.MovingAverage[uint64]

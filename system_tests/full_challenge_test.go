@@ -16,7 +16,7 @@ import (
 func TestChallengeManagerFullAsserterIncorrect(t *testing.T) {
 	t.Parallel()
 	defaultWasmRootDir := ""
-	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, defaultWasmRootDir)
+	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, false, defaultWasmRootDir)
 }
 
 func TestChallengeManagerFullAsserterIncorrectWithPublishedMachine(t *testing.T) {
@@ -24,13 +24,13 @@ func TestChallengeManagerFullAsserterIncorrectWithPublishedMachine(t *testing.T)
 	cr, err := github.LatestConsensusRelease(context.Background())
 	Require(t, err)
 	machPath := populateMachineDir(t, cr)
-	RunChallengeTest(t, false, true, makeBatch_MsgsPerBatch+1, machPath)
+	RunChallengeTest(t, false, true, makeBatch_MsgsPerBatch+1, false, machPath)
 }
 
 func TestChallengeManagerFullAsserterCorrect(t *testing.T) {
 	t.Parallel()
 	defaultWasmRootDir := ""
-	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, defaultWasmRootDir)
+	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, false, defaultWasmRootDir)
 }
 
 func TestChallengeManagerFullAsserterCorrectWithPublishedMachine(t *testing.T) {
@@ -38,5 +38,5 @@ func TestChallengeManagerFullAsserterCorrectWithPublishedMachine(t *testing.T) {
 	cr, err := github.LatestConsensusRelease(context.Background())
 	Require(t, err)
 	machPath := populateMachineDir(t, cr)
-	RunChallengeTest(t, true, true, makeBatch_MsgsPerBatch+2, machPath)
+	RunChallengeTest(t, true, true, makeBatch_MsgsPerBatch+2, false, machPath)
 }

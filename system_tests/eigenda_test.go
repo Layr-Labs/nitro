@@ -11,10 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/offchainlabs/nitro/arbnode"
-	"github.com/offchainlabs/nitro/execution/gethexec"
 )
 
 const (
@@ -22,57 +19,41 @@ const (
 )
 
 func TestEigenDAProxyBatchPosting(t *testing.T) {
-
-	initTest(t)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
 	}()
 
 	// Setup L1 chain and contracts
-	chainConfig := params.ArbitrumDevTestEigenDAConfig()
-	l1info, l1client, _, l1stack := createTestL1BlockChain(t, nil)
-	defer requireClose(t, l1stack)
-	feedErrChan := make(chan error, 10)
-	addresses, initMessage := DeployOnTestL1(t, ctx, l1info, l1client, chainConfig)
-
-	nodeDir := t.TempDir()
-	l2info := NewArbTestInfo(t, chainConfig.ChainID)
-	l1NodeConfigA := arbnode.ConfigDefaultL1Test()
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
+	builder.BuildL1(t)
+	// Setup DAS servers
 	l1NodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest()
-	sequencerTxOpts := l1info.GetDefaultTransactOpts("Sequencer", ctx)
-	sequencerTxOptsPtr := &sequencerTxOpts
-	parentChainID := big.NewInt(1337)
+
 	{
 
+		// Setup DAS config
+		builder.nodeConfig.EigenDA.Enable = true
+		builder.nodeConfig.EigenDA.Rpc = proxyURL
+
 		// Setup L2 chain
-		_, l2stackA, l2chainDb, l2arbDb, l2blockchain := createL2BlockChainWithStackConfig(t, l2info, nodeDir, chainConfig, initMessage, nil, nil)
-		l2info.GenerateAccount("User2")
+		builder.L2Info.GenerateAccount("User2")
+		builder.BuildL2OnL1(t)
 
-		// Setup EigenDA config
-		l1NodeConfigA.EigenDA.Enable = true
-		l1NodeConfigA.EigenDA.Rpc = proxyURL
-
-		execA, err := gethexec.CreateExecutionNode(ctx, l2stackA, l2chainDb, l2blockchain, l1client, gethexec.ConfigDefaultTest)
-		Require(t, err)
-
-		l2Cfg := l2blockchain.Config()
-		l2Cfg.ArbitrumChainParams.DataAvailabilityCommittee = false
-		l2Cfg.ArbitrumChainParams.EigenDA = true
-		nodeA, err := arbnode.CreateNode(ctx, l2stackA, execA, l2arbDb, NewFetcherFromConfig(l1NodeConfigA), l2Cfg, l1client, addresses, sequencerTxOptsPtr, sequencerTxOptsPtr, nil, feedErrChan, parentChainID, nil)
-		Require(t, err)
-		Require(t, nodeA.Start(ctx))
-		l2clientA := ClientForStack(t, l2stackA)
-
+		// Setup second node
 		l1NodeConfigB.BlockValidator.Enable = false
 		l1NodeConfigB.EigenDA.Enable = true
 		l1NodeConfigB.EigenDA.Rpc = proxyURL
 
-		l2clientB, nodeB := Create2ndNodeWithConfig(t, ctx, nodeA, l1stack, l1info, &l2info.ArbInitData, l1NodeConfigB, nil, nil)
-		checkEigenDABatchPosting(t, ctx, l1client, l2clientA, l1info, l2info, big.NewInt(1e12), l2clientB)
-		nodeA.StopAndWait()
-		nodeB.StopAndWait()
+		nodeBParams := SecondNodeParams{
+			nodeConfig: l1NodeConfigB,
+			initData:   &builder.L2Info.ArbInitData,
+		}
+		l2B, cleanupB := builder.Build2ndNode(t, &nodeBParams)
+		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12), l2B.Client)
+
+		builder.L2.cleanup()
+		cleanupB()
 	}
 }
 

@@ -226,7 +226,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("Error opening state db: %v", err.Error()))
 	}
-	
+
 	batchFetcher := func(batchNum uint64) ([]byte, error) {
 		currentBatch := wavmio.GetInboxPosition()
 		if batchNum > currentBatch {
