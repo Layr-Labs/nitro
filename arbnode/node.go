@@ -527,15 +527,16 @@ func createNodeImpl(
 	var daWriter das.DataAvailabilityServiceWriter
 	var daReader das.DataAvailabilityServiceReader
 	var dasLifecycleManager *das.LifecycleManager
+	var dasKeysetFetcher *das.KeysetFetcher
 	if config.DataAvailability.Enable {
 		log.Info("Data Availability enabled")
 		if config.BatchPoster.Enable {
-			daWriter, daReader, dasLifecycleManager, err = das.CreateBatchPosterDAS(ctx, &config.DataAvailability, dataSigner, l1client, deployInfo.SequencerInbox)
+			daWriter, daReader, dasKeysetFetcher, dasLifecycleManager, err = das.CreateBatchPosterDAS(ctx, &config.DataAvailability, dataSigner, l1client, deployInfo.SequencerInbox)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			daReader, dasLifecycleManager, err = das.CreateDAReaderForNode(ctx, &config.DataAvailability, l1Reader, &deployInfo.SequencerInbox)
+			daReader, dasKeysetFetcher, dasLifecycleManager, err = das.CreateDAReaderForNode(ctx, &config.DataAvailability, l1Reader, &deployInfo.SequencerInbox)
 			if err != nil {
 				return nil, err
 			}
@@ -570,7 +571,7 @@ func createNodeImpl(
 		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
 	}
 	if daReader != nil {
-		dapReaders = append(dapReaders, daprovider.NewReaderForDAS(daReader))
+		dapReaders = append(dapReaders, daprovider.NewReaderForDAS(daReader, dasKeysetFetcher))
 	}
 	if blobReader != nil {
 		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(blobReader))
@@ -675,7 +676,7 @@ func createNodeImpl(
 			confirmedNotifiers = append(confirmedNotifiers, messagePruner)
 		}
 
-		stakerObj, err = staker.NewStaker(l1Reader, wallet, bind.CallOpts{}, config.Staker, blockValidator, statelessBlockValidator, nil, confirmedNotifiers, deployInfo.ValidatorUtils, fatalErrChan)
+		stakerObj, err = staker.NewStaker(l1Reader, wallet, bind.CallOpts{}, func() *staker.L1ValidatorConfig { return &configFetcher.Get().Staker }, blockValidator, statelessBlockValidator, nil, confirmedNotifiers, deployInfo.ValidatorUtils, fatalErrChan)
 		if err != nil {
 			return nil, err
 		}
@@ -716,6 +717,7 @@ func createNodeImpl(
 			DAPWriter:     dapWriter,
 			EigenDAWriter: eigenDAWriter,
 			ParentChainID: parentChainID,
+			DAPReaders:    dapReaders,
 		})
 		if err != nil {
 			return nil, err
@@ -796,7 +798,7 @@ func CreateNode(
 	}
 	if currentNode.StatelessBlockValidator != nil {
 		apis = append(apis, rpc.API{
-			Namespace: "arbvalidator",
+			Namespace: "arbdebug",
 			Version:   "1.0",
 			Service: &BlockValidatorDebugAPI{
 				val: currentNode.StatelessBlockValidator,
@@ -1005,10 +1007,6 @@ func (n *Node) StopAndWait() {
 	if err := n.Stack.Close(); err != nil {
 		log.Error("error on stack close", "err", err)
 	}
-}
-
-func (n *Node) FetchBatch(ctx context.Context, batchNum uint64) ([]byte, common.Hash, error) {
-	return n.InboxReader.GetSequencerMessageBytes(ctx, batchNum)
 }
 
 func (n *Node) FindInboxBatchContainingMessage(message arbutil.MessageIndex) (uint64, bool, error) {

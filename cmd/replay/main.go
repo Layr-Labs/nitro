@@ -114,6 +114,10 @@ func (dasReader *PreimageDASReader) GetByHash(ctx context.Context, hash common.H
 	return dastree.Content(hash, oracle)
 }
 
+func (dasReader *PreimageDASReader) GetKeysetByHash(ctx context.Context, hash common.Hash) ([]byte, error) {
+	return dasReader.GetByHash(ctx, hash)
+}
+
 func (dasReader *PreimageDASReader) HealthCheck(ctx context.Context) error {
 	return nil
 }
@@ -222,6 +226,14 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("Error opening state db: %v", err.Error()))
 	}
+	
+	batchFetcher := func(batchNum uint64) ([]byte, error) {
+		currentBatch := wavmio.GetInboxPosition()
+		if batchNum > currentBatch {
+			return nil, fmt.Errorf("invalid batch fetch request %d, max %d", batchNum, currentBatch)
+		}
+		return wavmio.ReadInboxMessage(batchNum), nil
+	}
 
 	readMessage := func(dasEnabled bool, eigenDAEnabled bool) *arbostypes.MessageWithMetadata {
 		var delayedMessagesRead uint64
@@ -230,10 +242,13 @@ func main() {
 		}
 		var dasReader daprovider.DASReader
 		var eigenDAReader *EigenDAPreimageReader
+		var dasKeysetFetcher daprovider.DASKeysetFetcher
 		if dasEnabled {
+			// DAS batch and keysets are all together in the same preimage binary.
 			dasReader = &PreimageDASReader{}
 		} else if eigenDAEnabled {
 			eigenDAReader = &EigenDAPreimageReader{}
+			dasKeysetFetcher = &PreimageDASReader{}
 		}
 		backend := WavmInbox{}
 		var keysetValidationMode = daprovider.KeysetPanicIfInvalid
@@ -242,7 +257,7 @@ func main() {
 		}
 		var dapReaders []daprovider.Reader
 		if dasReader != nil {
-			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader))
+			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader, dasKeysetFetcher))
 		}
 		if eigenDAReader != nil {
 			dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
@@ -256,6 +271,10 @@ func main() {
 			panic(fmt.Sprintf("Error reading from inbox multiplexer: %v", err.Error()))
 		}
 
+		err = message.Message.FillInBatchGasCost(batchFetcher)
+		if err != nil {
+			message.Message = arbostypes.InvalidL1Message
+		}
 		return message
 	}
 
@@ -304,14 +323,10 @@ func main() {
 		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee, chainConfig.ArbitrumChainParams.EigenDA)
 
 		chainContext := WavmChainContext{}
-		batchFetcher := func(batchNum uint64) ([]byte, error) {
-			return wavmio.ReadInboxMessage(batchNum), nil
-		}
-		newBlock, _, err = arbos.ProduceBlock(message.Message, message.DelayedMessagesRead, lastBlockHeader, statedb, chainContext, chainConfig, batchFetcher, false)
+		newBlock, _, err = arbos.ProduceBlock(message.Message, message.DelayedMessagesRead, lastBlockHeader, statedb, chainContext, chainConfig, false)
 		if err != nil {
 			panic(err)
 		}
-
 	} else {
 		// Initialize ArbOS with this init message and create the genesis block.
 		message := readMessage(false, false)
