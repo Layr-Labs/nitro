@@ -246,9 +246,9 @@ func main() {
 		if dasEnabled {
 			// DAS batch and keysets are all together in the same preimage binary.
 			dasReader = &PreimageDASReader{}
+			dasKeysetFetcher = &PreimageDASReader{}
 		} else if eigenDAEnabled {
 			eigenDAReader = &EigenDAPreimageReader{}
-			dasKeysetFetcher = &PreimageDASReader{}
 		}
 		backend := WavmInbox{}
 		var keysetValidationMode = daprovider.KeysetPanicIfInvalid

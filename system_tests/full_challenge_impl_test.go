@@ -358,6 +358,14 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 	conf.InboxReader.CheckDelay = time.Second
 
 	if useEigenDA {
+		t.Log("Using EigenDA configurations for challenge test")
+		builder.chainConfig = params.ArbitrumDevTestEigenDAConfig()
+		builder.chainConfig.ArbitrumChainParams.EigenDA = true
+		builder.nodeConfig.EigenDA = eigenda.EigenDAConfig{
+			Enable: true,
+			Rpc:    "http://localhost:4242",
+		}
+
 		chainConfig = params.ArbitrumDevTestEigenDAConfig()
 		chainConfig.ArbitrumChainParams.EigenDA = true
 		conf.EigenDA = eigenda.EigenDAConfig{
@@ -402,9 +410,19 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 	challengerRollupAddresses.Bridge = challengerBridgeAddr
 	challengerRollupAddresses.SequencerInbox = challengerSeqInboxAddr
 	challengerL2Info := NewArbTestInfo(t, chainConfig.ChainID)
-	challengerParams := SecondNodeParams{
-		addresses: &challengerRollupAddresses,
-		initData:  &challengerL2Info.ArbInitData,
+
+	var challengerParams SecondNodeParams
+	if useEigenDA {
+		challengerParams = SecondNodeParams{
+			nodeConfig: conf,
+			addresses:  &challengerRollupAddresses,
+			initData:   &challengerL2Info.ArbInitData,
+		}
+	} else {
+		challengerParams = SecondNodeParams{
+			addresses: &challengerRollupAddresses,
+			initData:  &challengerL2Info.ArbInitData,
+		}
 	}
 	challenger, challengerCleanup := builder.Build2ndNode(t, &challengerParams)
 	defer challengerCleanup()
@@ -508,7 +526,6 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 	confirmLatestBlock(ctx, t, l1Info, l1Backend)
 
 	readers := make([]daprovider.Reader, 1)
-
 	if useEigenDA {
 		eigenDA, err := eigenda.NewEigenDA(&conf.EigenDA)
 
