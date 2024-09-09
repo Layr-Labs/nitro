@@ -20,7 +20,6 @@ func TestChallengeManagerFullAsserterIncorrect(t *testing.T) {
 	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, true, defaultWasmRootDir)
 }
 
-
 func TestChallengeManagerFullAsserterIncorrectWithPublishedMachine(t *testing.T) {
 	t.Parallel()
 	cr, err := github.LatestConsensusRelease(context.Background())

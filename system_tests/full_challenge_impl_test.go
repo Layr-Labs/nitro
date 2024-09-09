@@ -484,8 +484,6 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 		}
 	}
 
-	t.Log("WASM MODULE ROOT:", wasmModuleRoot.Hex())
-
 	asserterGenesis := asserterExec.ArbInterface.BlockChain().Genesis()
 	challengerGenesis := challengerExec.ArbInterface.BlockChain().Genesis()
 	if asserterGenesis.Hash() != challengerGenesis.Hash() {
@@ -509,7 +507,6 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 	}
 	numBlocks := asserterLatestBlock.Number.Uint64() - asserterGenesis.NumberU64()
 
-	println("CREATING CHALLENGE")
 	resultReceiver, challengeManagerAddr := CreateChallenge(
 		t,
 		ctx,
