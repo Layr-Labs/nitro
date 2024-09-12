@@ -12,7 +12,6 @@
   </p>
 </p>
 
-This is a fork of Arbitrum Nitro developed by [AltLayer](https://altlayer.io/), in a technical partnership with EigenLabs.
 
 ## About Arbitrum Nitro
 
