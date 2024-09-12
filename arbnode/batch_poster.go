@@ -312,7 +312,7 @@ var EigenDABatchPosterConfig = BatchPosterConfig{
 	MaxDelay:                       0,
 	WaitForMaxDelay:                false,
 	CompressionLevel:               2,
-	DASRetentionPeriod:             time.Hour * 24 * 15,
+	DASRetentionPeriod:             daprovider.DefaultDASRetentionPeriod,
 	GasRefunderAddress:             "",
 	ExtraBatchGas:                  10_000,
 	Post4844Blobs:                  false,
@@ -1246,6 +1246,12 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 			startMsgCount: batchPosition.MessageCount,
 			use4844:       use4844,
 			useEigenDA:    useEigenDA,
+		}
+		if b.config().CheckBatchCorrectness {
+			b.building.muxBackend = &simulatedMuxBackend{
+				batchSeqNum: batchPosition.NextSeqNum,
+				allMsgs:     make(map[arbutil.MessageIndex]*arbostypes.MessageWithMetadata),
+			}
 		}
 		if b.config().CheckBatchCorrectness {
 			b.building.muxBackend = &simulatedMuxBackend{

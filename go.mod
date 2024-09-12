@@ -55,6 +55,8 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
+require github.com/google/go-querystring v1.1.0 // indirect
+
 require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231016165738-49dd2c1f3d0b // indirect

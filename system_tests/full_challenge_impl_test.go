@@ -376,6 +376,7 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 
 	var valStack *node.Node
 	var mockSpawn *mockSpawner
+	builder.valnodeConfig.Wasm.RootPath = wasmRootDir
 	if useStubs {
 		mockSpawn, valStack = createMockValidationNode(t, ctx, &builder.valnodeConfig.Arbitrator)
 	} else {
