@@ -35,6 +35,7 @@ func (db PreimageDb) Get(key []byte) ([]byte, error) {
 	} else {
 		return nil, fmt.Errorf("preimage DB attempted to access non-hash key %v", hex.EncodeToString(key))
 	}
+
 	return wavmio.ResolveTypedPreimage(arbutil.Keccak256PreimageType, hash)
 }
 

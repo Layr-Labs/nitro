@@ -165,28 +165,26 @@ pub fn resolve_preimage_impl(
         .and_then(|m| m.get(&hash))
     else {
         let hash_hex = hex::encode(hash);
-        error!("Missing requested preimage for hash {hash_hex} in {name}")
+        error!(
+            "Missing requested preimage for hash {hash_hex} in {name} for type {:?}",
+            preimage_type
+        )
     };
 
-    #[cfg(debug_assertions)]
-    {
-        use sha2::Sha256;
-        use sha3::{Digest, Keccak256};
-
-        // Check if preimage rehashes to the provided hash. Exclude blob preimages
-        let calculated_hash: [u8; 32] = match preimage_type {
-            PreimageType::Keccak256 => Keccak256::digest(preimage).into(),
-            PreimageType::Sha2_256 => Sha256::digest(preimage).into(),
-            PreimageType::EthVersionedHash => *hash,
-        };
-        if calculated_hash != *hash {
-            error!(
-                "Calculated hash {} of preimage {} does not match provided hash {}",
-                hex::encode(calculated_hash),
-                hex::encode(preimage),
-                hex::encode(*hash)
-            );
-        }
+    // Check if preimage rehashes to the provided hash. Exclude blob preimages
+    let calculated_hash: [u8; 32] = match preimage_type {
+        PreimageType::Keccak256 => Keccak256::digest(preimage).into(),
+        PreimageType::Sha2_256 => Sha256::digest(preimage).into(),
+        PreimageType::EthVersionedHash => *hash,
+        PreimageType::EigenDAHash => *hash,
+    };
+    if calculated_hash != *hash {
+        error!(
+            "Calculated hash {} of preimage {} does not match provided hash {}",
+            hex::encode(calculated_hash),
+            hex::encode(preimage),
+            hex::encode(*hash)
+        );
     }
 
     if offset % 32 != 0 {

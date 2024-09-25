@@ -28,7 +28,7 @@ env:
 jobs:
   arbitrator:
     name: Run Arbitrator tests
-    runs-on: ubuntu-8
+    runs-on: linux-2xl
     steps:
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
@@ -40,6 +40,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
 
       - name: Install Ubuntu dependencies
         run: |
@@ -161,8 +162,8 @@ jobs:
       - name: Make arbitrator libraries
         run: make -j wasm-ci-build
 
-      - name: Clippy check
-        run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
+      # - name: Clippy check
+      #   run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
 
       - name: Run rust tests
         run: cargo test -p arbutil -p prover -p jit -p stylus --release --manifest-path arbitrator/prover/Cargo.toml

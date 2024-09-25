@@ -6,6 +6,7 @@ extern "C" {
     pub fn wavm_read_keccak_256_preimage(ptr: *mut u8, offset: usize) -> usize;
     pub fn wavm_read_sha2_256_preimage(ptr: *mut u8, offset: usize) -> usize;
     pub fn wavm_read_eth_versioned_hash_preimage(ptr: *mut u8, offset: usize) -> usize;
+    pub fn wavm_read_eigen_da_hash_preimage(ptr: *mut u8, offset: usize) -> usize;
     pub fn wavm_read_inbox_message(msg_num: u64, ptr: *mut u8, offset: usize) -> usize;
     pub fn wavm_read_delayed_inbox_message(seq_num: u64, ptr: *mut u8, offset: usize) -> usize;
     pub fn wavm_halt_and_set_finished();
@@ -102,6 +103,24 @@ fn main() {
             expected_hash[32-scalar_bytes.len()..].copy_from_slice(&scalar_bytes);
             assert_eq!(bytebuffer.0, expected_hash);
         }
+
+        println!("eigenda preimage");
+        
+        let expected_len = 0;
+
+        for i in 0..5{
+            let eigen_hash = hex!("1c303f6af17677aa69367bea000420f4b0ee26bb2c542a8879b9791a4b43d4d0");
+            bytebuffer = Bytes32(eigen_hash);
+
+            let actual_len = wavm_read_eigen_da_hash_preimage(bytebuffer.0.as_mut_ptr(), i * 32);
+            
+            if i < 4 {
+                assert_eq!(actual_len, 32);
+            } else {
+                assert_eq!(actual_len, 0);
+            }
+        }
     }
+    
     println!("Done!");
 }

@@ -1040,6 +1040,9 @@ func DeployOnTestL1(
 		arbnode.GenerateRollupConfig(prodConfirmPeriodBlocks, wasmModuleRoot, l1info.GetAddress("RollupOwner"), chainConfig, serializedChainConfig, common.Address{}),
 		nativeToken,
 		maxDataSize,
+		false,
+		common.HexToAddress("0x0"),
+		common.HexToAddress("0x0"),
 	)
 	Require(t, err)
 	l1info.SetContract("Bridge", addresses.Bridge)

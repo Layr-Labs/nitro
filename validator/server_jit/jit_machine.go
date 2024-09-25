@@ -69,6 +69,7 @@ func (machine *JitMachine) close() {
 func (machine *JitMachine) prove(
 	ctxIn context.Context, entry *validator.ValidationInput,
 ) (validator.GoGlobalState, error) {
+
 	ctx, cancel := context.WithCancel(ctxIn)
 	defer cancel() // ensure our cleanup functions run when we're done
 	state := validator.GoGlobalState{}

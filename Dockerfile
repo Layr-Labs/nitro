@@ -24,7 +24,7 @@ RUN apt-get update && \
 FROM scratch AS brotli-library-export
 COPY --from=brotli-library-builder /workspace/install/ /
 
-FROM node:18-bookworm-slim AS contracts-builder
+FROM node:18-bookworm-slim as contracts-builder
 RUN apt-get update && \
     apt-get install -y git python3 make g++ curl
 RUN curl -L https://foundry.paradigm.xyz | bash && . ~/.bashrc && ~/.foundry/bin/foundryup
@@ -49,6 +49,7 @@ RUN apt-get update && \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.80.1 --target x86_64-unknown-linux-gnu wasm32-unknown-unknown wasm32-wasi
 COPY ./Makefile ./
 COPY arbitrator/Cargo.* arbitrator/
+COPY arbitrator/rust-kzg-bn254 arbitrator/rust-kzg-bn254
 COPY arbitrator/arbutil arbitrator/arbutil
 COPY arbitrator/brotli arbitrator/brotli
 COPY arbitrator/caller-env arbitrator/caller-env
@@ -77,6 +78,7 @@ COPY ./blsSignatures ./blsSignatures
 COPY ./cmd/chaininfo ./cmd/chaininfo
 COPY ./cmd/replay ./cmd/replay
 COPY ./das/dastree ./das/dastree
+COPY ./eigenda ./eigenda
 COPY ./precompiles ./precompiles
 COPY ./statetransfer ./statetransfer
 COPY ./util ./util
@@ -109,6 +111,7 @@ COPY arbitrator/caller-env arbitrator/caller-env
 COPY arbitrator/prover arbitrator/prover
 COPY arbitrator/wasm-libraries arbitrator/wasm-libraries
 COPY arbitrator/jit arbitrator/jit
+COPY arbitrator/rust-kzg-bn254 arbitrator/rust-kzg-bn254
 COPY arbitrator/stylus arbitrator/stylus
 COPY arbitrator/tools/wasmer arbitrator/tools/wasmer
 COPY --from=brotli-wasm-export / target/
@@ -139,6 +142,8 @@ COPY arbitrator/prover/Cargo.toml arbitrator/prover/
 COPY arbitrator/prover/benches arbitrator/prover/benches
 COPY arbitrator/bench/Cargo.toml arbitrator/bench/
 COPY arbitrator/jit/Cargo.toml arbitrator/jit/
+COPY arbitrator/rust-kzg-bn254 arbitrator/rust-kzg-bn254
+
 COPY arbitrator/stylus/Cargo.toml arbitrator/stylus/
 COPY arbitrator/tools/wasmer arbitrator/tools/wasmer
 COPY arbitrator/wasm-libraries/user-host-trait/Cargo.toml arbitrator/wasm-libraries/user-host-trait/Cargo.toml
@@ -158,6 +163,8 @@ COPY ./Makefile ./
 COPY arbitrator/prover arbitrator/prover
 COPY arbitrator/wasm-libraries arbitrator/wasm-libraries
 COPY arbitrator/jit arbitrator/jit
+COPY arbitrator/rust-kzg-bn254 arbitrator/rust-kzg-bn254
+
 COPY arbitrator/stylus arbitrator/stylus
 COPY --from=brotli-wasm-export / target/
 COPY scripts/build-brotli.sh scripts/
@@ -216,8 +223,8 @@ COPY ./scripts/download-machine.sh .
 #RUN ./download-machine.sh consensus-v11 0xf4389b835497a910d7ba3ebfb77aa93da985634f3c052de1290360635be40c4a
 #RUN ./download-machine.sh consensus-v11.1 0x68e4fe5023f792d4ef584796c84d710303a5e12ea02d6e37e2b5e9c4332507c4
 #RUN ./download-machine.sh consensus-v20 0x8b104a2e80ac6165dc58b9048de12f301d70b02a0ab51396c22b4b4b802a16a4
-RUN ./download-machine.sh consensus-v30 0xb0de9cb89e4d944ae6023a3b62276e54804c242fd8c4c2d8e6cc4450f5fa8b1b && true
-RUN ./download-machine.sh consensus-v31 0x260f5fa5c3176a856893642e149cf128b5a8de9f828afec8d11184415dd8dc69
+#RUN ./download-machine.sh consensus-v30 0xb0de9cb89e4d944ae6023a3b62276e54804c242fd8c4c2d8e6cc4450f5fa8b1b && true
+#RUN ./download-machine.sh consensus-v31 0x260f5fa5c3176a856893642e149cf128b5a8de9f828afec8d11184415dd8dc69
 
 FROM golang:1.21.10-bookworm AS node-builder
 WORKDIR /workspace

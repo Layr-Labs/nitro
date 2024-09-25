@@ -54,6 +54,7 @@ import (
 	"github.com/offchainlabs/nitro/cmd/util"
 	"github.com/offchainlabs/nitro/cmd/util/confighelpers"
 	"github.com/offchainlabs/nitro/das"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution/gethexec"
 	_ "github.com/offchainlabs/nitro/execution/nodeInterface"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
@@ -221,7 +222,7 @@ func mainImpl() int {
 		return 1
 	}
 
-	log.Info("Running Arbitrum nitro node", "revision", vcsRevision, "vcs.time", vcsTime)
+	log.Info("Running Arbitrum nitro node with eigenda integration", "revision", vcsRevision, "vcs.time", vcsTime)
 
 	if nodeConfig.Node.Dangerous.NoL1Listener {
 		nodeConfig.Node.ParentChainReader.Enable = false
@@ -574,6 +575,17 @@ func mainImpl() int {
 	if nodeConfig.Node.BatchPoster.Enable && !nodeConfig.Node.DataAvailability.Enable {
 		if nodeConfig.Node.BatchPoster.MaxSize > seqInboxMaxDataSize-10000 {
 			log.Error("batchPoster's MaxSize is too large")
+			return 1
+		}
+	}
+
+	// NOTE: since the SRS is stored within the arbitrator and predetermines the max batch size
+	// supported for proving stateless execution - it could be possible to read from dynamically
+	// otherwise it maybe best to expose the max supported batch size from the disperser directly
+	// to ensure dynamically adaptability within the rollup.
+	if nodeConfig.Node.BatchPoster.Enable && nodeConfig.Node.EigenDA.Enable {
+		if nodeConfig.Node.BatchPoster.MaxEigenDABatchSize > eigenda.MaxBatchSize {
+			log.Error("batchPoster's MaxEigenDABatchSize too large.", "MaxEigenDABatchSize", eigenda.MaxBatchSize)
 			return 1
 		}
 	}

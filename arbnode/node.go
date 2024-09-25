@@ -34,6 +34,7 @@ import (
 	"github.com/offchainlabs/nitro/broadcaster"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/das"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/execution/gethexec"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
@@ -88,6 +89,7 @@ type Config struct {
 	Staker              staker.L1ValidatorConfig    `koanf:"staker" reload:"hot"`
 	SeqCoordinator      SeqCoordinatorConfig        `koanf:"seq-coordinator"`
 	DataAvailability    das.DataAvailabilityConfig  `koanf:"data-availability"`
+	EigenDA             eigenda.EigenDAConfig       `koanf:"eigen-da"`
 	SyncMonitor         SyncMonitorConfig           `koanf:"sync-monitor"`
 	Dangerous           DangerousConfig             `koanf:"dangerous"`
 	TransactionStreamer TransactionStreamerConfig   `koanf:"transaction-streamer" reload:"hot"`
@@ -544,11 +546,14 @@ func createNodeImpl(
 		return nil, err
 	}
 
+	var eigenDAReader eigenda.EigenDAReader
+	var eigenDAWriter eigenda.EigenDAWriter
 	var daWriter das.DataAvailabilityServiceWriter
 	var daReader das.DataAvailabilityServiceReader
 	var dasLifecycleManager *das.LifecycleManager
 	var dasKeysetFetcher *das.KeysetFetcher
 	if config.DataAvailability.Enable {
+		log.Info("Data Availability enabled")
 		if config.BatchPoster.Enable {
 			daWriter, daReader, dasKeysetFetcher, dasLifecycleManager, err = das.CreateBatchPosterDAS(ctx, &config.DataAvailability, dataSigner, l1client, deployInfo.SequencerInbox)
 			if err != nil {
@@ -571,6 +576,14 @@ func createNodeImpl(
 		}
 	} else if l2Config.ArbitrumChainParams.DataAvailabilityCommittee {
 		return nil, errors.New("a data availability service is required for this chain, but it was not configured")
+	} else if config.EigenDA.Enable {
+		log.Info("EigenDA enabled")
+		eigenDAService, err := eigenda.NewEigenDA(&config.EigenDA)
+		if err != nil {
+			return nil, err
+		}
+		eigenDAReader = eigenDAService
+		eigenDAWriter = eigenDAService
 	}
 
 	// We support a nil txStreamer for the pruning code
@@ -578,6 +591,9 @@ func createNodeImpl(
 		return nil, errors.New("data availability service required but unconfigured")
 	}
 	var dapReaders []daprovider.Reader
+	if eigenDAReader != nil {
+		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
+	}
 	if daReader != nil {
 		dapReaders = append(dapReaders, daprovider.NewReaderForDAS(daReader, dasKeysetFetcher))
 	}
@@ -712,6 +728,7 @@ func createNodeImpl(
 		if daWriter != nil {
 			dapWriter = daprovider.NewWriterForDAS(daWriter)
 		}
+
 		batchPoster, err = NewBatchPoster(ctx, &BatchPosterOpts{
 			DataPosterDB:  rawdb.NewTable(arbDb, storage.BatchPosterPrefix),
 			L1Reader:      l1Reader,
@@ -723,6 +740,7 @@ func createNodeImpl(
 			DeployInfo:    deployInfo,
 			TransactOpts:  txOptsBatchPoster,
 			DAPWriter:     dapWriter,
+			EigenDAWriter: eigenDAWriter,
 			ParentChainID: parentChainID,
 			DAPReaders:    dapReaders,
 		})

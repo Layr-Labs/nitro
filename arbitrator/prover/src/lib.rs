@@ -7,6 +7,7 @@ pub mod binary;
 mod host;
 #[cfg(feature = "native")]
 mod kzg;
+mod kzgbn254;
 pub mod machine;
 /// cbindgen:ignore
 pub mod memory;

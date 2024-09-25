@@ -130,6 +130,11 @@ func main() {
 		_, file := filepath.Split(path)
 		name := file[:len(file)-5]
 
+		if name != "Reader4844" {
+			continue
+		}
+
+		log.Printf("Processing %s", name)
 		data, err := os.ReadFile(path)
 		if err != nil {
 			log.Fatal("could not read", path, "for contract", name, err)

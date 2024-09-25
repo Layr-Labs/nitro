@@ -8,6 +8,7 @@ use crate::{
         self, parse, ExportKind, ExportMap, FloatInstruction, Local, NameCustomSection, WasmBinary,
     },
     host,
+    kzgbn254::prove_kzg_preimage_bn254,
     memory::Memory,
     merkle::{Merkle, MerkleType},
     programs::{config::CompileConfig, meter::MeteredMachine, ModuleMod, StylusData},
@@ -2483,6 +2484,7 @@ impl Machine {
                     let Some(hash) = module.memory.load_32_byte_aligned(ptr.into()) else {
                         error!();
                     };
+
                     let Some(preimage) =
                         self.preimage_resolver.get(self.context, preimage_ty, hash)
                     else {
@@ -2494,6 +2496,7 @@ impl Machine {
                         self.print_backtrace(true);
                         bail!("missing requested preimage for hash {}", hash);
                     };
+
                     if preimage_ty == PreimageType::EthVersionedHash
                         && preimage.len() != BYTES_PER_BLOB
                     {
@@ -2504,6 +2507,13 @@ impl Machine {
                             preimage.len(),
                         );
                     }
+
+                    if preimage_ty == PreimageType::EigenDAHash {
+                        if !preimage.len().is_power_of_two() {
+                            bail!("EigenDA hash preimage length should be a power of two but is instead {}", preimage.len());
+                        }
+                    }
+
                     let offset = usize::try_from(offset).unwrap();
                     let len = std::cmp::min(32, preimage.len().saturating_sub(offset));
                     let read = preimage.get(offset..(offset + len)).unwrap_or_default();
@@ -3070,7 +3080,7 @@ impl Machine {
                             self.preimage_resolver
                                 .get_const(self.context, preimage_ty, hash)
                         else {
-                            panic!("Missing requested preimage for hash {}", hash)
+                            panic!("Missing requested preimage for hash when trying to serialize proof {}", hash)
                         };
                         data.push(0); // preimage proof type
                         match preimage_ty {
@@ -3081,6 +3091,11 @@ impl Machine {
                             PreimageType::EthVersionedHash => {
                                 prove_kzg_preimage(hash, &preimage, offset, &mut data)
                                     .expect("Failed to generate KZG preimage proof");
+                            }
+                            PreimageType::EigenDAHash => {
+                                println!("Generating proof for EigenDA preimage");
+                                prove_kzg_preimage_bn254(hash, &preimage, offset, &mut data)
+                                    .expect("Failed to generate eigenDA KZG preimage proof");
                             }
                         }
                     } else if next_inst.opcode == Opcode::ReadInboxMessage {

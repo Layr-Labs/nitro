@@ -32,6 +32,7 @@ import (
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/das/dastree"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/gethhook"
 	"github.com/offchainlabs/nitro/wavmio"
 )
@@ -125,8 +126,7 @@ func (dasReader *PreimageDASReader) ExpirationPolicy(ctx context.Context) (dapro
 	return daprovider.DiscardImmediately, nil
 }
 
-type BlobPreimageReader struct {
-}
+type BlobPreimageReader struct{}
 
 func (r *BlobPreimageReader) GetBlobs(
 	ctx context.Context,
@@ -151,6 +151,30 @@ func (r *BlobPreimageReader) GetBlobs(
 
 func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 	return nil
+}
+
+type EigenDAPreimageReader struct{}
+
+// QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
+// certificate kzg commitment for identifying the preimage.
+func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDABlobInfo, domain string) ([]byte, error) {
+	hash, err := cert.PreimageHash()
+	if err != nil {
+		return nil, err
+	}
+
+	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, *hash)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedBlob, err := eigenda.GenericDecodeBlob(preimage)
+	if err != nil {
+		println("Error decoding blob: ", err)
+		return nil, err
+	}
+
+	return decodedBlob, nil
 }
 
 // To generate:
@@ -210,17 +234,21 @@ func main() {
 		}
 		return wavmio.ReadInboxMessage(batchNum), nil
 	}
-	readMessage := func(dasEnabled bool) *arbostypes.MessageWithMetadata {
+
+	readMessage := func(dasEnabled bool, eigenDAEnabled bool) *arbostypes.MessageWithMetadata {
 		var delayedMessagesRead uint64
 		if lastBlockHeader != nil {
 			delayedMessagesRead = lastBlockHeader.Nonce.Uint64()
 		}
 		var dasReader daprovider.DASReader
+		var eigenDAReader *EigenDAPreimageReader
 		var dasKeysetFetcher daprovider.DASKeysetFetcher
 		if dasEnabled {
 			// DAS batch and keysets are all together in the same preimage binary.
 			dasReader = &PreimageDASReader{}
 			dasKeysetFetcher = &PreimageDASReader{}
+		} else if eigenDAEnabled {
+			eigenDAReader = &EigenDAPreimageReader{}
 		}
 		backend := WavmInbox{}
 		var keysetValidationMode = daprovider.KeysetPanicIfInvalid
@@ -231,6 +259,10 @@ func main() {
 		if dasReader != nil {
 			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader, dasKeysetFetcher))
 		}
+		if eigenDAReader != nil {
+			dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
+		}
+
 		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(&BlobPreimageReader{}))
 		inboxMultiplexer := arbstate.NewInboxMultiplexer(backend, delayedMessagesRead, dapReaders, keysetValidationMode)
 		ctx := context.Background()
@@ -288,7 +320,7 @@ func main() {
 			}
 		}
 
-		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee)
+		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee, chainConfig.ArbitrumChainParams.EigenDA)
 
 		chainContext := WavmChainContext{}
 		newBlock, _, err = arbos.ProduceBlock(message.Message, message.DelayedMessagesRead, lastBlockHeader, statedb, chainContext, chainConfig, false)
@@ -297,8 +329,7 @@ func main() {
 		}
 	} else {
 		// Initialize ArbOS with this init message and create the genesis block.
-
-		message := readMessage(false)
+		message := readMessage(false, false)
 
 		initMessage, err := message.Message.ParseInitMessage()
 		if err != nil {
