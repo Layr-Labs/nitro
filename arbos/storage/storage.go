@@ -156,6 +156,11 @@ func (s *Storage) GetUint64ByUint64(key uint64) (uint64, error) {
 	return s.GetUint64(util.UintToHash(key))
 }
 
+func (s *Storage) GetUint32(key common.Hash) (uint32, error) {
+	value, err := s.Get(key)
+	return uint32(value.Big().Uint64()), err
+}
+
 func (s *Storage) Set(key common.Hash, value common.Hash) error {
 	if s.burner.ReadOnly() {
 		log.Error("Read-only burner attempted to mutate state", "key", key, "value", value)
@@ -322,11 +327,11 @@ func (s *Storage) Burner() burn.Burner {
 }
 
 func (s *Storage) Keccak(data ...[]byte) ([]byte, error) {
-	var byteCount uint64
+	byteCount := 0
 	for _, part := range data {
-		byteCount += uint64(len(part))
+		byteCount += len(part)
 	}
-	cost := 30 + 6*arbmath.WordsForBytes(byteCount)
+	cost := 30 + 6*arbmath.WordsForBytes(uint64(byteCount))
 	if err := s.burner.Burn(cost); err != nil {
 		return nil, err
 	}
@@ -415,12 +420,10 @@ func (sbu *StorageBackedInt64) Get() (int64, error) {
 	if !raw.Big().IsUint64() {
 		panic("invalid value found in StorageBackedInt64 storage")
 	}
-	// #nosec G115
 	return int64(raw.Big().Uint64()), err // see implementation note above
 }
 
 func (sbu *StorageBackedInt64) Set(value int64) error {
-	// #nosec G115
 	return sbu.StorageSlot.Set(util.UintToHash(uint64(value))) // see implementation note above
 }
 
@@ -457,7 +460,7 @@ func (sbu *StorageBackedUBips) Get() (arbmath.UBips, error) {
 }
 
 func (sbu *StorageBackedUBips) Set(bips arbmath.UBips) error {
-	return sbu.backing.Set(uint64(bips))
+	return sbu.backing.Set(bips.Uint64())
 }
 
 type StorageBackedUint16 struct {
@@ -474,7 +477,6 @@ func (sbu *StorageBackedUint16) Get() (uint16, error) {
 	if !big.IsUint64() || big.Uint64() > math.MaxUint16 {
 		panic("expected uint16 compatible value in storage")
 	}
-	// #nosec G115
 	return uint16(big.Uint64()), err
 }
 
@@ -515,7 +517,6 @@ func (sbu *StorageBackedUint32) Get() (uint32, error) {
 	if !big.IsUint64() || big.Uint64() > math.MaxUint32 {
 		panic("expected uint32 compatible value in storage")
 	}
-	// #nosec G115
 	return uint32(big.Uint64()), err
 }
 

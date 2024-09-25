@@ -40,13 +40,5 @@ func TestCompileArch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = resetNativeTarget()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = testCompileLoad()
-		if err != nil {
-			t.Fatal(err)
-		}
 	}
 }

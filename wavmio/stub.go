@@ -60,14 +60,13 @@ func parsePreimageBytes(path string) {
 		if read != len(lenBuf) {
 			panic(fmt.Sprintf("missing bytes reading len got %d", read))
 		}
-		fieldSize := binary.LittleEndian.Uint64(lenBuf)
+		fieldSize := int(binary.LittleEndian.Uint64(lenBuf))
 		dataBuf := make([]byte, fieldSize)
 		read, err = file.Read(dataBuf)
 		if err != nil {
 			panic(err)
 		}
-		// #nosec G115
-		if uint64(read) != fieldSize {
+		if read != fieldSize {
 			panic("missing bytes reading data")
 		}
 		hash := crypto.Keccak256Hash(dataBuf)
@@ -78,18 +77,18 @@ func parsePreimageBytes(path string) {
 func StubInit() {
 	preimages = make(map[common.Hash][]byte)
 	var delayedMsgPath arrayFlags
-	seqMsgPosFlag := flag.Uint64("inbox-position", 0, "position for sequencer inbox message")
-	posWithinMsgFlag := flag.Uint64("position-within-message", 0, "position inside sequencer inbox message")
-	delayedPositionFlag := flag.Uint64("delayed-inbox-position", 0, "position for first delayed inbox message")
+	seqMsgPosFlag := flag.Int("inbox-position", 0, "position for sequencer inbox message")
+	posWithinMsgFlag := flag.Int("position-within-message", 0, "position inside sequencer inbox message")
+	delayedPositionFlag := flag.Int("delayed-inbox-position", 0, "position for first delayed inbox message")
 	lastBlockFlag := flag.String("last-block-hash", "0000000000000000000000000000000000000000000000000000000000000000", "lastBlockHash")
 	flag.Var(&delayedMsgPath, "delayed-inbox", "delayed inbox messages (multiple values)")
 	inboxPath := flag.String("inbox", "", "file to load sequencer message")
 	preimagesPath := flag.String("preimages", "", "file to load preimages from")
 	flag.Parse()
 
-	seqMsgPos = *seqMsgPosFlag
-	posWithinMsg = *posWithinMsgFlag
-	delayedMsgFirstPos = *delayedPositionFlag
+	seqMsgPos = uint64(*seqMsgPosFlag)
+	posWithinMsg = uint64(*posWithinMsgFlag)
+	delayedMsgFirstPos = uint64(*delayedPositionFlag)
 	lastBlockHash = common.HexToHash(*lastBlockFlag)
 	for _, path := range delayedMsgPath {
 		msg, err := os.ReadFile(path)
@@ -126,7 +125,7 @@ func ReadInboxMessage(msgNum uint64) []byte {
 }
 
 func ReadDelayedInboxMessage(seqNum uint64) []byte {
-	if seqNum < delayedMsgFirstPos || (seqNum-delayedMsgFirstPos > uint64(len(delayedMsgs))) {
+	if seqNum < delayedMsgFirstPos || (int(seqNum-delayedMsgFirstPos) > len(delayedMsgs)) {
 		panic(fmt.Sprintf("trying to read bad delayed msg %d", seqNum))
 	}
 	return delayedMsgs[seqNum-delayedMsgFirstPos]

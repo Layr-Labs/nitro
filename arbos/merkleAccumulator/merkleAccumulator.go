@@ -97,7 +97,6 @@ func (acc *MerkleAccumulator) GetPartials() ([]*common.Hash, error) {
 	}
 	partials := make([]*common.Hash, CalcNumPartials(size))
 	for i := range partials {
-		// #nosec G115
 		p, err := acc.getPartial(uint64(i))
 		if err != nil {
 			return nil, err

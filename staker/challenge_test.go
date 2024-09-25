@@ -77,7 +77,7 @@ func CreateChallenge(
 		resultReceiverAddr,
 		maxInboxMessage,
 		[2][32]byte{startHashBytes, endHashBytes},
-		new(big.Int).SetUint64(endMachineSteps),
+		big.NewInt(int64(endMachineSteps)),
 		asserter,
 		challenger,
 		big.NewInt(100),

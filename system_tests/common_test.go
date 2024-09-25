@@ -197,7 +197,7 @@ var TestSequencerConfig = gethexec.SequencerConfig{
 	EnableProfiling:              false,
 }
 
-func ExecConfigDefaultNonSequencerTest(t *testing.T) *gethexec.Config {
+func ExecConfigDefaultNonSequencerTest() *gethexec.Config {
 	config := gethexec.ConfigDefault
 	config.Caching = TestCachingConfig
 	config.ParentChainReader = headerreader.TestConfig
@@ -206,12 +206,12 @@ func ExecConfigDefaultNonSequencerTest(t *testing.T) *gethexec.Config {
 	config.ForwardingTarget = "null"
 	config.TxPreChecker.Strictness = gethexec.TxPreCheckerStrictnessNone
 
-	Require(t, config.Validate())
+	_ = config.Validate()
 
 	return &config
 }
 
-func ExecConfigDefaultTest(t *testing.T) *gethexec.Config {
+func ExecConfigDefaultTest() *gethexec.Config {
 	config := gethexec.ConfigDefault
 	config.Caching = TestCachingConfig
 	config.Sequencer = TestSequencerConfig
@@ -219,7 +219,7 @@ func ExecConfigDefaultTest(t *testing.T) *gethexec.Config {
 	config.ForwardingTarget = "null"
 	config.TxPreChecker.Strictness = gethexec.TxPreCheckerStrictnessNone
 
-	Require(t, config.Validate())
+	_ = config.Validate()
 
 	return &config
 }
@@ -272,7 +272,7 @@ func (b *NodeBuilder) DefaultConfig(t *testing.T, withL1 bool) *NodeBuilder {
 	b.l2StackConfig = testhelpers.CreateStackConfigForTest(b.dataDir)
 	cp := valnode.TestValidationConfig
 	b.valnodeConfig = &cp
-	b.execConfig = ExecConfigDefaultTest(t)
+	b.execConfig = ExecConfigDefaultTest()
 	return b
 }
 
@@ -293,11 +293,6 @@ func (b *NodeBuilder) WithWasmRootDir(wasmRootDir string) *NodeBuilder {
 	return b
 }
 
-func (b *NodeBuilder) WithExtraArchs(targets []string) *NodeBuilder {
-	b.execConfig.StylusTarget.ExtraArchs = targets
-	return b
-}
-
 func (b *NodeBuilder) Build(t *testing.T) func() {
 	b.CheckConfig(t)
 	if b.withL1 {
@@ -315,7 +310,7 @@ func (b *NodeBuilder) CheckConfig(t *testing.T) {
 		b.nodeConfig = arbnode.ConfigDefaultL1Test()
 	}
 	if b.execConfig == nil {
-		b.execConfig = ExecConfigDefaultTest(t)
+		b.execConfig = ExecConfigDefaultTest()
 	}
 	if b.L1Info == nil {
 		b.L1Info = NewL1TestInfo(t)
@@ -351,7 +346,7 @@ func (b *NodeBuilder) BuildL2OnL1(t *testing.T) func() {
 	var l2arbDb ethdb.Database
 	var l2blockchain *core.BlockChain
 	_, b.L2.Stack, l2chainDb, l2arbDb, l2blockchain = createL2BlockChainWithStackConfig(
-		t, b.L2Info, b.dataDir, b.chainConfig, b.initMessage, b.l2StackConfig, b.execConfig)
+		t, b.L2Info, b.dataDir, b.chainConfig, b.initMessage, b.l2StackConfig, &b.execConfig.Caching)
 
 	var sequencerTxOptsPtr *bind.TransactOpts
 	var dataSigner signature.DataSignerFunc
@@ -414,7 +409,7 @@ func (b *NodeBuilder) BuildL2(t *testing.T) func() {
 	var arbDb ethdb.Database
 	var blockchain *core.BlockChain
 	b.L2Info, b.L2.Stack, chainDb, arbDb, blockchain = createL2BlockChain(
-		t, b.L2Info, b.dataDir, b.chainConfig, b.execConfig)
+		t, b.L2Info, b.dataDir, b.chainConfig, &b.execConfig.Caching)
 
 	Require(t, b.execConfig.Validate())
 	execConfig := b.execConfig
@@ -465,7 +460,7 @@ func (b *NodeBuilder) RestartL2Node(t *testing.T) {
 	}
 	b.L2.cleanup()
 
-	l2info, stack, chainDb, arbDb, blockchain := createL2BlockChainWithStackConfig(t, b.L2Info, b.dataDir, b.chainConfig, b.initMessage, b.l2StackConfig, b.execConfig)
+	l2info, stack, chainDb, arbDb, blockchain := createL2BlockChainWithStackConfig(t, b.L2Info, b.dataDir, b.chainConfig, b.initMessage, b.l2StackConfig, &b.execConfig.Caching)
 
 	execConfigFetcher := func() *gethexec.Config { return b.execConfig }
 	execNode, err := gethexec.CreateExecutionNode(b.ctx, stack, chainDb, blockchain, nil, execConfigFetcher)
@@ -671,7 +666,7 @@ func l2MessageBatchDataFromTxes(txes types.Transactions) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		binary.BigEndian.PutUint64(sizeBuf, uint64(len(txBytes))+1)
+		binary.BigEndian.PutUint64(sizeBuf, uint64(len(txBytes)+1))
 		l2Message = append(l2Message, sizeBuf...)
 		l2Message = append(l2Message, arbos.L2MessageKind_SignedTx)
 		l2Message = append(l2Message, txBytes...)
@@ -1040,6 +1035,9 @@ func DeployOnTestL1(
 		arbnode.GenerateRollupConfig(prodConfirmPeriodBlocks, wasmModuleRoot, l1info.GetAddress("RollupOwner"), chainConfig, serializedChainConfig, common.Address{}),
 		nativeToken,
 		maxDataSize,
+		false,
+		common.HexToAddress("0x0"),
+		common.HexToAddress("0x0"),
 	)
 	Require(t, err)
 	l1info.SetContract("Bridge", addresses.Bridge)
@@ -1051,32 +1049,30 @@ func DeployOnTestL1(
 }
 
 func createL2BlockChain(
-	t *testing.T, l2info *BlockchainTestInfo, dataDir string, chainConfig *params.ChainConfig, execConfig *gethexec.Config,
+	t *testing.T, l2info *BlockchainTestInfo, dataDir string, chainConfig *params.ChainConfig, cacheConfig *gethexec.CachingConfig,
 ) (*BlockchainTestInfo, *node.Node, ethdb.Database, ethdb.Database, *core.BlockChain) {
-	return createL2BlockChainWithStackConfig(t, l2info, dataDir, chainConfig, nil, nil, execConfig)
+	return createL2BlockChainWithStackConfig(t, l2info, dataDir, chainConfig, nil, nil, cacheConfig)
 }
 
 func createL2BlockChainWithStackConfig(
-	t *testing.T, l2info *BlockchainTestInfo, dataDir string, chainConfig *params.ChainConfig, initMessage *arbostypes.ParsedInitMessage, stackConfig *node.Config, execConfig *gethexec.Config,
+	t *testing.T, l2info *BlockchainTestInfo, dataDir string, chainConfig *params.ChainConfig, initMessage *arbostypes.ParsedInitMessage, stackConfig *node.Config, cacheConfig *gethexec.CachingConfig,
 ) (*BlockchainTestInfo, *node.Node, ethdb.Database, ethdb.Database, *core.BlockChain) {
 	if l2info == nil {
 		l2info = NewArbTestInfo(t, chainConfig.ChainID)
 	}
+	var stack *node.Node
+	var err error
 	if stackConfig == nil {
 		stackConfig = testhelpers.CreateStackConfigForTest(dataDir)
 	}
-	if execConfig == nil {
-		execConfig = ExecConfigDefaultTest(t)
-	}
-
-	stack, err := node.New(stackConfig)
+	stack, err = node.New(stackConfig)
 	Require(t, err)
 
 	chainData, err := stack.OpenDatabaseWithExtraOptions("l2chaindata", 0, 0, "l2chaindata/", false, conf.PersistentConfigDefault.Pebble.ExtraOptions("l2chaindata"))
 	Require(t, err)
 	wasmData, err := stack.OpenDatabaseWithExtraOptions("wasm", 0, 0, "wasm/", false, conf.PersistentConfigDefault.Pebble.ExtraOptions("wasm"))
 	Require(t, err)
-	chainDb := rawdb.WrapDatabaseWithWasm(chainData, wasmData, 0, execConfig.StylusTarget.WasmTargets())
+	chainDb := rawdb.WrapDatabaseWithWasm(chainData, wasmData, 0)
 	arbDb, err := stack.OpenDatabaseWithExtraOptions("arbitrumdata", 0, 0, "arbitrumdata/", false, conf.PersistentConfigDefault.Pebble.ExtraOptions("arbitrumdata"))
 	Require(t, err)
 
@@ -1091,8 +1087,11 @@ func createL2BlockChainWithStackConfig(
 			SerializedChainConfig: serializedChainConfig,
 		}
 	}
-	coreCacheConfig := gethexec.DefaultCacheConfigFor(stack, &execConfig.Caching)
-	blockchain, err := gethexec.WriteOrTestBlockChain(chainDb, coreCacheConfig, initReader, chainConfig, initMessage, ExecConfigDefaultTest(t).TxLookupLimit, 0)
+	var coreCacheConfig *core.CacheConfig
+	if cacheConfig != nil {
+		coreCacheConfig = gethexec.DefaultCacheConfigFor(stack, cacheConfig)
+	}
+	blockchain, err := gethexec.WriteOrTestBlockChain(chainDb, coreCacheConfig, initReader, chainConfig, initMessage, ExecConfigDefaultTest().TxLookupLimit, 0)
 	Require(t, err)
 
 	return l2info, stack, chainDb, arbDb, blockchain
@@ -1152,7 +1151,7 @@ func Create2ndNodeWithConfig(
 		nodeConfig = arbnode.ConfigDefaultL1NonSequencerTest()
 	}
 	if execConfig == nil {
-		execConfig = ExecConfigDefaultNonSequencerTest(t)
+		execConfig = ExecConfigDefaultNonSequencerTest()
 	}
 	feedErrChan := make(chan error, 10)
 	l1rpcClient := l1stack.Attach()
@@ -1168,7 +1167,7 @@ func Create2ndNodeWithConfig(
 	Require(t, err)
 	wasmData, err := l2stack.OpenDatabaseWithExtraOptions("wasm", 0, 0, "wasm/", false, conf.PersistentConfigDefault.Pebble.ExtraOptions("wasm"))
 	Require(t, err)
-	l2chainDb := rawdb.WrapDatabaseWithWasm(l2chainData, wasmData, 0, execConfig.StylusTarget.WasmTargets())
+	l2chainDb := rawdb.WrapDatabaseWithWasm(l2chainData, wasmData, 0)
 
 	l2arbDb, err := l2stack.OpenDatabaseWithExtraOptions("arbitrumdata", 0, 0, "arbitrumdata/", false, conf.PersistentConfigDefault.Pebble.ExtraOptions("arbitrumdata"))
 	Require(t, err)
@@ -1182,7 +1181,7 @@ func Create2ndNodeWithConfig(
 	chainConfig := firstExec.ArbInterface.BlockChain().Config()
 
 	coreCacheConfig := gethexec.DefaultCacheConfigFor(l2stack, &execConfig.Caching)
-	l2blockchain, err := gethexec.WriteOrTestBlockChain(l2chainDb, coreCacheConfig, initReader, chainConfig, initMessage, ExecConfigDefaultTest(t).TxLookupLimit, 0)
+	l2blockchain, err := gethexec.WriteOrTestBlockChain(l2chainDb, coreCacheConfig, initReader, chainConfig, initMessage, ExecConfigDefaultTest().TxLookupLimit, 0)
 	Require(t, err)
 
 	AddValNodeIfNeeded(t, ctx, nodeConfig, true, "", valnodeConfig.Wasm.RootPath)

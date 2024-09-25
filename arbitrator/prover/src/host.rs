@@ -75,6 +75,7 @@ pub enum Hostio {
     WavmReadKeccakPreimage,
     WavmReadSha256Preimage,
     WavmReadEthVersionedHashPreimage,
+    WavmReadEigenDAHashPreimage,
     WavmReadInboxMessage,
     WavmReadDelayedInboxMessage,
     WavmHaltAndSetFinished,
@@ -122,6 +123,7 @@ impl FromStr for Hostio {
             ("env", "wavm_read_keccak_256_preimage") => WavmReadKeccakPreimage,
             ("env", "wavm_read_sha2_256_preimage") => WavmReadSha256Preimage,
             ("env", "wavm_read_eth_versioned_hash_preimage") => WavmReadEthVersionedHashPreimage,
+            ("env", "wavm_read_eigen_da_hash_preimage") => WavmReadEigenDAHashPreimage,
             ("env", "wavm_read_inbox_message") => WavmReadInboxMessage,
             ("env", "wavm_read_delayed_inbox_message") => WavmReadDelayedInboxMessage,
             ("env", "wavm_halt_and_set_finished") => WavmHaltAndSetFinished,
@@ -183,6 +185,7 @@ impl Hostio {
             WavmReadKeccakPreimage           => func!([I32, I32], [I32]),
             WavmReadSha256Preimage           => func!([I32, I32], [I32]),
             WavmReadEthVersionedHashPreimage => func!([I32, I32], [I32]),
+            WavmReadEigenDAHashPreimage      => func!([I32, I32], [I32]),
             WavmReadInboxMessage             => func!([I64, I32, I32], [I32]),
             WavmReadDelayedInboxMessage      => func!([I64, I32, I32], [I32]),
             WavmHaltAndSetFinished           => func!(),
@@ -290,6 +293,11 @@ impl Hostio {
                 opcode!(LocalGet, 0);
                 opcode!(LocalGet, 1);
                 opcode!(ReadPreImage, PreimageType::EthVersionedHash);
+            }
+            WavmReadEigenDAHashPreimage => {
+                opcode!(LocalGet, 0);
+                opcode!(LocalGet, 1);
+                opcode!(ReadPreImage, PreimageType::EigenDAHash);
             }
             WavmReadInboxMessage => {
                 opcode!(LocalGet, 0);
@@ -405,7 +413,7 @@ impl Hostio {
     }
 }
 
-pub fn get_impl(module: &str, name: &str) -> Result<Function> {
+pub fn get_impl(module: &str, name: &str) -> Result<(Function, bool)> {
     let hostio: Hostio = format!("{module}__{name}").parse()?;
 
     let append = |code: &mut Vec<Instruction>| {
@@ -414,11 +422,8 @@ pub fn get_impl(module: &str, name: &str) -> Result<Function> {
         Ok(())
     };
 
-    Function::new(&[], append, hostio.ty(), &[])
-}
-
-pub fn hostio_module_is_debug(module: &str) -> bool {
-    module == "console" || module == "debug"
+    let debug = module == "console" || module == "debug";
+    Function::new(&[], append, hostio.ty(), &[]).map(|x| (x, debug))
 }
 
 /// Adds internal functions to a module.

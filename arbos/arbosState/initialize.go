@@ -108,7 +108,7 @@ func InitializeArbosInDatabase(db ethdb.Database, cacheConfig *core.CacheConfig,
 	if err != nil {
 		return common.Hash{}, err
 	}
-	for i := uint64(0); addressReader.More(); i++ {
+	for i := 0; addressReader.More(); i++ {
 		addr, err := addressReader.GetNext()
 		if err != nil {
 			return common.Hash{}, err
@@ -117,7 +117,7 @@ func InitializeArbosInDatabase(db ethdb.Database, cacheConfig *core.CacheConfig,
 		if err != nil {
 			return common.Hash{}, err
 		}
-		if i != slot {
+		if uint64(i) != slot {
 			return common.Hash{}, errors.New("address table slot mismatch")
 		}
 	}

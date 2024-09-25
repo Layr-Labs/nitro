@@ -16,7 +16,6 @@ import (
 
 func TestRedisStorageService(t *testing.T) {
 	ctx := context.Background()
-	// #nosec G115
 	timeout := uint64(time.Now().Add(time.Hour).Unix())
 	baseStorageService := NewMemoryBackedStorageService(ctx)
 	server, err := miniredis.Run()

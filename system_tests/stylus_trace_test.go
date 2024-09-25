@@ -76,7 +76,6 @@ func sendAndTraceTransaction(
 }
 
 func intToBytes(v int) []byte {
-	// #nosec G115
 	return binary.BigEndian.AppendUint64(nil, uint64(v))
 }
 

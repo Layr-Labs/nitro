@@ -105,7 +105,6 @@ func testReceiveMessages(t *testing.T, clientCompression bool, serverCompression
 
 	go func() {
 		for i := 0; i < messageCount; i++ {
-			// #nosec G115
 			Require(t, b.BroadcastSingle(arbostypes.TestMessageWithMetadataAndRequestId, arbutil.MessageIndex(i), nil))
 		}
 	}()
@@ -157,7 +156,6 @@ func TestInvalidSignature(t *testing.T) {
 
 	go func() {
 		for i := 0; i < messageCount; i++ {
-			// #nosec G115
 			Require(t, b.BroadcastSingle(arbostypes.TestMessageWithMetadataAndRequestId, arbutil.MessageIndex(i), nil))
 		}
 	}()

@@ -149,7 +149,7 @@ func (con ArbRetryableTx) GetTimeout(c ctx, evm mech, ticketId bytes32) (huge, e
 	if err != nil {
 		return nil, err
 	}
-	return new(big.Int).SetUint64(timeout), nil
+	return big.NewInt(int64(timeout)), nil
 }
 
 // Keepalive adds one lifetime period to the ticket's expiry
@@ -176,9 +176,8 @@ func (con ArbRetryableTx) Keepalive(c ctx, evm mech, ticketId bytes32) (huge, er
 		return big.NewInt(0), err
 	}
 
-	bigNewTimeout := new(big.Int).SetUint64(newTimeout)
-	err = con.LifetimeExtended(c, evm, ticketId, bigNewTimeout)
-	return bigNewTimeout, err
+	err = con.LifetimeExtended(c, evm, ticketId, big.NewInt(int64(newTimeout)))
+	return big.NewInt(int64(newTimeout)), err
 }
 
 // GetBeneficiary gets the beneficiary of the ticket

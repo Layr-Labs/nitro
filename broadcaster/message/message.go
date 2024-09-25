@@ -41,7 +41,6 @@ type BroadcastFeedMessage struct {
 }
 
 func (m *BroadcastFeedMessage) Size() uint64 {
-	// #nosec G115
 	return uint64(len(m.Signature) + len(m.Message.Message.L2msg) + 160)
 }
 

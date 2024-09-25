@@ -34,6 +34,7 @@ import (
 	"github.com/offchainlabs/nitro/broadcaster"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/das"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/execution/gethexec"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
@@ -88,6 +89,7 @@ type Config struct {
 	Staker              staker.L1ValidatorConfig    `koanf:"staker" reload:"hot"`
 	SeqCoordinator      SeqCoordinatorConfig        `koanf:"seq-coordinator"`
 	DataAvailability    das.DataAvailabilityConfig  `koanf:"data-availability"`
+	EigenDA             eigenda.EigenDAConfig       `koanf:"eigen-da"`
 	SyncMonitor         SyncMonitorConfig           `koanf:"sync-monitor"`
 	Dangerous           DangerousConfig             `koanf:"dangerous"`
 	TransactionStreamer TransactionStreamerConfig   `koanf:"transaction-streamer" reload:"hot"`
@@ -339,29 +341,6 @@ func checkArbDbSchemaVersion(arbDb ethdb.Database) error {
 	return nil
 }
 
-func DataposterOnlyUsedToCreateValidatorWalletContract(
-	ctx context.Context,
-	l1Reader *headerreader.HeaderReader,
-	transactOpts *bind.TransactOpts,
-	cfg *dataposter.DataPosterConfig,
-	parentChainID *big.Int,
-) (*dataposter.DataPoster, error) {
-	cfg.UseNoOpStorage = true
-	return dataposter.NewDataPoster(ctx,
-		&dataposter.DataPosterOpts{
-			HeaderReader: l1Reader,
-			Auth:         transactOpts,
-			Config: func() *dataposter.DataPosterConfig {
-				return cfg
-			},
-			MetadataRetriever: func(ctx context.Context, blockNum *big.Int) ([]byte, error) {
-				return nil, nil
-			},
-			ParentChainID: parentChainID,
-		},
-	)
-}
-
 func StakerDataposter(
 	ctx context.Context, db ethdb.Database, l1Reader *headerreader.HeaderReader,
 	transactOpts *bind.TransactOpts, cfgFetcher ConfigFetcher, syncMonitor *SyncMonitor,
@@ -538,17 +517,19 @@ func createNodeImpl(
 	if err != nil {
 		return nil, err
 	}
-	// #nosec G115
 	sequencerInbox, err := NewSequencerInbox(l1client, deployInfo.SequencerInbox, int64(deployInfo.DeployedAt))
 	if err != nil {
 		return nil, err
 	}
 
+	var eigenDAReader eigenda.EigenDAReader
+	var eigenDAWriter eigenda.EigenDAWriter
 	var daWriter das.DataAvailabilityServiceWriter
 	var daReader das.DataAvailabilityServiceReader
 	var dasLifecycleManager *das.LifecycleManager
 	var dasKeysetFetcher *das.KeysetFetcher
 	if config.DataAvailability.Enable {
+		log.Info("Data Availability enabled")
 		if config.BatchPoster.Enable {
 			daWriter, daReader, dasKeysetFetcher, dasLifecycleManager, err = das.CreateBatchPosterDAS(ctx, &config.DataAvailability, dataSigner, l1client, deployInfo.SequencerInbox)
 			if err != nil {
@@ -571,6 +552,14 @@ func createNodeImpl(
 		}
 	} else if l2Config.ArbitrumChainParams.DataAvailabilityCommittee {
 		return nil, errors.New("a data availability service is required for this chain, but it was not configured")
+	} else if config.EigenDA.Enable {
+		log.Info("EigenDA enabled")
+		eigenDAService, err := eigenda.NewEigenDA(&config.EigenDA)
+		if err != nil {
+			return nil, err
+		}
+		eigenDAReader = eigenDAService
+		eigenDAWriter = eigenDAService
 	}
 
 	// We support a nil txStreamer for the pruning code
@@ -578,6 +567,9 @@ func createNodeImpl(
 		return nil, errors.New("data availability service required but unconfigured")
 	}
 	var dapReaders []daprovider.Reader
+	if eigenDAReader != nil {
+		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
+	}
 	if daReader != nil {
 		dapReaders = append(dapReaders, daprovider.NewReaderForDAS(daReader, dasKeysetFetcher))
 	}
@@ -663,7 +655,6 @@ func createNodeImpl(
 					tmpAddress := common.HexToAddress(config.Staker.ContractWalletAddress)
 					existingWalletAddress = &tmpAddress
 				}
-				// #nosec G115
 				wallet, err = validatorwallet.NewContract(dp, existingWalletAddress, deployInfo.ValidatorWalletCreator, deployInfo.Rollup, l1Reader, txOptsValidator, int64(deployInfo.DeployedAt), func(common.Address) {}, getExtraGas)
 				if err != nil {
 					return nil, err
@@ -712,6 +703,7 @@ func createNodeImpl(
 		if daWriter != nil {
 			dapWriter = daprovider.NewWriterForDAS(daWriter)
 		}
+
 		batchPoster, err = NewBatchPoster(ctx, &BatchPosterOpts{
 			DataPosterDB:  rawdb.NewTable(arbDb, storage.BatchPosterPrefix),
 			L1Reader:      l1Reader,
@@ -723,6 +715,7 @@ func createNodeImpl(
 			DeployInfo:    deployInfo,
 			TransactOpts:  txOptsBatchPoster,
 			DAPWriter:     dapWriter,
+			EigenDAWriter: eigenDAWriter,
 			ParentChainID: parentChainID,
 			DAPReaders:    dapReaders,
 		})

@@ -20,7 +20,6 @@ func TestActivationDataFee(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
 	state, _ := arbosState.NewArbosMemoryBackedArbOSState()
 	pricer := state.Programs().DataPricer()
-	// #nosec G115
 	time := uint64(time.Now().Unix())
 
 	assert := func(cond bool) {

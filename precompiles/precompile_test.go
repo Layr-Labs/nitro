@@ -91,7 +91,6 @@ func TestEvents(t *testing.T) {
 		if log.Address != debugContractAddr {
 			Fail(t, "address mismatch:", log.Address, "vs", debugContractAddr)
 		}
-		// #nosec G115
 		if log.BlockNumber != uint64(blockNumber) {
 			Fail(t, "block number mismatch:", log.BlockNumber, "vs", blockNumber)
 		}
@@ -171,7 +170,6 @@ func TestEventCosts(t *testing.T) {
 		offsetBytes := 32
 		storeBytes := sizeBytes + offsetBytes + len(bytes)
 		storeBytes = storeBytes + 31 - (storeBytes+31)%32 // round up to a multiple of 32
-		// #nosec G115
 		storeCost := uint64(storeBytes) * params.LogDataGas
 
 		expected[i] = baseCost + addrCost + hashCost + storeCost

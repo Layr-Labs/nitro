@@ -187,12 +187,12 @@ func (c *Cache) Prune(ctx context.Context, messageNumber uint64) error {
 		if info.IsDir() {
 			matches := pattern.FindStringSubmatch(info.Name())
 			if len(matches) > 1 {
-				dirNameMessageNum, err := strconv.ParseUint(matches[1], 10, 64)
+				dirNameMessageNum, err := strconv.Atoi(matches[1])
 				if err != nil {
 					return err
 				}
 				// Collect the directory path if the message number is <= the specified value.
-				if dirNameMessageNum <= messageNumber {
+				if dirNameMessageNum <= int(messageNumber) {
 					pathsToDelete = append(pathsToDelete, path)
 				}
 			}

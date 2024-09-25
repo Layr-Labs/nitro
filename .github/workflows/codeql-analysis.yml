@@ -25,8 +25,8 @@ on:
 jobs:
   analyze:
     name: Analyze
-    if: github.repository == 'OffchainLabs/nitro' # don't run in any forks without "Advanced Security" enabled
-    runs-on: ubuntu-8
+    if: github.repository == 'Layr-Labs/nitro' # don't run in any forks without "Advanced Security" enabled
+    runs-on: linux-2xl
     permissions:
       actions: read
       contents: read
@@ -46,6 +46,9 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: true
+
+    - name: Install dependencies
+      run: sudo apt update && sudo apt install -y wabt
 
     - name: Install dependencies
       run: sudo apt update && sudo apt install -y wabt

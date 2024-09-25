@@ -7,6 +7,7 @@ use crate::{
         storage::{StorageCache, StorageWord},
         user::UserOutcomeKind,
     },
+    format::Utf8OrHex,
     pricing::EVM_API_INK,
     Bytes20, Bytes32,
 };
@@ -139,13 +140,8 @@ impl<D: DataReader, H: RequestHandler<D>> EvmApi<D> for EvmApiRequestor<D, H> {
         }
 
         let (res, _, cost) = self.request(EvmApiMethod::SetTrieSlots, data);
-        let status = res
-            .first()
-            .copied()
-            .map(EvmApiStatus::from)
-            .unwrap_or(EvmApiStatus::Failure);
-        if status != EvmApiStatus::Success {
-            bail!("{:?}", status);
+        if res[0] != EvmApiStatus::Success.into() {
+            bail!("{}", String::from_utf8_or_hex(res));
         }
         Ok(cost)
     }
@@ -160,13 +156,8 @@ impl<D: DataReader, H: RequestHandler<D>> EvmApi<D> for EvmApiRequestor<D, H> {
         data.extend(key);
         data.extend(value);
         let (res, ..) = self.request(EvmApiMethod::SetTransientBytes32, data);
-        let status = res
-            .first()
-            .copied()
-            .map(EvmApiStatus::from)
-            .unwrap_or(EvmApiStatus::Failure);
-        if status != EvmApiStatus::Success {
-            bail!("{:?}", status);
+        if res[0] != EvmApiStatus::Success.into() {
+            bail!("{}", String::from_utf8_or_hex(res));
         }
         Ok(())
     }

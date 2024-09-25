@@ -11,10 +11,8 @@ var (
 )
 
 func UpdateSequenceNumberGauge(sequenceNumber arbutil.MessageIndex) {
-	// #nosec G115
 	latestSequenceNumberGauge.Update(int64(sequenceNumber))
 }
 func UpdateSequenceNumberInBlockGauge(sequenceNumber arbutil.MessageIndex) {
-	// #nosec G115
 	sequenceNumberInBlockGauge.Update(int64(sequenceNumber))
 }

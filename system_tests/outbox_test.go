@@ -146,7 +146,6 @@ func TestOutboxProofs(t *testing.T) {
 		treeSize := root.size
 
 		balanced := treeSize == arbmath.NextPowerOf2(treeSize)/2
-		// #nosec G115
 		treeLevels := int(arbmath.Log2ceil(treeSize)) // the # of levels in the tree
 		proofLevels := treeLevels - 1                 // the # of levels where a hash is needed (all but root)
 		walkLevels := treeLevels                      // the # of levels we need to consider when building walks
@@ -175,7 +174,6 @@ func TestOutboxProofs(t *testing.T) {
 				sibling := place ^ which
 
 				position := merkletree.LevelAndLeaf{
-					// #nosec G115
 					Level: uint64(level),
 					Leaf:  sibling,
 				}
@@ -202,7 +200,6 @@ func TestOutboxProofs(t *testing.T) {
 						leaf := total - 1 // preceding it. We subtract 1 since we count from 0
 
 						partial := merkletree.LevelAndLeaf{
-							// #nosec G115
 							Level: uint64(level),
 							Leaf:  leaf,
 						}
@@ -291,7 +288,6 @@ func TestOutboxProofs(t *testing.T) {
 				step.Leaf += 1 << step.Level // we start on the min partial's zero-hash sibling
 				known[step] = zero
 
-				// #nosec G115
 				for step.Level < uint64(treeLevels) {
 
 					curr, ok := known[step]

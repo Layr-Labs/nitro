@@ -61,6 +61,7 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		afterDelayedMessages: binary.BigEndian.Uint64(data[32:40]),
 		segments:             [][]byte{},
 	}
+
 	payload := data[40:]
 
 	// Stage 0: Check if our node is out of date and we don't understand this batch type
@@ -246,7 +247,7 @@ func (r *inboxMultiplexer) IsCachedSegementLast() bool {
 	if r.delayedMessagesRead < seqMsg.afterDelayedMessages {
 		return false
 	}
-	for segmentNum := r.cachedSegmentNum + 1; segmentNum < uint64(len(seqMsg.segments)); segmentNum++ {
+	for segmentNum := int(r.cachedSegmentNum) + 1; segmentNum < len(seqMsg.segments); segmentNum++ {
 		segment := seqMsg.segments[segmentNum]
 		if len(segment) == 0 {
 			continue
@@ -276,7 +277,7 @@ func (r *inboxMultiplexer) getNextMsg() (*arbostypes.MessageWithMetadata, error)
 		if segmentNum >= uint64(len(seqMsg.segments)) {
 			break
 		}
-		segment = seqMsg.segments[segmentNum]
+		segment = seqMsg.segments[int(segmentNum)]
 		if len(segment) == 0 {
 			segmentNum++
 			continue
@@ -322,7 +323,7 @@ func (r *inboxMultiplexer) getNextMsg() (*arbostypes.MessageWithMetadata, error)
 		log.Warn("reading virtual delayed message segment", "delayedMessagesRead", r.delayedMessagesRead, "afterDelayedMessages", seqMsg.afterDelayedMessages)
 		segment = []byte{BatchSegmentKindDelayedMessages}
 	} else {
-		segment = seqMsg.segments[segmentNum]
+		segment = seqMsg.segments[int(segmentNum)]
 	}
 	if len(segment) == 0 {
 		log.Error("empty sequencer message segment", "sequence", r.cachedSegmentNum, "segmentNum", segmentNum)

@@ -1,6 +1,7 @@
 [submodule "go-ethereum"]
 	path = go-ethereum
-	url = https://github.com/OffchainLabs/go-ethereum.git
+	url = git@github.com:Layr-Labs/nitro-go-ethereum-private.git
+	branch = eigenda-v3.1.2
 [submodule "fastcache"]
 	path = fastcache
 	url = https://github.com/OffchainLabs/fastcache.git
@@ -10,19 +11,24 @@
 [submodule "brotli"]
 	path = brotli
 	url = https://github.com/google/brotli.git
-[submodule "contracts"]
-	path = contracts
-	url = https://github.com/OffchainLabs/nitro-contracts.git
-	branch = develop
 [submodule "arbitrator/wasm-testsuite/testsuite"]
 	path = arbitrator/wasm-testsuite/testsuite
 	url = https://github.com/WebAssembly/testsuite.git
+[submodule "contracts"]
+	path = contracts
+	url = https://github.com/Layr-Labs/nitro-contracts.git
+	branch = eigenda-v3.1.2
+[submodule "nitro-testnode"]
+	path = nitro-testnode
+	url = https://github.com/Layr-Labs/nitro-testnode.git
+	branch = eigenda-v3.1.2
+[submodule "arbitrator/rust-kzg-bn254"]
+	path = arbitrator/rust-kzg-bn254
+	url = https://github.com/Layr-Labs/rust-kzg-bn254.git
+	branch = epociask--better-linting
 [submodule "arbitrator/tools/wasmer"]
 	path = arbitrator/tools/wasmer
 	url = https://github.com/OffchainLabs/wasmer.git
-[submodule "nitro-testnode"]
-	path = nitro-testnode
-	url = https://github.com/OffchainLabs/nitro-testnode.git
 [submodule "arbitrator/langs/rust"]
 	path = arbitrator/langs/rust
 	url = https://github.com/OffchainLabs/stylus-sdk-rs.git

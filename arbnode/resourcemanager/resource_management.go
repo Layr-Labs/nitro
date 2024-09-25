@@ -256,7 +256,6 @@ func readIntFromFile(fileName string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
 
 	var limit int
 	if _, err = fmt.Fscanf(file, "%d", &limit); err != nil {
@@ -270,7 +269,6 @@ func readFromMemStats(fileName string, re *regexp.Regexp) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

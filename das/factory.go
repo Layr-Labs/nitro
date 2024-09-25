@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -186,7 +187,12 @@ func CreateDAComponentsForDaserver(
 		dasLifecycleManager.Register(restAgg)
 
 		syncConf := &config.RestAggregator.SyncToStorage
-		retentionPeriodSeconds := uint64(syncConf.RetentionPeriod.Seconds())
+		var retentionPeriodSeconds uint64
+		if uint64(syncConf.RetentionPeriod) == math.MaxUint64 {
+			retentionPeriodSeconds = math.MaxUint64
+		} else {
+			retentionPeriodSeconds = uint64(syncConf.RetentionPeriod.Seconds())
+		}
 
 		if syncConf.Eager {
 			if l1Reader == nil || seqInboxAddress == nil {

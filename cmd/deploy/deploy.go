@@ -39,6 +39,10 @@ func main() {
 
 	ctx := context.Background()
 
+	/* EigenDA dependency contracts */
+	svcManagerString := flag.String("svcManager", "0x0000000000000000000000000000000000000000", "the address of the eigenda service manager contract")
+	daRollupManagerString := flag.String("daRollupManager", "0x0000000000000000000000000000000000000000", "the address of the eigenda rollup manager contract")
+
 	l1conn := flag.String("l1conn", "", "l1 connection")
 	l1keystore := flag.String("l1keystore", "", "l1 private key store")
 	deployAccount := flag.String("l1DeployAccount", "", "l1 seq account to use (default is first account in keystore)")
@@ -61,6 +65,7 @@ func main() {
 	authorizevalidators := flag.Uint64("authorizevalidators", 0, "Number of validators to preemptively authorize")
 	txTimeout := flag.Duration("txtimeout", 10*time.Minute, "Timeout when waiting for a transaction to be included in a block")
 	prod := flag.Bool("prod", false, "Whether to configure the rollup for production or testing")
+	isUsingFeeToken := flag.Bool("isUsingFeeToken", false, "true if the chain uses custom fee token")
 	flag.Parse()
 	l1ChainId := new(big.Int).SetUint64(*l1ChainIdUint)
 	maxDataSize := new(big.Int).SetUint64(*maxDataSizeUint)
@@ -179,6 +184,9 @@ func main() {
 	defer l1Reader.StopAndWait()
 
 	nativeToken := common.HexToAddress(*nativeTokenAddressString)
+	eigenDASvcManager := common.HexToAddress(*svcManagerString)
+	eigenDARollupManager := common.HexToAddress(*daRollupManagerString)
+
 	deployedAddresses, err := deploycode.DeployOnL1(
 		ctx,
 		l1Reader,
@@ -189,6 +197,9 @@ func main() {
 		arbnode.GenerateRollupConfig(*prod, moduleRoot, ownerAddress, &chainConfig, chainConfigJson, loserEscrowAddress),
 		nativeToken,
 		maxDataSize,
+		*isUsingFeeToken,
+		eigenDASvcManager,
+		eigenDARollupManager,
 	)
 	if err != nil {
 		flag.Usage()

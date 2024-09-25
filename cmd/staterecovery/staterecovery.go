@@ -60,7 +60,6 @@ func RecreateMissingStates(chainDb ethdb.Database, bc *core.BlockChain, cacheCon
 			break
 		}
 		if time.Since(logged) > 1*time.Minute {
-			// #nosec G115
 			log.Info("Recreating missing states", "block", current, "target", target, "remaining", int64(target)-int64(current), "elapsed", time.Since(start), "recreated", recreated)
 			logged = time.Now()
 		}

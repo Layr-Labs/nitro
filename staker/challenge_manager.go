@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/offchainlabs/nitro/arbutil"
@@ -295,7 +294,7 @@ func (m *ChallengeManager) bisect(ctx context.Context, backend ChallengeBackend,
 	if newChallengeLength < bisectionDegree {
 		bisectionDegree = newChallengeLength
 	}
-	newSegments := make([][32]byte, bisectionDegree+1)
+	newSegments := make([][32]byte, int(bisectionDegree+1))
 	position := startSegmentPosition
 	normalSegmentLength := newChallengeLength / bisectionDegree
 	for i := range newSegments {
@@ -469,7 +468,7 @@ func (m *ChallengeManager) createExecutionBackend(ctx context.Context, step uint
 	if err != nil {
 		return fmt.Errorf("error creating validation entry for challenge %v msg %v for execution challenge: %w", m.challengeIndex, initialCount, err)
 	}
-	input, err := entry.ToInput([]ethdb.WasmTarget{rawdb.TargetWavm})
+	input, err := entry.ToInput([]rawdb.Target{rawdb.TargetWavm})
 	if err != nil {
 		return fmt.Errorf("error getting validation entry input of challenge %v msg %v: %w", m.challengeIndex, initialCount, err)
 	}
@@ -566,7 +565,6 @@ func (m *ChallengeManager) Act(ctx context.Context) (*types.Transaction, error) 
 			nextMovePos,
 		)
 	}
-	// #nosec G115
 	err = m.createExecutionBackend(ctx, uint64(nextMovePos))
 	if err != nil {
 		return nil, fmt.Errorf("error creating execution backend: %w", err)

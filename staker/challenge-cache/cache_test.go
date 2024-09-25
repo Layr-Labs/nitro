@@ -166,9 +166,8 @@ func TestPrune(t *testing.T) {
 				}
 				key = &Key{
 					WavmModuleRoot: root,
-					// #nosec G115
-					MessageHeight: uint64(i),
-					StepHeights:   []uint64{0},
+					MessageHeight:  uint64(i),
+					StepHeights:    []uint64{0},
 				}
 				if err = cache.Put(key, hashes); err != nil {
 					t.Fatal(err)
@@ -183,9 +182,8 @@ func TestPrune(t *testing.T) {
 			for i := 0; i <= 5; i++ {
 				key = &Key{
 					WavmModuleRoot: root,
-					// #nosec G115
-					MessageHeight: uint64(i),
-					StepHeights:   []uint64{0},
+					MessageHeight:  uint64(i),
+					StepHeights:    []uint64{0},
 				}
 				if _, err = cache.Get(key, 3); !errors.Is(err, ErrNotFoundInCache) {
 					t.Error(err)
@@ -195,9 +193,8 @@ func TestPrune(t *testing.T) {
 			for i := 6; i < totalMessages; i++ {
 				key = &Key{
 					WavmModuleRoot: root,
-					// #nosec G115
-					MessageHeight: uint64(i),
-					StepHeights:   []uint64{0},
+					MessageHeight:  uint64(i),
+					StepHeights:    []uint64{0},
 				}
 				items, err := cache.Get(key, 3)
 				if err != nil {

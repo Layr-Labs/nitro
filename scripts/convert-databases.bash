@@ -182,7 +182,7 @@ fi
 
 convert_result=
 convert () {
-    srcdir="$src"/$1
+    srcdir=$(echo $src/$1 | tr -s /)
     dstdir=$(echo $dst/$1 | tr -s /)
     if ! [ -e $dstdir ]; then
         echo "== Converting $1 db"

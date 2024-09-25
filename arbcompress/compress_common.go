@@ -17,8 +17,6 @@ func compressedBufferSizeFor(length int) int {
 	return length + (length>>10)*8 + 64 // actual limit is: length + (length >> 14) * 4 + 6
 }
 
-func CompressLevel(input []byte, level uint64) ([]byte, error) {
-	// level is trusted and shouldn't be anything crazy
-	// #nosec G115
+func CompressLevel(input []byte, level int) ([]byte, error) {
 	return Compress(input, uint32(level), EmptyDictionary)
 }
