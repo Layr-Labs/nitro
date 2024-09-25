@@ -61,6 +61,7 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		afterDelayedMessages: binary.BigEndian.Uint64(data[32:40]),
 		segments:             [][]byte{},
 	}
+
 	payload := data[40:]
 
 	// Stage 0: Check if our node is out of date and we don't understand this batch type

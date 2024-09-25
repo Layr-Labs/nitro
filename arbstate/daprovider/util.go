@@ -85,11 +85,13 @@ const ZeroheavyMessageHeaderFlag byte = 0x20
 // BlobHashesHeaderFlag indicates that this message contains EIP 4844 versioned hashes of the committments calculated over the blob data for the batch data.
 const BlobHashesHeaderFlag byte = L1AuthenticatedMessageHeaderFlag | 0x10 // 0x50
 
+const EigenDAMessageHeaderFlag byte = 0xed
+
 // BrotliMessageHeaderByte indicates that the message is brotli-compressed.
 const BrotliMessageHeaderByte byte = 0
 
 // KnownHeaderBits is all header bits with known meaning to this nitro version
-const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte
+const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAMessageHeaderFlag
 
 // hasBits returns true if `checking` has all `bits`
 func hasBits(checking byte, bits byte) bool {

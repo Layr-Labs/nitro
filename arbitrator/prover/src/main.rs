@@ -189,6 +189,7 @@ fn main() -> Result<()> {
                 .insert(hash.into(), buf.as_slice().into());
         }
     }
+
     let preimage_resolver =
         Arc::new(move |_, ty, hash| preimages.get(&ty).and_then(|m| m.get(&hash)).cloned())
             as PreimageResolver;

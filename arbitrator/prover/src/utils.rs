@@ -3,11 +3,15 @@
 
 #[cfg(feature = "native")]
 use crate::kzg::ETHEREUM_KZG_SETTINGS;
+use crate::kzgbn254::KZG_BN254_SETTINGS;
 use arbutil::PreimageType;
+use ark_serialize::CanonicalSerialize;
 #[cfg(feature = "native")]
 use c_kzg::{Blob, KzgCommitment};
 use digest::Digest;
 use eyre::{eyre, Result};
+use kzgbn254::{blob::Blob as EigenDABlob, polynomial::PolynomialFormat};
+use num::BigUint;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sha3::Keccak256;
@@ -190,6 +194,41 @@ pub fn split_import(qualified: &str) -> Result<(&str, &str)> {
     Ok((module, name))
 }
 
+// Helper function to append BigUint bytes into the vector with padding; left padded big endian bytes to 32
+pub fn append_left_padded_biguint_be(vec: &mut Vec<u8>, biguint: &BigUint) {
+    let bytes = biguint.to_bytes_be();
+    let padding = 32 - bytes.len();
+    vec.extend(std::iter::repeat(0).take(padding));
+    vec.extend_from_slice(&bytes);
+}
+
+pub fn append_left_padded_uint32_be(vec: &mut Vec<u8>, uint32: &u32) {
+    let bytes = uint32.to_be_bytes();
+    vec.extend_from_slice(&bytes);
+}
+
+pub fn hash_eigenda_preimage(preimage: &[u8]) -> Result<[u8; 32]> {
+    let blob = EigenDABlob::from_padded_bytes_unchecked(preimage);
+
+    let blob_polynomial = blob.to_polynomial(PolynomialFormat::InCoefficientForm)?;
+    let blob_commitment = KZG_BN254_SETTINGS.commit(&blob_polynomial)?;
+
+    let commitment_x_bigint: BigUint = blob_commitment.x.into();
+    let commitment_y_bigint: BigUint = blob_commitment.y.into();
+    let length_uint32: u32 = blob.len() as u32;
+
+    let mut commitment_length_encoded_bytes = Vec::with_capacity(68);
+    append_left_padded_biguint_be(&mut commitment_length_encoded_bytes, &commitment_x_bigint);
+    append_left_padded_biguint_be(&mut commitment_length_encoded_bytes, &commitment_y_bigint);
+    append_left_padded_uint32_be(&mut commitment_length_encoded_bytes, &length_uint32);
+
+    let mut keccak256_hasher = Keccak256::new();
+    keccak256_hasher.update(&commitment_length_encoded_bytes);
+    let commitment_hash: [u8; 32] = keccak256_hasher.finalize().into();
+
+    Ok(commitment_hash)
+}
+
 #[cfg(feature = "native")]
 pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
     match ty {
@@ -203,6 +242,11 @@ pub fn hash_preimage(preimage: &[u8], ty: PreimageType) -> Result<[u8; 32]> {
             let mut commitment_hash: [u8; 32] = Sha256::digest(&*commitment.to_bytes()).into();
             commitment_hash[0] = 1;
             Ok(commitment_hash)
+        }
+        PreimageType::EigenDAHash => {
+            let hash = hash_eigenda_preimage(preimage)?;
+
+            Ok(hash)
         }
     }
 }

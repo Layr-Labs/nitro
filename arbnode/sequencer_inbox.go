@@ -6,6 +6,7 @@ package arbnode
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/arbutil"
+	"github.com/offchainlabs/nitro/eigenda"
 
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 )
@@ -25,6 +27,7 @@ var sequencerBridgeABI *abi.ABI
 var batchDeliveredID common.Hash
 var addSequencerL2BatchFromOriginCallABI abi.Method
 var sequencerBatchDataABI abi.Event
+var addSequencerBatchFromEigenDACallABI abi.Method
 
 const sequencerBatchDataEvent = "SequencerBatchData"
 
@@ -35,6 +38,7 @@ const (
 	batchDataSeparateEvent
 	batchDataNone
 	batchDataBlobHashes
+	batchDataEigenDA
 )
 
 func init() {
@@ -45,6 +49,7 @@ func init() {
 	}
 	batchDeliveredID = sequencerBridgeABI.Events["SequencerBatchDelivered"].ID
 	sequencerBatchDataABI = sequencerBridgeABI.Events[sequencerBatchDataEvent]
+	addSequencerBatchFromEigenDACallABI = sequencerBridgeABI.Methods["addSequencerL2BatchFromEigenDA"]
 	addSequencerL2BatchFromOriginCallABI = sequencerBridgeABI.Methods["addSequencerL2BatchFromOrigin0"]
 }
 
@@ -118,6 +123,7 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 		if err != nil {
 			return nil, err
 		}
+
 		args := make(map[string]interface{})
 		err = addSequencerL2BatchFromOriginCallABI.Inputs.UnpackIntoMap(args, data[4:])
 		if err != nil {
@@ -164,9 +170,56 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 			data = append(data, h[:]...)
 		}
 		return data, nil
+
+	case batchDataEigenDA:
+		tx, err := arbutil.GetLogTransaction(ctx, client, m.rawLog)
+		if err != nil {
+			return nil, err
+		}
+
+		calldata := tx.Data()
+
+		args := make(map[string]interface{})
+		err = addSequencerBatchFromEigenDACallABI.Inputs.UnpackIntoMap(args, calldata[4:])
+		if err != nil {
+			return nil, err
+		}
+
+		certBytes, err := interfaceToBytesJSON(args["cert"])
+		if err != nil {
+			return nil, err
+		}
+
+		var blobInfo eigenda.EigenDABlobInfo
+		err = json.Unmarshal(certBytes, &blobInfo)
+		if err != nil {
+			return nil, err
+		}
+
+		arguments := abi.Arguments{
+			{Type: eigenda.DACertTypeABI},
+		}
+
+		b, err := arguments.Pack(blobInfo)
+		if err != nil {
+			return nil, err
+		}
+
+		msgData := []byte{daprovider.EigenDAMessageHeaderFlag}
+		msgData = append(msgData, b...)
+
+		return msgData, nil
 	default:
 		return nil, fmt.Errorf("batch has invalid data location %v", m.dataLocation)
 	}
+}
+
+func interfaceToBytesJSON(data interface{}) ([]byte, error) {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
 }
 
 func (m *SequencerInboxBatch) Serialize(ctx context.Context, client arbutil.L1Interface) ([]byte, error) {

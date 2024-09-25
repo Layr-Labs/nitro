@@ -43,6 +43,7 @@ import (
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/util"
@@ -80,8 +81,9 @@ var (
 const (
 	batchPosterSimpleRedisLockKey = "node.batch-poster.redis-lock.simple-lock-key"
 
-	sequencerBatchPostMethodName          = "addSequencerL2BatchFromOrigin0"
-	sequencerBatchPostWithBlobsMethodName = "addSequencerL2BatchFromBlobs"
+	sequencerBatchPostMethodName            = "addSequencerL2BatchFromOrigin0"
+	sequencerBatchPostWithBlobsMethodName   = "addSequencerL2BatchFromBlobs"
+	sequencerBatchPostWithEigendaMethodName = "addSequencerL2BatchFromEigenDA"
 )
 
 type batchPosterPosition struct {
@@ -106,11 +108,14 @@ type BatchPoster struct {
 	gasRefunderAddr    common.Address
 	building           *buildingBatch
 	dapWriter          daprovider.Writer
-	dapReaders         []daprovider.Reader
-	dataPoster         *dataposter.DataPoster
-	redisLock          *redislock.Simple
-	messagesPerBatch   *arbmath.MovingAverage[uint64]
-	non4844BatchCount  int // Count of consecutive non-4844 batches posted
+	// This deviates from the DA spec but is necessary for the batch poster to work efficiently
+	// since we need to an extended method on the SequencerInbox contract
+	eigenDAWriter     eigenda.EigenDAWriter
+	dapReaders        []daprovider.Reader
+	dataPoster        *dataposter.DataPoster
+	redisLock         *redislock.Simple
+	messagesPerBatch  *arbmath.MovingAverage[uint64]
+	non4844BatchCount int // Count of consecutive non-4844 batches posted
 	// This is an atomic variable that should only be accessed atomically.
 	// An estimate of the number of batches we want to post but haven't yet.
 	// This doesn't include batches which we don't want to post yet due to the L1 bounds.
@@ -147,6 +152,8 @@ type BatchPosterConfig struct {
 	MaxSize int `koanf:"max-size" reload:"hot"`
 	// Maximum 4844 blob enabled batch size.
 	Max4844BatchSize int `koanf:"max-4844-batch-size" reload:"hot"`
+	// Maximum EigenDA blob enabled batch size.
+	MaxEigenDABatchSize int `koanf:"max-eigenda-batch-size" reload:"hot"`
 	// Max batch post delay.
 	MaxDelay time.Duration `koanf:"max-delay" reload:"hot"`
 	// Wait for max BatchPost delay.
@@ -163,6 +170,7 @@ type BatchPosterConfig struct {
 	RedisLock                      redislock.SimpleCfg         `koanf:"redis-lock" reload:"hot"`
 	ExtraBatchGas                  uint64                      `koanf:"extra-batch-gas" reload:"hot"`
 	Post4844Blobs                  bool                        `koanf:"post-4844-blobs" reload:"hot"`
+	PostEigenDA                    bool                        `koanf:"post-eigen-da" reload:"hot"`
 	IgnoreBlobPrice                bool                        `koanf:"ignore-blob-price" reload:"hot"`
 	ParentChainWallet              genericconf.WalletConfig    `koanf:"parent-chain-wallet"`
 	L1BlockBound                   string                      `koanf:"l1-block-bound" reload:"hot"`
@@ -208,6 +216,7 @@ func BatchPosterConfigAddOptions(prefix string, f *pflag.FlagSet) {
 	f.Bool(prefix+".disable-dap-fallback-store-data-on-chain", DefaultBatchPosterConfig.DisableDapFallbackStoreDataOnChain, "If unable to batch to DA provider, disable fallback storing data on chain")
 	f.Int(prefix+".max-size", DefaultBatchPosterConfig.MaxSize, "maximum batch size")
 	f.Int(prefix+".max-4844-batch-size", DefaultBatchPosterConfig.Max4844BatchSize, "maximum 4844 blob enabled batch size")
+	f.Int(prefix+".max-eigenda-batch-size", DefaultBatchPosterConfig.MaxEigenDABatchSize, "maximum EigenDA blob enabled batch size")
 	f.Duration(prefix+".max-delay", DefaultBatchPosterConfig.MaxDelay, "maximum batch posting delay")
 	f.Bool(prefix+".wait-for-max-delay", DefaultBatchPosterConfig.WaitForMaxDelay, "wait for the max batch delay, even if the batch is full")
 	f.Duration(prefix+".poll-interval", DefaultBatchPosterConfig.PollInterval, "how long to wait after no batches are ready to be posted before checking again")
@@ -217,6 +226,7 @@ func BatchPosterConfigAddOptions(prefix string, f *pflag.FlagSet) {
 	f.String(prefix+".gas-refunder-address", DefaultBatchPosterConfig.GasRefunderAddress, "The gas refunder contract address (optional)")
 	f.Uint64(prefix+".extra-batch-gas", DefaultBatchPosterConfig.ExtraBatchGas, "use this much more gas than estimation says is necessary to post batches")
 	f.Bool(prefix+".post-4844-blobs", DefaultBatchPosterConfig.Post4844Blobs, "if the parent chain supports 4844 blobs and they're well priced, post EIP-4844 blobs")
+	f.Bool(prefix+".post-eigen-da", DefaultBatchPosterConfig.PostEigenDA, "Post data to EigenDA")
 	f.Bool(prefix+".ignore-blob-price", DefaultBatchPosterConfig.IgnoreBlobPrice, "if the parent chain supports 4844 blobs and ignore-blob-price is true, post 4844 blobs even if it's not price efficient")
 	f.String(prefix+".redis-url", DefaultBatchPosterConfig.RedisUrl, "if non-empty, the Redis URL to store queued transactions in")
 	f.String(prefix+".l1-block-bound", DefaultBatchPosterConfig.L1BlockBound, "only post messages to batches when they're within the max future block/timestamp as of this L1 block tag (\"safe\", \"finalized\", \"latest\", or \"ignore\" to ignore this check)")
@@ -234,7 +244,8 @@ var DefaultBatchPosterConfig = BatchPosterConfig{
 	Enable:                             false,
 	DisableDapFallbackStoreDataOnChain: false,
 	// This default is overridden for L3 chains in applyChainParameters in cmd/nitro/nitro.go
-	MaxSize: 100000,
+	MaxSize:             100000,
+	MaxEigenDABatchSize: 2_000_000,
 	// Try to fill 3 blobs per batch
 	Max4844BatchSize:               blobs.BlobEncodableData*(params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob)/2 - 2000,
 	PollInterval:                   time.Second * 10,
@@ -246,6 +257,7 @@ var DefaultBatchPosterConfig = BatchPosterConfig{
 	GasRefunderAddress:             "",
 	ExtraBatchGas:                  50_000,
 	Post4844Blobs:                  false,
+	PostEigenDA:                    false,
 	IgnoreBlobPrice:                false,
 	DataPoster:                     dataposter.DefaultDataPosterConfig,
 	ParentChainWallet:              DefaultBatchPosterL1WalletConfig,
@@ -270,6 +282,7 @@ var TestBatchPosterConfig = BatchPosterConfig{
 	Enable:                         true,
 	MaxSize:                        100000,
 	Max4844BatchSize:               DefaultBatchPosterConfig.Max4844BatchSize,
+	MaxEigenDABatchSize:            DefaultBatchPosterConfig.MaxEigenDABatchSize,
 	PollInterval:                   time.Millisecond * 10,
 	ErrorDelay:                     time.Millisecond * 10,
 	MaxDelay:                       0,
@@ -279,6 +292,31 @@ var TestBatchPosterConfig = BatchPosterConfig{
 	GasRefunderAddress:             "",
 	ExtraBatchGas:                  10_000,
 	Post4844Blobs:                  true,
+	PostEigenDA:                    false,
+	IgnoreBlobPrice:                false,
+	DataPoster:                     dataposter.TestDataPosterConfig,
+	ParentChainWallet:              DefaultBatchPosterL1WalletConfig,
+	L1BlockBound:                   "",
+	L1BlockBoundBypass:             time.Hour,
+	UseAccessLists:                 true,
+	GasEstimateBaseFeeMultipleBips: arbmath.OneInBips * 3 / 2,
+}
+
+var EigenDABatchPosterConfig = BatchPosterConfig{
+	Enable:                         true,
+	MaxSize:                        100000,
+	Max4844BatchSize:               DefaultBatchPosterConfig.Max4844BatchSize,
+	MaxEigenDABatchSize:            DefaultBatchPosterConfig.MaxEigenDABatchSize,
+	PollInterval:                   time.Millisecond * 10,
+	ErrorDelay:                     time.Millisecond * 10,
+	MaxDelay:                       0,
+	WaitForMaxDelay:                false,
+	CompressionLevel:               2,
+	DASRetentionPeriod:             daprovider.DefaultDASRetentionPeriod,
+	GasRefunderAddress:             "",
+	ExtraBatchGas:                  10_000,
+	Post4844Blobs:                  false,
+	PostEigenDA:                    true,
 	IgnoreBlobPrice:                false,
 	DataPoster:                     dataposter.TestDataPosterConfig,
 	ParentChainWallet:              DefaultBatchPosterL1WalletConfig,
@@ -301,6 +339,7 @@ type BatchPosterOpts struct {
 	TransactOpts  *bind.TransactOpts
 	DAPWriter     daprovider.Writer
 	ParentChainID *big.Int
+	EigenDAWriter eigenda.EigenDAWriter
 	DAPReaders    []daprovider.Reader
 }
 
@@ -347,6 +386,7 @@ func NewBatchPoster(ctx context.Context, opts *BatchPosterOpts) (*BatchPoster, e
 		gasRefunderAddr:    opts.Config().gasRefunder,
 		bridgeAddr:         opts.DeployInfo.Bridge,
 		dapWriter:          opts.DAPWriter,
+		eigenDAWriter:      opts.EigenDAWriter,
 		redisLock:          redisLock,
 		dapReaders:         opts.DAPReaders,
 	}
@@ -721,13 +761,16 @@ type buildingBatch struct {
 	msgCount          arbutil.MessageIndex
 	haveUsefulMessage bool
 	use4844           bool
+	useEigenDA        bool
 	muxBackend        *simulatedMuxBackend
 }
 
-func newBatchSegments(firstDelayed uint64, config *BatchPosterConfig, backlog uint64, use4844 bool) *batchSegments {
+func newBatchSegments(firstDelayed uint64, config *BatchPosterConfig, backlog uint64, use4844 bool, useEigenDA bool) *batchSegments {
 	maxSize := config.MaxSize
 	if use4844 {
 		maxSize = config.Max4844BatchSize
+	} else if useEigenDA {
+		maxSize = config.MaxEigenDABatchSize
 	} else {
 		if maxSize <= 40 {
 			panic("Maximum batch size too small")
@@ -958,11 +1001,16 @@ func (b *BatchPoster) encodeAddBatch(
 	l2MessageData []byte,
 	delayedMsg uint64,
 	use4844 bool,
+	useEigenDA bool,
+	eigenDaBlobInfo *eigenda.EigenDABlobInfo,
 ) ([]byte, []kzg4844.Blob, error) {
 	methodName := sequencerBatchPostMethodName
 	if use4844 {
 		methodName = sequencerBatchPostWithBlobsMethodName
+	} else if useEigenDA {
+		methodName = sequencerBatchPostWithEigendaMethodName
 	}
+
 	method, ok := b.seqInboxABI.Methods[methodName]
 	if !ok {
 		return nil, nil, errors.New("failed to find add batch method")
@@ -983,6 +1031,42 @@ func (b *BatchPoster) encodeAddBatch(
 			new(big.Int).SetUint64(uint64(prevMsgNum)),
 			new(big.Int).SetUint64(uint64(newMsgNum)),
 		)
+	} else if useEigenDA {
+
+		addressType, err := abi.NewType("address", "", nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		uint256Type, err := abi.NewType("uint256", "", nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Create ABI arguments
+		arguments := abi.Arguments{
+			{Type: uint256Type},
+			{Type: eigenda.DACertTypeABI},
+			{Type: addressType},
+			{Type: uint256Type},
+			{Type: uint256Type},
+			{Type: uint256Type},
+		}
+
+		values := make([]interface{}, 6)
+		values[0] = seqNum
+		values[1] = eigenDaBlobInfo
+		values[2] = b.config().gasRefunder
+		values[3] = new(big.Int).SetUint64(delayedMsg)
+		values[4] = new(big.Int).SetUint64(uint64(prevMsgNum))
+		values[5] = new(big.Int).SetUint64(uint64(newMsgNum))
+
+		calldata, err = arguments.PackValues(values)
+
+		if err != nil {
+			return nil, nil, err
+		}
+
 	} else {
 		calldata, err = method.Inputs.Pack(
 			seqNum,
@@ -1018,7 +1102,7 @@ func estimateGas(client rpc.ClientInterface, ctx context.Context, params estimat
 	return uint64(gas), err
 }
 
-func (b *BatchPoster) estimateGas(ctx context.Context, sequencerMessage []byte, delayedMessages uint64, realData []byte, realBlobs []kzg4844.Blob, realNonce uint64, realAccessList types.AccessList) (uint64, error) {
+func (b *BatchPoster) estimateGas(ctx context.Context, sequencerMessage []byte, delayedMessages uint64, realData []byte, realBlobs []kzg4844.Blob, realNonce uint64, realAccessList types.AccessList, eigenDaBlobInfo *eigenda.EigenDABlobInfo) (uint64, error) {
 	config := b.config()
 	rpcClient := b.l1Reader.Client()
 	rawRpcClient := rpcClient.Client()
@@ -1060,7 +1144,7 @@ func (b *BatchPoster) estimateGas(ctx context.Context, sequencerMessage []byte, 
 	// However, we set nextMsgNum to 1 because it is necessary for a correct estimation for the final to be non-zero.
 	// Because we're likely estimating against older state, this might not be the actual next message,
 	// but the gas used should be the same.
-	data, kzgBlobs, err := b.encodeAddBatch(abi.MaxUint256, 0, 1, sequencerMessage, delayedMessages, len(realBlobs) > 0)
+	data, kzgBlobs, err := b.encodeAddBatch(abi.MaxUint256, 0, 1, sequencerMessage, delayedMessages, len(realBlobs) > 0, eigenDaBlobInfo != nil, eigenDaBlobInfo)
 	if err != nil {
 		return 0, err
 	}
@@ -1155,11 +1239,23 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 			}
 		}
 
+		var useEigenDA bool
+		if b.eigenDAWriter != nil {
+			useEigenDA = true
+		}
+
 		b.building = &buildingBatch{
-			segments:      newBatchSegments(batchPosition.DelayedMessageCount, b.config(), b.GetBacklogEstimate(), use4844),
+			segments:      newBatchSegments(batchPosition.DelayedMessageCount, b.config(), b.GetBacklogEstimate(), use4844, useEigenDA),
 			msgCount:      batchPosition.MessageCount,
 			startMsgCount: batchPosition.MessageCount,
 			use4844:       use4844,
+			useEigenDA:    useEigenDA,
+		}
+		if b.config().CheckBatchCorrectness {
+			b.building.muxBackend = &simulatedMuxBackend{
+				batchSeqNum: batchPosition.NextSeqNum,
+				allMsgs:     make(map[arbutil.MessageIndex]*arbostypes.MessageWithMetadata),
+			}
 		}
 		if b.config().CheckBatchCorrectness {
 			b.building.muxBackend = &simulatedMuxBackend{
@@ -1376,6 +1472,28 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 		batchPosterDALastSuccessfulActionGauge.Update(time.Now().Unix())
 	}
 
+	var eigenDaBlobInfo *eigenda.EigenDABlobInfo
+	if b.eigenDAWriter != nil {
+
+		gotNonce, gotMeta, err := b.dataPoster.GetNextNonceAndMeta(ctx)
+		if err != nil {
+			batchPosterDAFailureCounter.Inc(1)
+			return false, err
+		}
+		if nonce != gotNonce || !bytes.Equal(batchPositionBytes, gotMeta) {
+			batchPosterDAFailureCounter.Inc(1)
+			return false, fmt.Errorf("%w: nonce changed from %d to %d while creating batch", storage.ErrStorageRace, nonce, gotNonce)
+		}
+		eigenDaBlobInfo, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
+		if err != nil {
+			batchPosterDAFailureCounter.Inc(1)
+			return false, err
+		}
+
+		batchPosterDASuccessCounter.Inc(1)
+		batchPosterDALastSuccessfulActionGauge.Update(time.Now().Unix())
+	}
+
 	prevMessageCount := batchPosition.MessageCount
 	if b.config().Dangerous.AllowPostingFirstBatchWhenSequencerMessageCountMismatch && !b.postedFirstBatch {
 		// AllowPostingFirstBatchWhenSequencerMessageCountMismatch can be used when the
@@ -1406,7 +1524,7 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 		prevMessageCount = 0
 	}
 
-	data, kzgBlobs, err := b.encodeAddBatch(new(big.Int).SetUint64(batchPosition.NextSeqNum), prevMessageCount, b.building.msgCount, sequencerMsg, b.building.segments.delayedMsg, b.building.use4844)
+	data, kzgBlobs, err := b.encodeAddBatch(new(big.Int).SetUint64(batchPosition.NextSeqNum), prevMessageCount, b.building.msgCount, sequencerMsg, b.building.segments.delayedMsg, b.building.use4844, b.building.useEigenDA, eigenDaBlobInfo)
 	if err != nil {
 		return false, err
 	}
@@ -1421,7 +1539,7 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 	// In theory, this might reduce gas usage, but only by a factor that's already
 	// accounted for in `config.ExtraBatchGas`, as that same factor can appear if a user
 	// posts a new delayed message that we didn't see while gas estimating.
-	gasLimit, err := b.estimateGas(ctx, sequencerMsg, lastPotentialMsg.DelayedMessagesRead, data, kzgBlobs, nonce, accessList)
+	gasLimit, err := b.estimateGas(ctx, sequencerMsg, lastPotentialMsg.DelayedMessagesRead, data, kzgBlobs, nonce, accessList, eigenDaBlobInfo)
 	if err != nil {
 		return false, err
 	}
@@ -1484,6 +1602,7 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 	b.postedFirstBatch = true
 	log.Info(
 		"BatchPoster: batch sent",
+		"eigenDA", b.building.useEigenDA,
 		"sequenceNumber", batchPosition.NextSeqNum,
 		"from", batchPosition.MessageCount,
 		"to", b.building.msgCount,
