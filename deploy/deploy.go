@@ -58,8 +58,6 @@ func deployBridgeCreator(ctx context.Context, l1Reader *headerreader.HeaderReade
 		return common.Address{}, fmt.Errorf("sequencer inbox erc20 based deploy error: %w", err)
 	}
 
-	println("Sequencer inbox deployed at ", seqInboxTemplate.String())
-
 	inboxTemplate, tx, _, err := bridgegen.DeployInbox(auth, client, maxDataSize)
 	err = andTxSucceeded(ctx, l1Reader, tx, err)
 	if err != nil {
@@ -260,7 +258,7 @@ func DeployOnL1(ctx context.Context, parentChainReader *headerreader.HeaderReade
 		eigenDARollupManager = dummyRollupManager
 	}
 
-	rollupCreator, _, validatorUtils, validatorWalletCreator, err := deployRollupCreator(ctx, parentChainReader, deployAuth, maxDataSize, isUsingFeeToken)
+	rollupCreator, _, validatorUtils, validatorWalletCreator, err := deployRollupCreator(ctx, parentChainReader, deployAuth, maxDataSize)
 	if err != nil {
 		return nil, fmt.Errorf("error deploying rollup creator: %w", err)
 	}

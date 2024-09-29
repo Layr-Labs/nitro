@@ -2270,7 +2270,7 @@ checksum = "89dc553bc0cf4512a8b96caa2e21ed5f6e4b66bf28a1bd08fd9eb07c0b39b28c"
 
 [[package]]
 name = "rust-kzg-bn254"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "ark-bn254",
  "ark-ec",
