@@ -171,20 +171,27 @@ pub fn resolve_preimage_impl(
         )
     };
 
-    // Check if preimage rehashes to the provided hash. Exclude blob preimages
-    let calculated_hash: [u8; 32] = match preimage_type {
-        PreimageType::Keccak256 => Keccak256::digest(preimage).into(),
-        PreimageType::Sha2_256 => Sha256::digest(preimage).into(),
-        PreimageType::EthVersionedHash => *hash,
-        PreimageType::EigenDAHash => *hash,
-    };
-    if calculated_hash != *hash {
-        error!(
-            "Calculated hash {} of preimage {} does not match provided hash {}",
-            hex::encode(calculated_hash),
-            hex::encode(preimage),
-            hex::encode(*hash)
-        );
+
+    #[cfg(debug_assertions)]
+    {
+        use sha2::Sha256;
+        use sha3::{Digest, Keccak256};
+
+        // Check if preimage rehashes to the provided hash. Exclude blob preimages
+        let calculated_hash: [u8; 32] = match preimage_type {
+            PreimageType::Keccak256 => Keccak256::digest(preimage).into(),
+            PreimageType::Sha2_256 => Sha256::digest(preimage).into(),
+            PreimageType::EthVersionedHash => *hash,
+            PreimageType::EigenDAHash => *hash,
+        };
+        if calculated_hash != *hash {
+            error!(
+                "Calculated hash {} of preimage {} does not match provided hash {}",
+                hex::encode(calculated_hash),
+                hex::encode(preimage),
+                hex::encode(*hash)
+            );
+        }
     }
 
     if offset % 32 != 0 {
