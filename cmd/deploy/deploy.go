@@ -196,9 +196,9 @@ func main() {
 		arbnode.GenerateRollupConfig(*prod, moduleRoot, ownerAddress, &chainConfig, chainConfigJson, loserEscrowAddress),
 		nativeToken,
 		maxDataSize,
-		true,
 		eigenDASvcManager,
 		eigenDARollupManager,
+		true,
 	)
 	if err != nil {
 		flag.Usage()

@@ -1271,10 +1271,9 @@ func deployOnParentChain(
 		arbnode.GenerateRollupConfig(prodConfirmPeriodBlocks, wasmModuleRoot, parentChainInfo.GetAddress("RollupOwner"), chainConfig, serializedChainConfig, common.Address{}),
 		nativeToken,
 		maxDataSize,
+		common.HexToAddress("0x0"),
+		common.HexToAddress("0x0"),
 		chainSupportsBlobs,
-		false,
-		common.HexToAddress("0x0"),
-		common.HexToAddress("0x0"),
 	)
 	Require(t, err)
 	parentChainInfo.SetContract("Bridge", addresses.Bridge)
