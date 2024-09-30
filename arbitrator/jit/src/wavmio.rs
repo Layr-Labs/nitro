@@ -171,7 +171,6 @@ pub fn resolve_preimage_impl(
         )
     };
 
-
     #[cfg(debug_assertions)]
     {
         use sha2::Sha256;
