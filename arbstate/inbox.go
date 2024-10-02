@@ -45,7 +45,7 @@ type sequencerMessage struct {
 	segments             [][]byte
 }
 
-const MaxDecompressedLen int = 1024 * 1024 * 16 // 16 MiB
+const MaxDecompressedLen int = 1024 * 1024 * 16 * 40 // 40 MiB
 const maxZeroheavyDecompressedLen = 101*MaxDecompressedLen/100 + 64
 const MaxSegmentsPerSequencerMessage = 100 * 1024
 
