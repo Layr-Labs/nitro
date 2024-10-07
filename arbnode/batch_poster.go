@@ -245,7 +245,7 @@ var DefaultBatchPosterConfig = BatchPosterConfig{
 	DisableDapFallbackStoreDataOnChain: false,
 	// This default is overridden for L3 chains in applyChainParameters in cmd/nitro/nitro.go
 	MaxSize:             100000,
-	MaxEigenDABatchSize: 16_000_000,
+	MaxEigenDABatchSize: 16_777_216,
 	// Try to fill 3 blobs per batch
 	Max4844BatchSize:               blobs.BlobEncodableData*(params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob)/2 - 2000,
 	PollInterval:                   time.Second * 10,

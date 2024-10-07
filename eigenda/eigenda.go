@@ -11,7 +11,7 @@ import (
 
 const (
 	sequencerMsgOffset = 41
-	MaxBatchSize       = 16_000_000 // 16MB
+	MaxBatchSize       = 16_777_216 // 16MiB
 )
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
