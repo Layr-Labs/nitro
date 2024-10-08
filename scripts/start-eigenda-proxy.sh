@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 echo "Pull eigenda-proxy container"
 docker pull  ghcr.io/layr-labs/eigenda-proxy@sha256:10a4762f5c43e9037835617e6ec0b03da34012df87048a363f43b969ab93679b
 
