@@ -1258,12 +1258,6 @@ func (b *BatchPoster) maybePostSequencerBatch(ctx context.Context) (bool, error)
 				allMsgs:     make(map[arbutil.MessageIndex]*arbostypes.MessageWithMetadata),
 			}
 		}
-		if b.config().CheckBatchCorrectness {
-			b.building.muxBackend = &simulatedMuxBackend{
-				batchSeqNum: batchPosition.NextSeqNum,
-				allMsgs:     make(map[arbutil.MessageIndex]*arbostypes.MessageWithMetadata),
-			}
-		}
 	}
 	msgCount, err := b.streamer.GetMessageCount()
 	if err != nil {
