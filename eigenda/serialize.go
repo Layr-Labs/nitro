@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -61,6 +62,10 @@ func GenericEncodeBlob(data []byte) ([]byte, error) {
 }
 
 func encodeBlob(rawData []byte) ([]byte, error) {
+	if len(rawData) > math.MaxUint32 {
+		return nil, fmt.Errorf("data length exceeds 2^32 bytes: %d", len(rawData))
+	}
+
 	codecBlobHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the codecBlobHeader is a valid bn254 element
 	// encode version byte
@@ -72,7 +77,7 @@ func encodeBlob(rawData []byte) ([]byte, error) {
 	// encode raw data modulo bn254
 	rawDataPadded := codec.ConvertByPaddingEmptyByte(rawData)
 
-	// append raw data; reassgin avoids copying
+	// append raw data; reassign avoids copying
 	encodedData := codecBlobHeader
 	encodedData = append(encodedData, rawDataPadded...)
 
