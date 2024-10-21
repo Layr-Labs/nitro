@@ -178,6 +178,9 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client arbut
 		}
 
 		calldata := tx.Data()
+		if len(calldata) < 4 {
+			return nil, fmt.Errorf("calldata less than 4 bytes: %x", calldata)
+		}
 
 		args := make(map[string]interface{})
 		err = addSequencerBatchFromEigenDACallABI.Inputs.UnpackIntoMap(args, calldata[4:])
