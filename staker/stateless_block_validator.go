@@ -236,6 +236,7 @@ func NewStatelessBlockValidator(
 	var executionSpawners []validator.ExecutionSpawner
 	var redisValClient *redis.ValidationClient
 
+	println("Dap readers: ", dapReaders)
 	if config().RedisValidationClientConfig.Enabled() {
 		var err error
 		redisValClient, err = redis.NewValidationClient(&config().RedisValidationClientConfig)
@@ -298,6 +299,7 @@ func (v *StatelessBlockValidator) readFullBatch(ctx context.Context, batchNum ui
 	preimages := make(map[arbutil.PreimageType]map[common.Hash][]byte)
 	if len(postedData) > 40 {
 		foundDA := false
+		println(fmt.Sprintf("v.dapReaders: %v", v.dapReaders))
 		for _, dapReader := range v.dapReaders {
 			if dapReader != nil && dapReader.IsValidHeaderByte(postedData[40]) {
 				preimageRecorder := daprovider.RecordPreimagesTo(preimages)
