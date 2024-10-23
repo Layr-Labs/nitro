@@ -31,6 +31,7 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	preimageRecorder daprovider.PreimageRecorder,
 	validateSeqMsg bool,
 ) ([]byte, error) {
+	log.Info("Recovering payload from EigenDA batch", "batchNum", batchNum, "batchBlockHash", batchBlockHash)
 	return RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder, "binary")
 }
 

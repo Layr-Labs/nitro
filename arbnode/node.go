@@ -592,6 +592,7 @@ func createNodeImpl(
 	}
 	var dapReaders []daprovider.Reader
 	if eigenDAReader != nil {
+		log.Info("Appending eigenDAReader to dapReaders slice") 
 		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
 	}
 	if daReader != nil {
@@ -612,6 +613,8 @@ func createNodeImpl(
 
 	var statelessBlockValidator *staker.StatelessBlockValidator
 	if config.BlockValidator.RedisValidationClientConfig.Enabled() || config.BlockValidator.ValidationServerConfigs[0].URL != "" {
+		log.Info("Creating stateless block validator")
+		log.Info("Dap readers: ", fmt.Sprintf("%+v", dapReaders))
 		statelessBlockValidator, err = staker.NewStatelessBlockValidator(
 			inboxReader,
 			inboxTracker,
