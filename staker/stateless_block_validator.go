@@ -300,7 +300,7 @@ func (v *StatelessBlockValidator) readFullBatch(ctx context.Context, batchNum ui
 	preimages := make(map[arbutil.PreimageType]map[common.Hash][]byte)
 	if len(postedData) > 40 {
 		foundDA := false
-		log.Info(fmt.Sprintf("v.dapReaders: %v", v.dapReaders))
+		log.Error(fmt.Sprintf("v.dapReaders: %v", v.dapReaders)) // err to see if JIT picks it up
 		for _, dapReader := range v.dapReaders {
 			if dapReader != nil && dapReader.IsValidHeaderByte(postedData[40]) {
 				preimageRecorder := daprovider.RecordPreimagesTo(preimages)
@@ -320,7 +320,7 @@ func (v *StatelessBlockValidator) readFullBatch(ctx context.Context, batchNum ui
 		}
 		if !foundDA {
 			if daprovider.IsDASMessageHeaderByte(postedData[40]) {
-				log.Error("No DAS Reader configured, but sequencer message found with DAS header")
+				log.Error("[stateless_block_validator] No DAS Reader configured, but sequencer message found with DAS header")
 			}
 		}
 	}
