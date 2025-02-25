@@ -2,9 +2,9 @@ use crate::utils::append_left_padded_uint32_be;
 use crate::{utils::append_left_padded_biguint_be, Bytes32};
 use ark_bn254::G2Affine;
 use ark_ec::{AffineRepr, CurveGroup};
-use ark_ff::{BigInteger, PrimeField};
 use eyre::{ensure, Result};
-use kzgbn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
+use ark_ff::{BigInteger, PrimeField};
+use rust_kzg_bn254::{blob::Blob, kzg::Kzg, polynomial::PolynomialFormat};
 use num::BigUint;
 use sha2::Digest;
 use sha3::Keccak256;
@@ -20,7 +20,8 @@ lazy_static::lazy_static! {
         &load_directory_with_prefix("src/mainnet-files/g2.point.65536"),
         &load_directory_with_prefix("src/mainnet-files/g2.point.powerOf2"),
         268435456,
-        65536
+        65536,
+        String::from(""),
     ).unwrap();
 }
 

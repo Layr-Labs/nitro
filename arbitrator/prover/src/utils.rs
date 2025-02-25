@@ -9,7 +9,7 @@ use arbutil::PreimageType;
 use c_kzg::{Blob, KzgCommitment};
 use digest::Digest;
 use eyre::{eyre, Result};
-use kzgbn254::{blob::Blob as EigenDABlob, polynomial::PolynomialFormat};
+use rust_kzg_bn254::{blob::Blob as EigenDABlob, polynomial::PolynomialFormat};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
