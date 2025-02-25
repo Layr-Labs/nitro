@@ -288,7 +288,9 @@ func (e *EigenDABlobInfo) ToDisperserBlobInfo() (*DisperserBlobInfo, error) {
 					ReferenceBlockNumber:    metadata.BatchHeader.ReferenceBlockNumber,
 				},
 				BatchHeaderHash:         metadata.BatchHeaderHash,
-				Fee:                     metadata.Fee,
+				// assumed to always be 0x0
+				// see: https://github.com/Layr-Labs/eigenda/blob/545b7ebc4772e9d85b9863c334abe0512508c0df/disperser/batcher/batcher.go#L319
+				Fee:                     []byte{0x00},
 				SignatoryRecordHash:     metadata.SignatoryRecordHash[:],
 				ConfirmationBlockNumber: metadata.ConfirmationBlockNumber,
 			}
