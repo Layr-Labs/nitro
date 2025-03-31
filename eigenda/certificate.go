@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -21,6 +22,17 @@ import (
 type EigenDAV1Cert struct {
 	BlobVerificationProof cv_binding.BlobVerificationProof `json:"blobVerificationProof"`
 	BlobHeader            cv_binding.BlobHeader            `json:"blobHeader"`
+}
+
+
+type EigenDAV2Cert coretypes.EigenDACert
+
+func (e *EigenDAV2Cert) PreimageHash() common.Hash {
+	blobCommit := e.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment
+
+	dataCommitBytes := append(blobCommit.Commitment.X.Bytes(), blobCommit.Commitment.Y.Bytes()...)
+
+	return crypto.Keccak256Hash(append(dataCommitBytes, uint32ToBytes(blobCommit.Length)...))
 }
 
 /*

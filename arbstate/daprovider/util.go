@@ -85,13 +85,15 @@ const ZeroheavyMessageHeaderFlag byte = 0x20
 // BlobHashesHeaderFlag indicates that this message contains EIP 4844 versioned hashes of the committments calculated over the blob data for the batch data.
 const BlobHashesHeaderFlag byte = L1AuthenticatedMessageHeaderFlag | 0x10 // 0x50
 
-const EigenDAMessageHeaderFlag byte = 0xed
+const EigenDAV1MessageHeaderFlag byte = 0xed
+
+const EigenDAV2MessageHeaderFlag byte = 0x69
 
 // BrotliMessageHeaderByte indicates that the message is brotli-compressed.
 const BrotliMessageHeaderByte byte = 0
 
 // KnownHeaderBits is all header bits with known meaning to this nitro version
-const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAMessageHeaderFlag
+const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAV1MessageHeaderFlag | EigenDAV2MessageHeaderFlag
 
 // hasBits returns true if `checking` has all `bits`
 func hasBits(checking byte, bits byte) bool {
@@ -116,6 +118,15 @@ func IsZeroheavyEncodedHeaderByte(header byte) bool {
 
 func IsBlobHashesHeaderByte(header byte) bool {
 	return hasBits(header, BlobHashesHeaderFlag)
+}
+
+func IsEigenDAV1HeaderByte(header byte) bool {
+	return hasBits(header, EigenDAV1MessageHeaderFlag)
+
+}
+
+func IsEigenDAV2HeaderByte(header byte) bool {
+	return hasBits(header, EigenDAV2MessageHeaderFlag)
 }
 
 func IsBrotliMessageHeaderByte(b uint8) bool {
@@ -210,7 +221,18 @@ func RecoverPayloadFromDasBatch(
 		return nil, nil
 	}
 
+	// eigenda cert
+	// inbox submission block #
+	// reference block #
+	// if reference block # + ALLOWED_SUBMISSION_BUFFER < inbox submission block # {
+    //        INVALIDATE
+	// }
+
 	maxTimestamp := binary.BigEndian.Uint64(sequencerMsg[8:16])
+	// maxTS
+
+	// maxTS +
+	// timeout = actual UTC timestamp that cert will be invalidated  
 	if cert.Timeout < maxTimestamp+MinLifetimeSecondsForDataAvailabilityCert {
 		log.Error("Data availability cert expires too soon", "err", "")
 		return nil, nil

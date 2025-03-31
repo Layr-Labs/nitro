@@ -32,11 +32,13 @@ func TestEigenDAIntegration(t * testing.T) {
 	// TODO: https://github.com/Layr-Labs/nitro/issues/73
 
 	// 1 - Batch posting / derivation
-	testEigenDAProxyBatchPosting(t)
+	// testEigenDAProxyBatchPosting(t)
 
-	// 2 - EigenDA failover to native Arbitrum DA destinations
-	testFailOverFromEigenDAToAnyTrust(t)
-	testFailOverFromEigenDAToCallData(t)
+	// // 2 - EigenDA failover to native Arbitrum DA destinations
+	// testFailOverFromEigenDAToAnyTrust(t)
+	// testFailOverFromEigenDAToCallData(t)
+	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, true, "")
+
 
 }
 

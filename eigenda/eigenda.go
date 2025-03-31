@@ -15,7 +15,7 @@ const (
 )
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
-	return hasBits(header, daprovider.EigenDAMessageHeaderFlag)
+	return hasBits(header, daprovider.EigenDAV1MessageHeaderFlag)
 }
 
 // hasBits returns true if `checking` has all `bits`
@@ -24,12 +24,13 @@ func hasBits(checking byte, bits byte) bool {
 }
 
 type EigenDAWriter interface {
-	Store(context.Context, []byte) (*EigenDAV1Cert, error)
+	Store(context.Context, []byte) ([]byte, error)
 	Serialize(eigenDAV1Cert *EigenDAV1Cert) ([]byte, error)
 }
 
 type EigenDAReader interface {
-	QueryBlob(ctx context.Context, cert *EigenDAV1Cert, domainFilter string) ([]byte, error)
+	QueryBlobV1(ctx context.Context, cert *EigenDAV1Cert) ([]byte, error)
+	QueryBlobV2(ctx context.Context, daCommit []byte) ([]byte, error)
 }
 
 type EigenDAConfig struct {
@@ -52,9 +53,9 @@ func NewEigenDA(config *EigenDAConfig) (*EigenDA, error) {
 	}, nil
 }
 
-// QueryBlob retrieves a blob from EigenDA using the provided EigenDAV1Cert
-func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDAV1Cert, domainFilter string) ([]byte, error) {
-	log.Info("Reading blob from EigenDA", "batchID", cert.BlobVerificationProof.BatchId)
+// QueryBlobV1 retrieves a blob from EigenDA using the provided EigenDAV1Cert
+func (e *EigenDA) QueryBlobV1(ctx context.Context, cert *EigenDAV1Cert) ([]byte, error) {
+	log.Info("Reading blob from EigenDA V1 network", "batchID", cert.BlobVerificationProof.BatchId)
 	info, err := cert.ToDisperserBlobInfo()
 	if err != nil {
 		return nil, err
@@ -68,18 +69,24 @@ func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDAV1Cert, domainFilt
 	return data, nil
 }
 
-// Store disperses a blob to EigenDA and returns the appropriate EigenDAV1Cert or certificate values
-func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDAV1Cert, error) {
-	log.Info("Dispersing batch as blob to EigenDA", "dataLength", len(data))
-	var v1Cert = &EigenDAV1Cert{}
-	blobInfo, err := e.client.Put(ctx, data)
+func (e *EigenDA) QueryBlobV2(ctx context.Context, daCommit []byte) ([]byte, error) {
+	data, err := e.client.GetV2(ctx, daCommit)
 	if err != nil {
 		return nil, err
 	}
 
-	v1Cert.Load(blobInfo)
+	return data, nil
+}
 
-	return v1Cert, nil
+// Store disperses a blob to EigenDA and returns the appropriate EigenDAV1Cert or certificate values
+func (e *EigenDA) Store(ctx context.Context, data []byte) ([]byte, error) {
+	log.Info("Dispersing batch as blob to EigenDA", "dataLength", len(data))
+	daCommitment, err := e.client.Put(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return daCommitment, nil
 }
 
 func (e *EigenDA) Serialize(cert *EigenDAV1Cert) ([]byte, error) {

@@ -17,6 +17,7 @@ docker run -d --name eigenda-proxy-nitro-test-instance \
   -e EIGENDA_PROXY_EIGENDA_ETH_RPC=http://localhost:6969 \
   -e EIGENDA_PROXY_EIGENDA_SERVICE_MANAGER_ADDR="0x0000000000000000000000000000000000000000" \
   -e EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED=true \
+  -e EIGENDA_PROXY_EIGENDA_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443
   ghcr.io/layr-labs/eigenda-proxy:v1.6.5
 
 # shellcheck disable=SC2181

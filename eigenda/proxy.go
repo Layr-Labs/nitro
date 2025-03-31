@@ -10,7 +10,7 @@ import (
 )
 
 type EigenDAProxyClient struct {
-	client ProxyClient
+	client *standard_client.Client
 }
 
 func NewEigenDAProxyClient(rpcUrl string) *EigenDAProxyClient {
@@ -20,20 +20,25 @@ func NewEigenDAProxyClient(rpcUrl string) *EigenDAProxyClient {
 	return &EigenDAProxyClient{client: c}
 }
 
-func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) (*disperser.BlobInfo, error) {
-	cert, err := c.client.SetData(ctx, data)
+func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) ([]byte, error) {
+	daCommitment, err := c.client.SetData(ctx, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set data: %w", err)
 	}
 
-	var blobInfo disperser.BlobInfo
-	err = rlp.DecodeBytes(cert[1:], &blobInfo)
+	return daCommitment, nil
+}
+
+func (c *EigenDAProxyClient) GetV2(ctx context.Context, daCommitment []byte) ([]byte, error) {
+
+	data, err := c.client.GetData(ctx, daCommitment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode blob info: %w", err)
+		return nil, fmt.Errorf("failed to get data: %w", err)
 	}
 
-	return &blobInfo, nil
+	return data, nil
 }
+
 
 func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *disperser.BlobInfo) ([]byte, error) {
 	commitment, err := rlp.EncodeToBytes(blobInfo)
@@ -52,9 +57,3 @@ func (c *EigenDAProxyClient) Get(ctx context.Context, blobInfo *disperser.BlobIn
 	return data, nil
 }
 
-// ProxyClient is an interface for communicating with the EigenDA proxy server
-type ProxyClient interface {
-	Health() error
-	GetData(ctx context.Context, cert []byte) ([]byte, error)
-	SetData(ctx context.Context, b []byte) ([]byte, error)
-}
