@@ -72,20 +72,13 @@ func NewWriterForDAS(dasWriter DASWriter) *writerForDAS {
 	return &writerForDAS{dasWriter: dasWriter}
 }
 
+type writerForDAS struct {
+	dasWriter DASWriter
+}
+
 const EigenDAV1MessageHeaderFlag byte = 0xed
 
 const EigenDAV2MessageHeaderFlag byte = 0x69
-
-// BrotliMessageHeaderByte indicates that the message is brotli-compressed.
-const BrotliMessageHeaderByte byte = 0
-
-// KnownHeaderBits is all header bits with known meaning to this nitro version
-const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAV1MessageHeaderFlag | EigenDAV2MessageHeaderFlag
-
-// hasBits returns true if `checking` has all `bits`
-func hasBits(checking byte, bits byte) bool {
-	return (checking & bits) == bits
-}
 
 func (d *writerForDAS) Store(ctx context.Context, message []byte, timeout uint64, disableFallbackStoreDataOnChain bool) ([]byte, error) {
 	cert, err := d.dasWriter.Store(ctx, message, timeout)
@@ -102,47 +95,11 @@ func (d *writerForDAS) Store(ctx context.Context, message []byte, timeout uint64
 	}
 }
 
-func IsDASMessageHeaderByte(header byte) bool {
-	return hasBits(header, DASMessageHeaderFlag)
-}
-
-func IsTreeDASMessageHeaderByte(header byte) bool {
-	return hasBits(header, TreeDASMessageHeaderFlag)
-}
-
-func IsZeroheavyEncodedHeaderByte(header byte) bool {
-	return hasBits(header, ZeroheavyMessageHeaderFlag)
-}
-
-func IsBlobHashesHeaderByte(header byte) bool {
-	return hasBits(header, BlobHashesHeaderFlag)
-}
-
-func IsEigenDAV1HeaderByte(header byte) bool {
-	return hasBits(header, EigenDAV1MessageHeaderFlag)
-
-}
-
-func IsEigenDAV2HeaderByte(header byte) bool {
-	return hasBits(header, EigenDAV2MessageHeaderFlag)
-}
-
-func IsBrotliMessageHeaderByte(b uint8) bool {
-	return b == BrotliMessageHeaderByte
-}
-
-// IsKnownHeaderByte returns true if the supplied header byte has only known bits
-func IsKnownHeaderByte(b uint8) bool {
-	return b&^KnownHeaderBits == 0
-}
-
 const MinLifetimeSecondsForDataAvailabilityCert = 7 * 24 * 60 * 60 // one week
 var (
 	ErrHashMismatch     = errors.New("result does not match expected hash")
 	ErrBatchToDasFailed = errors.New("unable to batch to DAS")
 )
-
-const MinLifetimeSecondsForDataAvailabilityCert = 7 * 24 * 60 * 60 // one week
 
 func RecoverPayloadFromDasBatch(
 	ctx context.Context,

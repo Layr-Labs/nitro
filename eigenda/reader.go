@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/daprovider"
 )
@@ -20,8 +21,10 @@ type readerForEigenDA struct {
 	readerEigenDA EigenDAReader
 }
 
-func (d *readerForEigenDA) IsValidHeaderByte(headerByte byte) bool {
-	return daprovider.IsEigenDAV1HeaderByte(headerByte) || daprovider.IsEigenDAV2HeaderByte(headerByte)
+// TODO: Determine whether we should support version switching within the reader itself or use different
+// readers for protocol version
+func (d *readerForEigenDA) IsValidHeaderByte(_ context.Context, headerByte byte) bool {
+	return daprovider.IsEigenDAV1MessageHeaderByte(headerByte) || daprovider.IsEigenDAV2MessageHeaderByte(headerByte)
 }
 
 func (d *readerForEigenDA) RecoverPayloadFromBatch(
@@ -31,17 +34,32 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	sequencerMsg []byte,
 	preimages daprovider.PreimagesMap,
 	validateSeqMsg bool,
-) ([]byte, error) {
+) ([]byte, daprovider.PreimagesMap, error) {
 	if preimages == nil {
 		preimages = make(daprovider.PreimagesMap)
 	}
+	preimageRecorder := daprovider.RecordPreimagesTo(preimages)
+	msg := sequencerMsg[40:]
 
-	if daprovider.IsEigenDAV1HeaderByte(sequencerMsg[0]) {
-		return RecoverPayloadFromEigenDAV1Batch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder)
+	if daprovider.IsEigenDAV1MessageHeaderByte(sequencerMsg[0]) {
+		payload, err := RecoverPayloadFromEigenDAV1Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
+		if err != nil {
+			return nil, nil, fmt.Errorf("recovering payload from EigenDAV1 batch: %w", err)
+		}
+
+		return payload, preimages, nil
+
+	} else if daprovider.IsEigenDAV2MessageHeaderByte(sequencerMsg[0]) {
+		payload, err := RecoverPayloadFromEigenDAV2Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
+		if err != nil {
+			return nil, nil, fmt.Errorf("recovering payload from EigenDAV2 batch: %w", err)
+		}
+
+		return payload, preimages, nil
+
 	} else {
-		return RecoverPayloadFromEigenDAV2Batch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder)
+		return nil, nil, fmt.Errorf("uknown message header byte: %x", msg[0])
 	}
-
 }
 
 func RecoverPayloadFromEigenDAV2Batch(ctx context.Context,

@@ -643,7 +643,7 @@ func getDAS(
 	var eigenDAWriter eigenda.EigenDAWriter
 	if config.EigenDA.Enable {
 		log.Info("EigenDA enabled", "failover", config.BatchPoster.EnableEigenDAFailover, "anytrust", config.DataAvailability.Enable,
-		"4844 blobs", !config.Dangerous.DisableBlobReader)
+			"4844 blobs", !config.Dangerous.DisableBlobReader)
 		eigenDAService, err := eigenda.NewEigenDA(&config.EigenDA)
 		if err != nil {
 			return nil, nil, nil, nil, err

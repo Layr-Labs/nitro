@@ -17,8 +17,7 @@ const (
 )
 
 type EigenDAWriter interface {
-	// NOTE: This method will be deprecated in the V2 migration release
-	Store(context.Context, []byte) (*EigenDAV1Cert, error)
+	Store(context.Context, []byte) ([]byte, error)
 	Serialize(eigenDAV1Cert *EigenDAV1Cert) ([]byte, error)
 }
 
@@ -67,7 +66,7 @@ func NewEigenDA(config *EigenDAConfig) (*EigenDA, error) {
 	}, nil
 }
 
-// QueryBlobV1 retrieves a blob from EigenDA using the provided EigenDAV1Cert
+// QueryBlobV1 retrieves a blob from EigenDAV1 using the provided EigenDAV1Cert
 func (e *EigenDA) QueryBlobV1(ctx context.Context, cert *EigenDAV1Cert) ([]byte, error) {
 	log.Info("Reading blob from EigenDA V1 network", "batchID", cert.BlobVerificationProof.BatchId)
 	info, err := cert.ToDisperserBlobInfo()
@@ -83,21 +82,7 @@ func (e *EigenDA) QueryBlobV1(ctx context.Context, cert *EigenDAV1Cert) ([]byte,
 	return data, nil
 }
 
-// Store disperses a blob to EigenDA and returns the appropriate EigenDAV1Cert or certificate values
-// NOTE: This method will be deprecated in the V2 migration release
-func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDAV1Cert, error) {
-	log.Info("Dispersing batch as blob to EigenDA", "dataLength", len(data))
-	var v1Cert = &EigenDAV1Cert{}
-	blobInfo, err := e.client.Put(ctx, data)
-	if err != nil {
-		return nil, err
-	}
-
-	v1Cert.Load(blobInfo)
-
-	return v1Cert, nil
-}
-
+// QueryBlobV2 retrieves from EigenDAV2 using the provided daCommit bytes
 func (e *EigenDA) QueryBlobV2(ctx context.Context, daCommit []byte) ([]byte, error) {
 	data, err := e.client.GetV2(ctx, daCommit)
 	if err != nil {
@@ -105,6 +90,17 @@ func (e *EigenDA) QueryBlobV2(ctx context.Context, daCommit []byte) ([]byte, err
 	}
 
 	return data, nil
+}
+
+// Store disperses a blob to EigenDA and returns the appropriate EigenDAV1Cert or certificate values
+func (e *EigenDA) Store(ctx context.Context, data []byte) ([]byte, error) {
+	log.Info("Dispersing batch as blob to EigenDA", "dataLength", len(data))
+	daCommitment, err := e.client.Put(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return daCommitment, nil
 }
 
 func (e *EigenDA) Serialize(cert *EigenDAV1Cert) ([]byte, error) {

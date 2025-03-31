@@ -105,7 +105,7 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		}
 
 		if !foundDA {
-			if daprovider.IsEigenDAMessageHeaderByte(payload[0]) {
+			if daprovider.IsEigenDAV1MessageHeaderByte(payload[0]) {
 				return nil, daprovider.ErrNoEigenDAReader
 			}
 			if daprovider.IsDASMessageHeaderByte(payload[0]) {

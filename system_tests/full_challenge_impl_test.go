@@ -179,7 +179,7 @@ func makeBatch(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, b
 	Require(t, err, "failed to get batch metadata after adding batch:")
 }
 
-func makeBatchEigenDAV1(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, backend *ethclient.Client, sequencer *bind.TransactOpts, seqInbox *mocksgen.SequencerInboxStub, seqInboxAddr common.Address, modStep int64) {
+func makeBatchEigenDAV1(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, backend *ethclient.Client, sequencer *bind.TransactOpts, seqInbox *mocks_legacy_gen.SequencerInboxStub, seqInboxAddr common.Address, modStep int64) {
 	ctx := context.Background()
 
 	batchBuffer := bytes.NewBuffer([]byte{})
@@ -281,7 +281,7 @@ func makeBatchEigenDAV1(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTe
 	Require(t, err, "failed to get batch metadata after adding batch:")
 }
 
-func makeBatchEigenDAV2(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, backend *ethclient.Client, sequencer *bind.TransactOpts, seqInbox *mocksgen.SequencerInboxStub, seqInboxAddr common.Address, modStep int64) {
+func makeBatchEigenDAV2(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, backend *ethclient.Client, sequencer *bind.TransactOpts, seqInbox *mocks_legacy_gen.SequencerInboxStub, seqInboxAddr common.Address, modStep int64) {
 	ctx := context.Background()
 
 	batchBuffer := bytes.NewBuffer([]byte{})
@@ -312,7 +312,7 @@ func makeBatchEigenDAV2(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTe
 	daCommitBytes, err := eigenDA.Store(ctx, message)
 	Require(t, err)
 
-	seqMsg := append([]byte{daprovider.EigenDAV2MessageHeaderFlag}, daCommitBytes...)
+	seqMsg := append([]byte{daprovider.EigenDAV2MessageHeader}, daCommitBytes...)
 	tx, err := seqInbox.AddSequencerL2BatchFromOrigin8f111f3c(sequencer, seqNum, seqMsg, big.NewInt(1), common.Address{}, big.NewInt(0), big.NewInt(0))
 	Require(t, err)
 	receipt, err := EnsureTxSucceeded(ctx, backend, tx)

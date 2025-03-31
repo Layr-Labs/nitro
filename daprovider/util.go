@@ -76,23 +76,26 @@ const BlobHashesHeaderFlag byte = L1AuthenticatedMessageHeaderFlag | 0x10 // 0x5
 // BrotliMessageHeaderByte indicates that the message is brotli-compressed.
 const BrotliMessageHeaderByte byte = 0
 
-// EigenDAMessageHeaderFlag indicates that this message contains EigenDA blob data.
-const EigenDAMessageHeaderFlag byte = 0xed
+// EigenDAV1MessageHeader indicates that this message contains EigenDAV1 blob data.
+const EigenDAV1MessageHeader byte = 0xed
+
+// EigenDAV2MessageHeader indicates that this message contains EigenDAV2 blob data.
+const EigenDAV2MessageHeader byte = 0x11
 
 // KnownHeaderBits is all header bits with known meaning to this nitro version
-const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAMessageHeaderFlag
+const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAV1MessageHeader
 
 var DefaultDASRetentionPeriod time.Duration = time.Hour * 24 * 15
 
 // hasBits returns true if `checking` has all `bits`
 func hasBits(checking byte, bits byte) bool {
 	// NOTE: This is done to mitigate a bug where the
-	// bitwise AND between EigenDAMessageHeaderFlag and other flag values would return true
+	// bitwise AND between EigenDAV1MessageHeader and other flag values would return true
 	// when doing the low-level check - resulting in this function to return true
 	// from other dapReaders and cause terminal errors since an EigenDA message type
 	// would be passed into e.g an AnyTrust reader
 	// assuming 0xed for the message header byte is a fundamental design flaw
-	if checking == EigenDAMessageHeaderFlag && bits != EigenDAMessageHeaderFlag {
+	if checking == EigenDAV1MessageHeader && bits != EigenDAV1MessageHeader {
 		return false
 	}
 
@@ -123,8 +126,12 @@ func IsBrotliMessageHeaderByte(b uint8) bool {
 	return b == BrotliMessageHeaderByte
 }
 
-func IsEigenDAMessageHeaderByte(header byte) bool {
-	return hasBits(header, EigenDAMessageHeaderFlag)
+func IsEigenDAV1MessageHeaderByte(header byte) bool {
+	return hasBits(header, EigenDAV1MessageHeader)
+}
+
+func IsEigenDAV2MessageHeaderByte(header byte) bool {
+	return hasBits(header, EigenDAV2MessageHeader)
 }
 
 // IsKnownHeaderByte returns true if the supplied header byte has only known bits

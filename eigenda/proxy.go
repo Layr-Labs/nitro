@@ -21,8 +21,8 @@ func NewEigenDAProxyClient(rpcUrl string) *EigenDAProxyClient {
 }
 
 // NOTE: This method will be deprecated in the V2 migration release
-func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) (*disperser.BlobInfo, error) {
-	cert, err := c.client.SetData(ctx, data)
+func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) ([]byte, error) {
+	daCommitment, err := c.client.SetData(ctx, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set data: %w", err)
 	}
