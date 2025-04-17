@@ -34,10 +34,11 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	validateSeqMsg bool,
 ) ([]byte, error) {
 
-	if daprovider.IsEigenDAV1HeaderByte(sequencerMsg[0]) {
-		return RecoverPayloadFromEigenDAV1Batch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder)
+	msg := sequencerMsg[sequencerMsgOffset:]
+	if msg[0] == 0x0 {
+		return RecoverPayloadFromEigenDAV1Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
 	} else {
-		return RecoverPayloadFromEigenDAV2Batch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder)
+		return RecoverPayloadFromEigenDAV2Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
 	}
 
 }
@@ -47,7 +48,6 @@ func RecoverPayloadFromEigenDAV2Batch(ctx context.Context,
 	daReader EigenDAReader,
 	preimageRecoder daprovider.PreimageRecorder,
 ) ([]byte, error) {
-
 	data, err := daReader.QueryBlobV2(ctx, sequencerMsg)
 	if err != nil {
 		log.Error("Failed to query data from EigenDA", "err", err)
@@ -77,9 +77,6 @@ func RecoverPayloadFromEigenDAV1Batch(ctx context.Context,
 	daReader EigenDAReader,
 	preimageRecoder daprovider.PreimageRecorder,
 ) ([]byte, error) {
-
-	println(fmt.Sprintf("%+x", sequencerMsg[40:]))
-
 	eigenDAV1Cert, err := ParseSequencerMsg(sequencerMsg)
 	if err != nil {
 		log.Error("Failed to parse sequencer message", "err", err)

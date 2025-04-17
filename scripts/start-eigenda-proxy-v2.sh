@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 
 echo "==== Pull eigenda-proxy container ===="
-docker pull  ghcr.io/layr-labs/eigenda-proxy:v1.6.5
+docker pull  ghcr.io/layr-labs/eigenda-proxy:v1.7.0
 
 echo "==== Starting eigenda-proxy container ===="
 
 # proxy has a bug currently which forces the use of the service manager address 
 # & eth rpc despite cert verification being disabled.
 
-docker run -d --name eigenda-proxy-nitro-test-instance \
-  -p 4242:6666 \
-  -e EIGENDA_PROXY_EIGENDA_V2_DISPERSE_TO_V2=true \
+docker run -d --name eigenda-proxy-nitro-test-instance-v2 \
+  -p 6969:6666 \
+  -e EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE=V2 \
+  -e EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V2 \
   -e EIGENDA_PROXY_ADDR=0.0.0.0 \
   -e EIGENDA_PROXY_PORT=6666 \
   -e EIGENDA_PROXY_MEMSTORE_ENABLED=true \
@@ -21,7 +22,7 @@ docker run -d --name eigenda-proxy-nitro-test-instance \
   -e EIGENDA_PROXY_EIGENDA_READ_G2_POINTS=true \
   -e EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443 \
   -e EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX=ca9cfa217a7684f494a5709bc04fc57cb6051911454cb76fba2058ca0ba09552 \
-  ghcr.io/layr-labs/eigenda-proxy:dev
+  ghcr.io/layr-labs/eigenda-proxy:v1.7.0
 
 # shellcheck disable=SC2181
 if [ $? -ne 0 ]; then

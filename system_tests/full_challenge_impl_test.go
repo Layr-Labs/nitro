@@ -213,7 +213,7 @@ func makeBatchEigenDAV1(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTe
 	daCommitBytes, err := eigenDA.Store(ctx, message)
 	Require(t, err)
 
-	var certV1 *eigenda.EigenDAV1Cert
+	certV1 := &eigenda.EigenDAV1Cert{}
 
 	var blobInfo disperser.BlobInfo
 	err = rlp.DecodeBytes(daCommitBytes[1:], &blobInfo)
@@ -308,7 +308,7 @@ func makeBatchEigenDAV2(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTe
 
 	eigenDA, err := eigenda.NewEigenDA(&eigenda.EigenDAConfig{
 		Enable: true,
-		Rpc:    "http://localhost:4242",
+		Rpc:    "http://localhost:6969",
 	})
 
 	Require(t, err)
@@ -394,7 +394,7 @@ func setupSequencerInboxStub(ctx context.Context, t *testing.T, l1Info *Blockcha
 	return bridgeAddr, seqInbox, seqInboxAddr
 }
 
-func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, challengeMsgIdx int64, useEigenDA bool, wasmRootDir string) {
+func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, challengeMsgIdx int64, useEigenDA bool, useV2 bool, wasmRootDir string) {
 	glogger := log.NewGlogHandler(
 		log.NewTerminalHandler(io.Writer(os.Stderr), false))
 	glogger.Verbosity(log.LvlInfo)
@@ -417,8 +417,8 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 	conf.BatchPoster.Enable = false
 	conf.InboxReader.CheckDelay = time.Second
 
-	if useEigenDA {
-		t.Log("Using EigenDA configurations for challenge test")
+	if useEigenDA && !useV2 {
+		t.Log("Using EigenDA V1 configurations for challenge test")
 		builder.chainConfig.ArbitrumChainParams.EigenDA = true
 		builder.nodeConfig.EigenDA = eigenda.EigenDAConfig{
 			Enable: true,
@@ -429,6 +429,19 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 		conf.EigenDA = eigenda.EigenDAConfig{
 			Enable: true,
 			Rpc:    "http://localhost:4242",
+		}
+	} else if useEigenDA && useV2 {
+		t.Log("Using EigenDA V2 configurations for challenge test")
+		builder.chainConfig.ArbitrumChainParams.EigenDA = true
+		builder.nodeConfig.EigenDA = eigenda.EigenDAConfig{
+			Enable: true,
+			Rpc:    "http://localhost:6969",
+		}
+
+		chainConfig.ArbitrumChainParams.EigenDA = true
+		conf.EigenDA = eigenda.EigenDAConfig{
+			Enable: true,
+			Rpc:    "http://localhost:6969",
 		}
 	}
 
@@ -495,7 +508,7 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 		Fatal(t, "challengeMsgIdx illegal")
 	}
 
-	if useEigenDA {
+	if useEigenDA && useV2 {
 		// seqNum := common.Big2
 		makeBatchEigenDAV2(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
 		makeBatchEigenDAV2(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-1)
@@ -507,6 +520,18 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 		// seqNum.Add(seqNum, common.Big1)
 		makeBatchEigenDAV2(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
 		makeBatchEigenDAV2(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch*2-1)
+	} else if useEigenDA && !useV2 {
+		// seqNum := common.Big2
+		makeBatchEigenDAV1(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDAV1(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-1)
+
+		// seqNum.Add(seqNum, common.Big1)
+		makeBatchEigenDAV1(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDAV1(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch-1)
+
+		// seqNum.Add(seqNum, common.Big1)
+		makeBatchEigenDAV1(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDAV1(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch*2-1)
 	} else {
 		// seqNum := common.Big2
 		makeBatch(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)

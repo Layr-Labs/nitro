@@ -145,8 +145,8 @@ jobs:
           echo "GOGC=80" >> "$GITHUB_ENV"
           echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> "$GITHUB_ENV"
 
-      - name: spinup eigenda-proxy
-        run: ./scripts/start-eigenda-proxy.sh
+      - name: spinup eigenda-proxy testing instances
+        run: ./scripts/start-eigenda-proxy-v1.sh && ./scripts/start-eigenda-proxy-v2.sh
 
       - name: run tests without race detection and path state scheme
         if: matrix.test-mode == 'defaults'

@@ -4,9 +4,14 @@
 package arbtest
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"log"
 	"math/big"
 	"net"
+	"net/http"
 	"testing"
 	"time"
 
@@ -14,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/offchainlabs/nitro/arbnode"
+	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
 	"github.com/offchainlabs/nitro/das"
@@ -22,27 +28,155 @@ import (
 )
 
 const (
+	v1Backend = "v1"
+	v2Backend = "v2"
+
 	// TODO: https://github.com/Layr-Labs/nitro/issues/73
-	proxyURL = "http://127.0.0.1:4242"
+	proxyURLV1 = "http://127.0.0.1:4242"
+	proxyURLV2 = "http://127.0.0.1:6969"
 )
 
-func TestEigenDAIntegration(t * testing.T) {
-	// single threaded test execution since conflicts can happen
-	// on proxy memconfig states if ran in parallel.
-	// TODO: https://github.com/Layr-Labs/nitro/issues/73
+func setEigenDAProxyDispersalBackend(baseURL string, backend string) error {
+	url := fmt.Sprintf("%s/admin/eigenda-dispersal-backend", baseURL)
 
-	// 1 - Batch posting / derivation
-	// testEigenDAProxyBatchPosting(t)
+	payload := map[string]string{
+		"eigenDADispersalBackend": backend,
+	}
 
-	// // 2 - EigenDA failover to native Arbitrum DA destinations
-	// testFailOverFromEigenDAToAnyTrust(t)
-	// testFailOverFromEigenDAToCallData(t)
-	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, true, "")
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
 
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
 
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		log.Printf("Successfully set dispersal backend to v2. Status: %s", resp.Status)
+	} else {
+		return fmt.Errorf("server returned non-2xx status: %s", resp.Status)
+	}
+
+	return nil
 }
 
-func testEigenDAProxyBatchPosting(t *testing.T) {
+func getProxyURL(useV2 bool) string {
+	if useV2 {
+		return proxyURLV2
+	}
+
+	return proxyURLV1
+}
+
+// single threaded test execution since conflicts can happen
+// on proxy memconfig states if ran in parallel.
+// TODO: https://github.com/Layr-Labs/nitro/issues/73
+func TestEigenDAIntegrationV1(t *testing.T) {
+	testEigenDAProxyBatchPosting(t, false)
+
+	testFailOverFromEigenDAToAnyTrust(t, false)
+	testFailOverFromEigenDAToCallData(t, false)
+	testEigenDAIntegrationV1ToV2InsecureMigration(t)
+}
+
+func TestEigenDAIntegrationV2(t *testing.T) {
+	testEigenDAProxyBatchPosting(t, true)
+
+	testFailOverFromEigenDAToAnyTrust(t, true)
+	testFailOverFromEigenDAToCallData(t, true)
+}
+
+func testEigenDAIntegrationV1ToV2InsecureMigration(t *testing.T) {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+
+	// Setup L1 chain and contracts
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
+	builder.BuildL1(t)
+	// Setup DAS servers
+	l1NodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest()
+
+	{
+		builder.nodeConfig.EigenDA.Enable = true
+		builder.nodeConfig.EigenDA.Rpc = getProxyURL(false)
+
+		// Setup L2 chain
+		builder.L2Info.GenerateAccount("User2")
+		builder.BuildL2OnL1(t)
+
+		// Setup second node
+		l1NodeConfigB.BlockValidator.Enable = false
+		l1NodeConfigB.EigenDA.Enable = true
+		l1NodeConfigB.EigenDA.Rpc = getProxyURL(false)
+
+		nodeBParams := SecondNodeParams{
+			nodeConfig: l1NodeConfigB,
+			initData:   &builder.L2Info.ArbInitData,
+		}
+		l2B, cleanupB := builder.Build2ndNode(t, &nodeBParams)
+		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12), l2B.Client)
+
+		err := setEigenDAProxyDispersalBackend(getProxyURL(false), v2Backend)
+		Require(t, err)
+
+		defer setEigenDAProxyDispersalBackend(getProxyURL(false), v2Backend)
+
+		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*2), l2B.Client)
+
+		seqInbox, err := arbnode.NewSequencerInbox(builder.L1.Client, builder.addresses.SequencerInbox, 0)
+		Require(t, err)
+
+		latestBlock, err := builder.L1.Client.BlockNumber(ctx)
+		Require(t, err)
+
+		batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
+		Require(t, err)
+
+		// ensure that sequencer inbox contains both V1 and V2 certificates
+		var v1Seen, v2Seen bool = false, false
+
+		for _, batch := range batches {
+			serializedBatch, err := batch.Serialize(ctx, builder.L1.Client)
+			Require(t, err)
+
+			if len(serializedBatch) <= 40 {
+				continue
+			}
+
+			if daprovider.IsEigenDAV1HeaderByte(serializedBatch[40]) {
+				v1Seen = true
+			} else if daprovider.IsEigenDAV2HeaderByte(serializedBatch[40]) {
+				v2Seen = true
+			}
+		}
+
+		if !v1Seen || !v2Seen {
+			t.Fatal("expected both v1 and v2 eigenda certs to be seen within Sequencer Inbox")
+		}
+		cleanupB()
+
+		// build another secondary node to re-trigger derivation pipeline
+		l2B, cleanupB = builder.Build2ndNode(t, &nodeBParams)
+		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*3), l2B.Client)
+
+		builder.L2.cleanup()
+	}
+}
+
+func testEigenDAProxyBatchPosting(t *testing.T, useV2 bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
@@ -58,7 +192,7 @@ func testEigenDAProxyBatchPosting(t *testing.T) {
 
 		// Setup DAS config
 		builder.nodeConfig.EigenDA.Enable = true
-		builder.nodeConfig.EigenDA.Rpc = proxyURL
+		builder.nodeConfig.EigenDA.Rpc = getProxyURL(useV2)
 
 		// Setup L2 chain
 		builder.L2Info.GenerateAccount("User2")
@@ -67,7 +201,7 @@ func testEigenDAProxyBatchPosting(t *testing.T) {
 		// Setup second node
 		l1NodeConfigB.BlockValidator.Enable = false
 		l1NodeConfigB.EigenDA.Enable = true
-		l1NodeConfigB.EigenDA.Rpc = proxyURL
+		l1NodeConfigB.EigenDA.Rpc = getProxyURL(useV2)
 
 		nodeBParams := SecondNodeParams{
 			nodeConfig: l1NodeConfigB,
@@ -81,9 +215,9 @@ func testEigenDAProxyBatchPosting(t *testing.T) {
 	}
 }
 
-func testFailOverFromEigenDAToCallData(t *testing.T) {
+func testFailOverFromEigenDAToCallData(t *testing.T, useV2 bool) {
 	memCfgClient := memconfig_client.New(
-		&memconfig_client.Config{URL: proxyURL},
+		&memconfig_client.Config{URL: getProxyURL(useV2)},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -101,7 +235,7 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 
 		// Setup DAS config
 		builder.nodeConfig.EigenDA.Enable = true
-		builder.nodeConfig.EigenDA.Rpc = proxyURL
+		builder.nodeConfig.EigenDA.Rpc = getProxyURL(useV2)
 		builder.nodeConfig.BatchPoster.EnableEigenDAFailover = true
 
 		// Setup L2 chain
@@ -111,7 +245,7 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 		// Setup second node
 		l1NodeConfigB.BlockValidator.Enable = false
 		l1NodeConfigB.EigenDA.Enable = true
-		l1NodeConfigB.EigenDA.Rpc = proxyURL
+		l1NodeConfigB.EigenDA.Rpc = getProxyURL(useV2)
 		l1NodeConfigB.BatchPoster.EnableEigenDAFailover = true
 
 		nodeBParams := SecondNodeParams{
@@ -130,26 +264,26 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 		memCfg.PutReturnsFailoverError = true
 		_, err = memCfgClient.UpdateConfig(ctx, memCfg)
 		Require(t, err)
-		
-		checkBatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(2000000000000), l2B.Client)
+
+		checkBatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*2), l2B.Client)
 
 		// 3 - Emulate EigenDA becoming healthy again and ensure that the system starts using it for DA
 		memCfg.PutReturnsFailoverError = false
 		memCfgClient.UpdateConfig(ctx, memCfg)
 
-		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(3000000000000), l2B.Client)
+		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*3), l2B.Client)
 		builder.L2.cleanup()
 		cleanupB()
 	}
 }
 
-func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
+func testFailOverFromEigenDAToAnyTrust(t *testing.T, useV2 bool) {
 	initEigenDATest(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	memCfgClient := memconfig_client.New(
-		&memconfig_client.Config{URL: proxyURL},
+		&memconfig_client.Config{URL: getProxyURL(useV2)},
 	)
 
 	// Setup L1 chain and contracts
@@ -224,7 +358,7 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 
 	// set EigenDA params into L2 sequencer config
 	builder.nodeConfig.EigenDA.Enable = true
-	builder.nodeConfig.EigenDA.Rpc = proxyURL
+	builder.nodeConfig.EigenDA.Rpc = getProxyURL(useV2)
 	builder.nodeConfig.BatchPoster.EnableEigenDAFailover = true
 
 	// Setup L2 chain
@@ -252,7 +386,7 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 	childNodeConfigB.DataAvailability.RestAggregator.Urls = []string{"http://" + restLis.Addr().String()}
 	childNodeConfigB.DataAvailability.ParentChainNodeURL = "none"
 	childNodeConfigB.EigenDA.Enable = true
-	childNodeConfigB.EigenDA.Rpc = proxyURL
+	childNodeConfigB.EigenDA.Rpc = getProxyURL(useV2)
 	childNodeConfigB.BatchPoster.EnableEigenDAFailover = true
 	childNodeConfigB.BatchPoster.CheckBatchCorrectness = true
 
