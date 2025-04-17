@@ -16,8 +16,9 @@ import (
 func TestChallengeManagerFullAsserterIncorrect(t *testing.T) {
 	t.Parallel()
 	defaultWasmRootDir := ""
-	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, false, defaultWasmRootDir)
-	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, true, defaultWasmRootDir)
+	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, false, false, defaultWasmRootDir)
+	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, true, false, defaultWasmRootDir)
+	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, true, true, defaultWasmRootDir)
 }
 
 func TestChallengeManagerFullAsserterIncorrectWithPublishedMachine(t *testing.T) {
@@ -25,15 +26,17 @@ func TestChallengeManagerFullAsserterIncorrectWithPublishedMachine(t *testing.T)
 	cr, err := github.LatestConsensusRelease(context.Background())
 	Require(t, err)
 	machPath := populateMachineDir(t, cr)
-	RunChallengeTest(t, false, true, makeBatch_MsgsPerBatch+1, false, machPath)
-	RunChallengeTest(t, false, true, makeBatch_MsgsPerBatch+1, true, machPath)
+	RunChallengeTest(t, false, true, makeBatch_MsgsPerBatch+1, false, false, machPath)
+	RunChallengeTest(t, false, true, makeBatch_MsgsPerBatch+1, true, false, machPath)
+	RunChallengeTest(t, false, true, makeBatch_MsgsPerBatch+1, true, true, machPath)
 }
 
 func TestChallengeManagerFullAsserterCorrect(t *testing.T) {
 	t.Parallel()
 	defaultWasmRootDir := ""
-	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, false, defaultWasmRootDir)
-	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, true, defaultWasmRootDir)
+	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, false, false, defaultWasmRootDir)
+	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, true, false, defaultWasmRootDir)
+	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, true, true, defaultWasmRootDir)
 }
 
 func TestChallengeManagerFullAsserterCorrectWithPublishedMachine(t *testing.T) {
@@ -41,6 +44,7 @@ func TestChallengeManagerFullAsserterCorrectWithPublishedMachine(t *testing.T) {
 	cr, err := github.LatestConsensusRelease(context.Background())
 	Require(t, err)
 	machPath := populateMachineDir(t, cr)
-	RunChallengeTest(t, true, true, makeBatch_MsgsPerBatch+2, false, machPath)
-	RunChallengeTest(t, true, true, makeBatch_MsgsPerBatch+2, true, machPath)
+	RunChallengeTest(t, true, true, makeBatch_MsgsPerBatch+2, false, false, machPath)
+	RunChallengeTest(t, true, true, makeBatch_MsgsPerBatch+2, true, false, machPath)
+	RunChallengeTest(t, true, true, makeBatch_MsgsPerBatch+2, true, true, machPath)
 }
