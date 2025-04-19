@@ -123,8 +123,6 @@ func verifySignature2(sig Signature, message []byte, publicKey PublicKey, keyVal
 	engine := bls12381.NewPairingEngine()
 	engine.Reset()
 	engine.AddPair(pointOnCurve, publicKey.key)
-
-	// e(H(m), g2Point) == e(g1 sig, g2Generator)
 	leftSide := engine.Result()
 	engine.AddPair(sig, engine.G2.One())
 	rightSide := engine.Result()

@@ -219,7 +219,6 @@ func (r *inboxMultiplexer) Pop(ctx context.Context) (*arbostypes.MessageWithMeta
 	}
 	// parsing error in getNextMsg
 	if msg == nil && err == nil {
-		log.Warn("Setting invalid message")
 		msg = &arbostypes.MessageWithMetadata{
 			Message:             arbostypes.InvalidL1Message,
 			DelayedMessagesRead: r.delayedMessagesRead,

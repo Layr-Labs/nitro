@@ -173,18 +173,7 @@ func RecoverPayloadFromDasBatch(
 		return nil, nil, nil
 	}
 
-	// eigenda cert
-	// inbox submission block #
-	// reference block #
-	// if reference block # + ALLOWED_SUBMISSION_BUFFER < inbox submission block # {
-	//        INVALIDATE
-	// }
-
 	maxTimestamp := binary.BigEndian.Uint64(sequencerMsg[8:16])
-	// maxTS
-
-	// maxTS +
-	// timeout = actual UTC timestamp that cert will be invalidated
 	if cert.Timeout < maxTimestamp+MinLifetimeSecondsForDataAvailabilityCert {
 		log.Error("Data availability cert expires too soon", "err", "")
 		return nil, nil, nil
