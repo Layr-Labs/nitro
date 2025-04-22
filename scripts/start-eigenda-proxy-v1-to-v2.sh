@@ -8,20 +8,18 @@ echo "==== Starting eigenda-proxy container ===="
 # proxy has a bug currently which forces the use of the service manager address 
 # & eth rpc despite cert verification being disabled.
 
-docker run -d --name eigenda-proxy-nitro-test-instance-v2 \
-  -p 6969:6666 \
-  -e EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE=V2 \
-  -e EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V2 \
+docker run -d --name eigenda-proxy-nitro-test-instance-v1-to-v2 \
+  -p 4200:4242 \
   -e EIGENDA_PROXY_ADDR=0.0.0.0 \
-  -e EIGENDA_PROXY_PORT=6666 \
+  -e EIGENDA_PROXY_PORT=4242 \
+  -e EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE=V1,V2 \
+  -e EIGENDA_PROXY_API_ENABLED=admin \
   -e EIGENDA_PROXY_MEMSTORE_ENABLED=true \
   -e EIGENDA_PROXY_MEMSTORE_EXPIRATION=120m \
   -e EIGENDA_PROXY_EIGENDA_ETH_RPC=http://localhost:6969 \
   -e EIGENDA_PROXY_EIGENDA_SERVICE_MANAGER_ADDR="0x0000000000000000000000000000000000000000" \
   -e EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED=true \
-  -e EIGENDA_PROXY_EIGENDA_READ_G2_POINTS=true \
-  -e EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443 \
-  -e EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX=ca9cfa217a7684f494a5709bc04fc57cb6051911454cb76fba2058ca0ba09552 \
+  -e EIGENDA_PROXY_EIGENDA_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443 \
   ghcr.io/layr-labs/eigenda-proxy:v1.7.0
 
 # shellcheck disable=SC2181
