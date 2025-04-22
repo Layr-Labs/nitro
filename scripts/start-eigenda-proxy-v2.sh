@@ -29,6 +29,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+sleep 30
 echo "==== eigenda-proxy container started ===="
 
 ## TODO - support teardown or embed a docker client wrapper that spins up and tears down resource 
