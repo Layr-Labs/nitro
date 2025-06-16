@@ -20,6 +20,7 @@ docker run -d --name eigenda-proxy-nitro-test-instance-v2 \
   -e EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED=true \
   -e EIGENDA_PROXY_EIGENDA_READ_G2_POINTS=true \
   -e EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443 \
+  -e EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443 \
   -e EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX=ca9cfa217a7684f494a5709bc04fc57cb6051911454cb76fba2058ca0ba09552 \
   ghcr.io/layr-labs/eigenda-proxy:v1.8.2
 

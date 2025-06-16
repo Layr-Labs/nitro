@@ -18,6 +18,7 @@ docker run -d --name eigenda-proxy-nitro-test-instance-v1 \
   -e EIGENDA_PROXY_MEMSTORE_EXPIRATION=120m \
   -e EIGENDA_PROXY_EIGENDA_ETH_RPC=http://localhost:6969 \
   -e EIGENDA_PROXY_EIGENDA_SERVICE_MANAGER_ADDR="0x0000000000000000000000000000000000000000" \
+  -e EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443 \
   -e EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED=true \
   ghcr.io/layr-labs/eigenda-proxy:v1.8.2
 
