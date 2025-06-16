@@ -13,7 +13,7 @@ on:
 jobs:
   docker:
     name: Docker build
-    runs-on: linux-2xl
+    runs-on: ubuntu-latest
     services:
       # local registery
       registry:
@@ -65,8 +65,8 @@ jobs:
           cd nitro-testnode
           ./test-node.bash --init --dev &
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
         
       - name: Wait for rpc to come up
         shell: bash
