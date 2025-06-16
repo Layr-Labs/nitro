@@ -65,6 +65,9 @@ jobs:
           cd nitro-testnode
           ./test-node.bash --init --dev &
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        
       - name: Wait for rpc to come up
         shell: bash
         run: |
