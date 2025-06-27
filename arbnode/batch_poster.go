@@ -44,8 +44,8 @@ import (
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
-	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/daprovider"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/util"
 	"github.com/offchainlabs/nitro/util/arbmath"
@@ -1750,7 +1750,19 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 			batchPosterDAFailureCounter.Inc(1)
 			return false, fmt.Errorf("%w: nonce changed from %d to %d while creating batch", storage.ErrStorageRace, nonce, gotNonce)
 		}
+
+		// The upstream repository doesn't release the lock here. It's necessary to do in the EigenDA
+		// fork because EigenDA writing can a substantial amount of time, and we don't want to hold
+		// this lock for that long.
+		b.redisLock.Release(ctx)
+
 		eigenDAV1Cert, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
+
+		// After finishing EigenDA writing, reacquire the lock to match the behavior of the
+		// upstream repo, where subsequent operation are guarded.
+		if !b.redisLock.AttemptLock(ctx) {
+			return false, errAttemptLockFailed
+		}
 
 		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter != nil { // Failover to anytrust commitee if enabled
 			log.Error("EigenDA service is unavailable, failing over to any trust mode")
