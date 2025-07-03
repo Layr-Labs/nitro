@@ -22,20 +22,20 @@ import (
 	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
-	"github.com/offchainlabs/nitro/das"
+	"github.com/offchainlabs/nitro/daprovider/das"
 	"github.com/offchainlabs/nitro/solgen/go/precompilesgen"
 	"github.com/offchainlabs/nitro/util/headerreader"
 )
 
 const (
-	v1Backend = "v1"
+	v1Backend     = "v1"
 	v1ToV2Backend = "v1-to-v2"
-	v2Backend = "v2"
+	v2Backend     = "v2"
 
 	// TODO: https://github.com/Layr-Labs/nitro/issues/73
-	proxyURLV1 = "http://127.0.0.1:4242"
+	proxyURLV1     = "http://127.0.0.1:4242"
 	proxyURLV1ToV2 = "http://127.0.0.1:4200"
-	proxyURLV2 = "http://127.0.0.1:6969"
+	proxyURLV2     = "http://127.0.0.1:6969"
 )
 
 func setEigenDAProxyDispersalBackend(baseURL string, backend string) error {
@@ -44,6 +44,18 @@ func setEigenDAProxyDispersalBackend(baseURL string, backend string) error {
 	payload := map[string]string{
 		"eigenDADispersalBackend": backend,
 	}
+}
+
+func TestEigenDAIntegration(t *testing.T) {
+	// single threaded test execution since conflicts can happen
+	// on proxy memconfig states if ran in parallel.
+	// TODO: https://github.com/Layr-Labs/nitro/issues/73
+
+	// 0 - Test that the proxy is reachable
+	testEigenDAProxyReachability(t)
+
+	// 1 - Batch posting / derivation
+	testEigenDAProxyBatchPosting(t)
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
@@ -74,17 +86,17 @@ func setEigenDAProxyDispersalBackend(baseURL string, backend string) error {
 
 func getProxyURL(proxyBackend string) string {
 	switch proxyBackend {
-		case v1Backend:
-			return proxyURLV1
+	case v1Backend:
+		return proxyURLV1
 
-		case v2Backend:
-			return proxyURLV2
+	case v2Backend:
+		return proxyURLV2
 
-		case v1ToV2Backend:
-			return proxyURLV1ToV2
+	case v1ToV2Backend:
+		return proxyURLV1ToV2
 
-		default:
-			panic("could not determine proxy url from backend: " + proxyBackend)
+	default:
+		panic("could not determine proxy url from backend: " + proxyBackend)
 	}
 }
 
@@ -460,4 +472,18 @@ func checkEigenDABatchPosting(t *testing.T, ctx context.Context, l1client, l2cli
 		}
 
 	}
+}
+
+// TestEigenDAProxyReachability tests that the EigenDA proxy is accessible
+func testEigenDAProxyReachability(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	memCfgClient := memconfig_client.New(&memconfig_client.Config{URL: proxyURL})
+
+	_, err := memCfgClient.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("❌ EigenDA proxy not reachable at %s: %v", proxyURL, err)
+	}
+	t.Logf("✅ EigenDA proxy reachable at %s", proxyURL)
 }

@@ -12,7 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 
-	cv_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	cv_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -20,8 +20,8 @@ import (
 // read from EigenDA proxy. It is used for type compatibility with the Solidity V1 certificate.
 // This object is encoded into txs submitted to the SequencerInbox.
 type EigenDAV1Cert struct {
-	BlobVerificationProof cv_binding.BlobVerificationProof `json:"blobVerificationProof"`
-	BlobHeader            cv_binding.BlobHeader            `json:"blobHeader"`
+	BlobVerificationProof cv_binding.EigenDATypesV1BlobVerificationProof `json:"blobVerificationProof"`
+	BlobHeader            cv_binding.EigenDATypesV1BlobHeader            `json:"blobHeader"`
 }
 
 
@@ -65,7 +65,7 @@ func (e *EigenDAV1Cert) Load(blobInfo *disperser.BlobInfo) {
 	x := blobInfo.GetBlobHeader().GetCommitment().GetX()
 	y := blobInfo.GetBlobHeader().GetCommitment().GetY()
 
-	e.BlobHeader = cv_binding.BlobHeader{}
+	e.BlobHeader = cv_binding.EigenDATypesV1BlobHeader{}
 
 	e.BlobHeader.Commitment = cv_binding.BN254G1Point{
 		X: new(big.Int).SetBytes(x),
@@ -75,7 +75,7 @@ func (e *EigenDAV1Cert) Load(blobInfo *disperser.BlobInfo) {
 	e.BlobHeader.DataLength = blobInfo.GetBlobHeader().GetDataLength()
 
 	for _, quorumBlobParam := range blobInfo.GetBlobHeader().GetBlobQuorumParams() {
-		e.BlobHeader.QuorumBlobParams = append(e.BlobHeader.QuorumBlobParams, cv_binding.QuorumBlobParam{
+		e.BlobHeader.QuorumBlobParams = append(e.BlobHeader.QuorumBlobParams, cv_binding.EigenDATypesV1QuorumBlobParam{
 			QuorumNumber:                    uint8(quorumBlobParam.QuorumNumber),
 			AdversaryThresholdPercentage:    uint8(quorumBlobParam.AdversaryThresholdPercentage),
 			ConfirmationThresholdPercentage: uint8(quorumBlobParam.ConfirmationThresholdPercentage),
@@ -88,8 +88,8 @@ func (e *EigenDAV1Cert) Load(blobInfo *disperser.BlobInfo) {
 
 	e.BlobVerificationProof.BatchId = blobInfo.GetBlobVerificationProof().GetBatchId()
 	e.BlobVerificationProof.BlobIndex = blobInfo.GetBlobVerificationProof().GetBlobIndex()
-	e.BlobVerificationProof.BatchMetadata = cv_binding.BatchMetadata{
-		BatchHeader:             cv_binding.BatchHeader{},
+	e.BlobVerificationProof.BatchMetadata = cv_binding.EigenDATypesV1BatchMetadata{
+		BatchHeader:             cv_binding.EigenDATypesV1BatchHeader{},
 		SignatoryRecordHash:     signatoryRecordHash,
 		ConfirmationBlockNumber: blobInfo.GetBlobVerificationProof().GetBatchMetadata().GetConfirmationBlockNumber(),
 	}

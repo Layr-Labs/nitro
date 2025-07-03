@@ -8,9 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/arbutil"
+	"github.com/offchainlabs/nitro/daprovider"
 )
 
 func NewReaderForEigenDA(reader EigenDAReader) *readerForEigenDA {
@@ -21,7 +20,7 @@ type readerForEigenDA struct {
 	readerEigenDA EigenDAReader
 }
 
-func (d *readerForEigenDA) IsValidHeaderByte(headerByte byte) bool {
+func (d *readerForEigenDA) IsValidHeaderByte(ctx context.Context, headerByte byte) bool {
 	return daprovider.IsEigenDAV1HeaderByte(headerByte) || daprovider.IsEigenDAV2HeaderByte(headerByte)
 }
 
@@ -30,17 +29,20 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	batchNum uint64,
 	batchBlockHash common.Hash,
 	sequencerMsg []byte,
-	preimageRecorder daprovider.PreimageRecorder,
+	preimages daprovider.PreimagesMap,
 	validateSeqMsg bool,
-) ([]byte, error) {
-
+) ([]byte, daprovider.PreimagesMap, error) {
+	if preimages == nil {
+		preimages = make(daprovider.PreimagesMap)
+	}
+	preimageRecorder := daprovider.RecordPreimagesTo(preimages)
 	msg := sequencerMsg[sequencerMsgOffset:]
 	if msg[0] == 0x0 {
 		return RecoverPayloadFromEigenDAV1Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
 	} else {
 		return RecoverPayloadFromEigenDAV2Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
 	}
-
+	return payload, preimages, err
 }
 
 func RecoverPayloadFromEigenDAV2Batch(ctx context.Context,
@@ -53,7 +55,6 @@ func RecoverPayloadFromEigenDAV2Batch(ctx context.Context,
 		log.Error("Failed to query data from EigenDA", "err", err)
 		return nil, err
 	}
-
 
 	var v2Cert EigenDAV2Cert
 	println(fmt.Sprintf("v2 certificate rlp encoded bytes: %x", sequencerMsg[1:]))
