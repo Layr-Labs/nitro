@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/daprovider"
@@ -38,11 +39,20 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	preimageRecorder := daprovider.RecordPreimagesTo(preimages)
 	msg := sequencerMsg[sequencerMsgOffset:]
 	if msg[0] == 0x0 {
-		return RecoverPayloadFromEigenDAV1Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
+		eigenDABatch, err := RecoverPayloadFromEigenDAV1Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return eigenDABatch, preimages, nil
 	} else {
-		return RecoverPayloadFromEigenDAV2Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
+		eigenDABatch, err := RecoverPayloadFromEigenDAV2Batch(ctx, msg, d.readerEigenDA, preimageRecorder)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return eigenDABatch, preimages, nil
 	}
-	return payload, preimages, err
 }
 
 func RecoverPayloadFromEigenDAV2Batch(ctx context.Context,
@@ -57,7 +67,6 @@ func RecoverPayloadFromEigenDAV2Batch(ctx context.Context,
 	}
 
 	var v2Cert EigenDAV2Cert
-	println(fmt.Sprintf("v2 certificate rlp encoded bytes: %x", sequencerMsg[1:]))
 	err = rlp.DecodeBytes(sequencerMsg[1:], &v2Cert)
 	if err != nil {
 		return nil, err

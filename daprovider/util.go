@@ -75,11 +75,14 @@ const BlobHashesHeaderFlag byte = L1AuthenticatedMessageHeaderFlag | 0x10 // 0x5
 // BrotliMessageHeaderByte indicates that the message is brotli-compressed.
 const BrotliMessageHeaderByte byte = 0
 
-// EigenDAMessageHeaderFlag indicates that this message contains EigenDA blob data.
-const EigenDAMessageHeaderFlag byte = 0xed
+// EigenDAV1MessageHeaderFlag indicates that this message contains EigenDA V1 blob data.
+const EigenDAV1MessageHeaderFlag byte = 0xed
+
+// EigenDAV2MessageHeaderFlag indicates that this message contains EigenDA V2 (blazzar) blob data.
+const EigenDAV2MessageHeaderFlag byte = 0x69
 
 // KnownHeaderBits is all header bits with known meaning to this nitro version
-const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAMessageHeaderFlag
+const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAV1MessageHeaderFlag | EigenDAV2MessageHeaderFlag
 
 var DefaultDASRetentionPeriod time.Duration = time.Hour * 24 * 15
 
@@ -98,6 +101,15 @@ func IsDASMessageHeaderByte(header byte) bool {
 
 func IsTreeDASMessageHeaderByte(header byte) bool {
 	return hasBits(header, TreeDASMessageHeaderFlag)
+}
+
+func IsEigenDAV1HeaderByte(header byte) bool {
+	return hasBits(header, EigenDAV1MessageHeaderFlag)
+
+}
+
+func IsEigenDAV2HeaderByte(header byte) bool {
+	return hasBits(header, EigenDAV2MessageHeaderFlag)
 }
 
 func IsZeroheavyEncodedHeaderByte(header byte) bool {

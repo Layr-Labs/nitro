@@ -45,8 +45,8 @@ import (
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
-	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/daprovider"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/util"
 	"github.com/offchainlabs/nitro/util/arbmath"
@@ -1806,7 +1806,7 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 
 				eigenDAV1Cert = &eigenda.EigenDAV1Cert{}
 				eigenDAV1Cert.Load(&blobInfo)
-					
+
 			} else { // dispersed to EigenDA V2 network
 				buf := make([]byte, 0)
 				buf = append(buf, daprovider.EigenDAV2MessageHeaderFlag)
