@@ -114,6 +114,15 @@ func IsTreeDASMessageHeaderByte(header byte) bool {
 	return hasBits(header, TreeDASMessageHeaderFlag)
 }
 
+func IsEigenDAV1HeaderByte(header byte) bool {
+	return hasBits(header, EigenDAV1MessageHeaderFlag)
+
+}
+
+func IsEigenDAV2HeaderByte(header byte) bool {
+	return hasBits(header, EigenDAV2MessageHeaderFlag)
+}
+
 func IsZeroheavyEncodedHeaderByte(header byte) bool {
 	return hasBits(header, ZeroheavyMessageHeaderFlag)
 }

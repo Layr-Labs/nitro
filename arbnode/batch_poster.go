@@ -1814,7 +1814,6 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 				eigenDAV1Cert = &eigenda.EigenDAV1Cert{}
 				eigenDAV1Cert.Load(&blobInfo)
 
-				// TODO: clean this up
 			} else { // dispersed to EigenDA V2 network
 				sequencerMsg = append([]byte{daprovider.EigenDAV2MessageHeader}, daCommitBytes...)
 			}

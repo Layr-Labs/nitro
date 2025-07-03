@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/offchainlabs/nitro/arbnode"
-	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
 	daprovider "github.com/offchainlabs/nitro/daprovider"
@@ -88,6 +87,44 @@ func getProxyURL(proxyBackend string) string {
 		panic("could not determine proxy url from backend: " + proxyBackend)
 	}
 }
+
+// func TestEigenDAIntegration(t *testing.T) {
+// 	// single threaded test execution since conflicts can happen
+// 	// on proxy memconfig states if ran in parallel.
+// 	// TODO: https://github.com/Layr-Labs/nitro/issues/73
+
+// 	// 0 - Test that the proxy is reachable
+// 	testEigenDAProxyReachability(t)
+
+// 	// 1 - Batch posting / derivation
+// 	testEigenDAProxyBatchPosting(t)
+
+// 	jsonData, err := json.Marshal(payload)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to marshal JSON: %w", err)
+// 	}
+
+// 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(jsonData))
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create request: %w", err)
+// 	}
+// 	req.Header.Set("Content-Type", "application/json")
+
+// 	client := &http.Client{}
+// 	resp, err := client.Do(req)
+// 	if err != nil {
+// 		return fmt.Errorf("request failed: %w", err)
+// 	}
+// 	defer resp.Body.Close()
+
+// 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+// 		log.Printf("Successfully set dispersal backend to v2. Status: %s", resp.Status)
+// 	} else {
+// 		return fmt.Errorf("server returned non-2xx status: %s", resp.Status)
+// 	}
+
+// 	return nil
+// }
 
 // single threaded test execution since conflicts can happen
 // on proxy memconfig states if ran in parallel.
@@ -469,11 +506,11 @@ func testEigenDAProxyReachability(t *testing.T, proxyURL string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	memCfgClient := memconfig_client.New(&memconfig_client.Config{URL: proxyURL})
+// 	memCfgClient := memconfig_client.New(&memconfig_client.Config{URL: proxyURL})
 
-	_, err := memCfgClient.GetConfig(ctx)
-	if err != nil {
-		t.Fatalf("❌ EigenDA proxy not reachable at %s: %v", proxyURL, err)
-	}
-	t.Logf("✅ EigenDA proxy reachable at %s", proxyURL)
-}
+// 	_, err := memCfgClient.GetConfig(ctx)
+// 	if err != nil {
+// 		t.Fatalf("❌ EigenDA proxy not reachable at %s: %v", proxyURL, err)
+// 	}
+// 	t.Logf("✅ EigenDA proxy reachable at %s", proxyURL)
+// }

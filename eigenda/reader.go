@@ -7,8 +7,9 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/daprovider"
 )
@@ -74,7 +75,6 @@ func RecoverPayloadFromEigenDAV2Batch(ctx context.Context,
 	}
 
 	var v2Cert EigenDAV2Cert
-	println(fmt.Sprintf("v2 certificate rlp encoded bytes: %x", sequencerMsg[1:]))
 	err = rlp.DecodeBytes(sequencerMsg[1:], &v2Cert)
 	if err != nil {
 		return nil, err

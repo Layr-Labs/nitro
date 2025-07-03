@@ -24,8 +24,11 @@ type EigenDAV1Cert struct {
 	BlobHeader            cv_binding.EigenDATypesV1BlobHeader            `json:"blobHeader"`
 }
 
-
-type EigenDAV2Cert coretypes.EigenDACert
+// TODO: We should probably leverage an interface for here instead
+// it could be possible to codify a ProvableCertInterface which is used for generating preimage hashes
+// btwn cert versions? actually most likely not since the hashing logic is re-performed within the arbitrator
+// for invariance safety
+type EigenDAV2Cert coretypes.EigenDACertV3
 
 func (e *EigenDAV2Cert) PreimageHash() common.Hash {
 	blobCommit := e.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment
