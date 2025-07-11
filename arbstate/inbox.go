@@ -80,7 +80,10 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		foundDA := false
 		var err error
 		for _, dapReader := range dapReaders {
+			println("payload ", payload[0])
+			println(fmt.Sprintf("dapReader: %v", dapReader))
 			if dapReader != nil && dapReader.IsValidHeaderByte(payload[0]) {
+				println("recovering payload from batch for: ", payload[0])
 				payload, err = dapReader.RecoverPayloadFromBatch(ctx, batchNum, batchBlockHash, data, nil, keysetValidationMode != daprovider.KeysetDontValidate)
 				if err != nil {
 					// Matches the way keyset validation was done inside DAS readers i.e logging the error

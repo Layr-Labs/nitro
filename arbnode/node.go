@@ -630,14 +630,12 @@ func createNodeImpl(
 		return nil, errors.New("data availability service required but unconfigured")
 	}
 
-	// NOTE: This ordering should be preserved when constructing readers in the replay script
-	//       i.e. cmd/replay/main.go
 	var dapReaders []daprovider.Reader
-	if daReader != nil {
-		dapReaders = append(dapReaders, daprovider.NewReaderForDAS(daReader, dasKeysetFetcher))
-	}
 	if eigenDAReader != nil {
 		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
+	}
+	if daReader != nil {
+		dapReaders = append(dapReaders, daprovider.NewReaderForDAS(daReader, dasKeysetFetcher))
 	}
 	if blobReader != nil {
 		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(blobReader))
