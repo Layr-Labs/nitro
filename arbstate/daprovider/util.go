@@ -95,6 +95,16 @@ const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L
 
 // hasBits returns true if `checking` has all `bits`
 func hasBits(checking byte, bits byte) bool {
+	// NOTE: This is done to mitigate a bug where the
+	// bitwise AND between EigenDAMessageHeaderFlag and other flag values would return true
+	// when doing the low-level check - resulting in this function to return true
+	// from other dapReaders and cause terminal errors since an EigenDA message type
+	// would be passed into e.g an AnyTrust reader
+	// assuming 0xed for the message header byte is a fundamental design flaw
+	if bits == EigenDAMessageHeaderFlag && checking != EigenDAMessageHeaderFlag {
+		return false
+	}
+
 	return (checking & bits) == bits
 }
 

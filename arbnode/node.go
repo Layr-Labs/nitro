@@ -629,6 +629,7 @@ func createNodeImpl(
 	if txStreamer != nil && txStreamer.chainConfig.ArbitrumChainParams.DataAvailabilityCommittee && daReader == nil {
 		return nil, errors.New("data availability service required but unconfigured")
 	}
+
 	var dapReaders []daprovider.Reader
 	if eigenDAReader != nil {
 		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
