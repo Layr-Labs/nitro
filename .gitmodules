@@ -21,7 +21,7 @@
 [submodule "nitro-testnode"]
 	path = nitro-testnode
 	url = https://github.com/Layr-Labs/nitro-testnode.git
-	branch = v3-upstream-merge
+	commit = 2f32dc150866963bbaed051b3c594e533f1faa51
 [submodule "arbitrator/rust-kzg-bn254"]
 	path = arbitrator/rust-kzg-bn254
 	url = https://github.com/Layr-Labs/rust-kzg-bn254.git
@@ -48,4 +48,4 @@
 [submodule "contracts-legacy"]
 	path = contracts-legacy
 	url = https://github.com/Layr-Labs/nitro-contracts.git
-	commit = ece63f6c3a37d2645573f747bdd3cd6209697f2b
+	commit = fffc3f2949a9bc873dfd974a13ff89330a10c08f
