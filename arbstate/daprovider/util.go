@@ -95,7 +95,7 @@ const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L
 
 // hasBits returns true if `checking` has all `bits`
 func hasBits(checking byte, bits byte) bool {
-	return (checking & bits) == bits
+	return checking == bits
 }
 
 func IsL1AuthenticatedMessageHeaderByte(header byte) bool {
