@@ -11,7 +11,7 @@ import (
 
 const (
 	sequencerMsgOffset = 41
-	MaxBatchSize       = 16_777_216 // 16MiB
+	MaxBatchSize       = 16_252_897 // largest blob size allowed before payload -> blob padding to 16MiB
 )
 
 func IsEigenDAMessageHeaderByte(header byte) bool {
