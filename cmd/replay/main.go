@@ -258,12 +258,15 @@ func main() {
 		if backend.GetPositionWithinMessage() > 0 {
 			keysetValidationMode = daprovider.KeysetDontValidate
 		}
+
+		// NOTE: This dependency ordering must be preserved between replay and node dependency injection
+		// to ensure isomorphism between execution logics when linearly processing batches
 		var dapReaders []daprovider.Reader
-		if dasReader != nil {
-			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader, dasKeysetFetcher))
-		}
 		if eigenDAReader != nil {
 			dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
+		}
+		if dasReader != nil {
+			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader, dasKeysetFetcher))
 		}
 
 		dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(&BlobPreimageReader{}))
