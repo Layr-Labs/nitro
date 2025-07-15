@@ -260,7 +260,7 @@ var DefaultBatchPosterConfig = BatchPosterConfig{
 	// This default is overridden for L3 chains in applyChainParameters in cmd/nitro/nitro.go
 	EnableEigenDAFailover: false,
 	MaxSize:               100000,
-	MaxEigenDABatchSize:   16_777_216,
+	MaxEigenDABatchSize:   16_252_897,
 	// Try to fill 3 blobs per batch
 	Max4844BatchSize:               blobs.BlobEncodableData*(params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob)/2 - 2000,
 	PollInterval:                   time.Second * 10,
