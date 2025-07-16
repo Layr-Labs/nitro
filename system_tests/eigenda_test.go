@@ -14,9 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/offchainlabs/nitro/arbnode"
+	"github.com/offchainlabs/nitro/arbstate/daprovider"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
 	"github.com/offchainlabs/nitro/das"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/solgen/go/precompilesgen"
 	"github.com/offchainlabs/nitro/util/headerreader"
 )
@@ -26,7 +28,7 @@ const (
 	proxyURL = "http://127.0.0.1:4242"
 )
 
-func TestEigenDAIntegration(t * testing.T) {
+func TestEigenDAIntegration(t *testing.T) {
 	// single threaded test execution since conflicts can happen
 	// on proxy memconfig states if ran in parallel.
 	// TODO: https://github.com/Layr-Labs/nitro/issues/73
@@ -128,7 +130,7 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 		memCfg.PutReturnsFailoverError = true
 		_, err = memCfgClient.UpdateConfig(ctx, memCfg)
 		Require(t, err)
-		
+
 		checkBatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(2000000000000), l2B.Client)
 
 		// 3 - Emulate EigenDA becoming healthy again and ensure that the system starts using it for DA
@@ -136,6 +138,38 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 		memCfgClient.UpdateConfig(ctx, memCfg)
 
 		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(3000000000000), l2B.Client)
+
+		// ensure that sequencer inbox contains both eigenda and AnyTrust certificates
+		seqInbox, err := arbnode.NewSequencerInbox(builder.L1.Client, builder.addresses.SequencerInbox, 0)
+		Require(t, err)
+
+		latestBlock, err := builder.L1.Client.BlockNumber(ctx)
+		Require(t, err)
+
+		batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
+		Require(t, err)
+		// ensure that sequencer inbox contains both eigenda and calldata batches
+		var eigenDASeen, callDataBatchSeen bool = false, false
+
+		for _, batch := range batches {
+			serializedBatch, err := batch.Serialize(ctx, builder.L1.Client)
+			Require(t, err)
+
+			if len(serializedBatch) <= 40 {
+				continue
+			}
+
+			if eigenda.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
+				eigenDASeen = true
+			} else if daprovider.IsBrotliMessageHeaderByte(serializedBatch[40]) {
+				callDataBatchSeen = true
+			}
+		}
+
+		if !eigenDASeen || !callDataBatchSeen {
+			t.Fatal("expected both eigenda and calldata batches to be seen within Sequencer Inbox")
+		}
+
 		builder.L2.cleanup()
 		cleanupB()
 	}
@@ -175,8 +209,9 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 		LocalCache: das.TestCacheConfig,
 
 		LocalFileStorage: das.LocalFileStorageConfig{
-			Enable:  true,
-			DataDir: fileDataDir,
+			Enable:       true,
+			DataDir:      fileDataDir,
+			MaxRetention: das.DefaultLocalFileStorageConfig.MaxRetention,
 		},
 		LocalDBStorage: dbConfig,
 
@@ -279,6 +314,38 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 	Require(t, err)
 
 	checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*3), l2B.Client)
+
+	// wire up an inbox reader to extract all submitted batches from sequencer inbox
+	seqInbox, err := arbnode.NewSequencerInbox(builder.L1.Client, builder.addresses.SequencerInbox, 0)
+	Require(t, err)
+
+	latestBlock, err := builder.L1.Client.BlockNumber(ctx)
+	Require(t, err)
+
+	batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
+	Require(t, err)
+
+	// ensure that sequencer inbox contains both eigenda and AnyTrust certificates
+	var eigenDASeen, anyTrustSeen bool = false, false
+
+	for _, batch := range batches {
+		serializedBatch, err := batch.Serialize(ctx, builder.L1.Client)
+		Require(t, err)
+
+		if len(serializedBatch) <= 40 {
+			continue
+		}
+
+		if eigenda.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
+			eigenDASeen = true
+		} else if daprovider.IsDASMessageHeaderByte(serializedBatch[40]) {
+			anyTrustSeen = true
+		}
+	}
+
+	if !eigenDASeen || !anyTrustSeen {
+		t.Fatal("expected both eigenda and anytrust certificates to be seen within Sequencer Inbox")
+	}
 
 	err = restServer.Shutdown()
 	Require(t, err)
