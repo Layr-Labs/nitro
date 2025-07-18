@@ -101,7 +101,7 @@ func hasBits(checking byte, bits byte) bool {
 	// from other dapReaders and cause terminal errors since an EigenDA message type
 	// would be passed into e.g an AnyTrust reader
 	// assuming 0xed for the message header byte is a fundamental design flaw
-	if bits == EigenDAMessageHeaderFlag && checking != EigenDAMessageHeaderFlag {
+	if checking == EigenDAMessageHeaderFlag && bits != EigenDAMessageHeaderFlag {
 		return false
 	}
 
