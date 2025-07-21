@@ -20,7 +20,7 @@ type readerForEigenDA struct {
 }
 
 func (d *readerForEigenDA) IsValidHeaderByte(headerByte byte) bool {
-	return IsEigenDAMessageHeaderByte(headerByte)
+	return daprovider.IsEigenDAMessageHeaderByte(headerByte)
 }
 
 func (d *readerForEigenDA) RecoverPayloadFromBatch(
