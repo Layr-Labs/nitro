@@ -108,6 +108,10 @@ func hasBits(checking byte, bits byte) bool {
 	return (checking & bits) == bits
 }
 
+func IsEigenDAMessageHeaderByte(header byte) bool {
+	return hasBits(header, EigenDAMessageHeaderFlag)
+}
+
 func IsL1AuthenticatedMessageHeaderByte(header byte) bool {
 	return hasBits(header, L1AuthenticatedMessageHeaderFlag)
 }

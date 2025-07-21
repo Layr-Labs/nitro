@@ -6,22 +6,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/offchainlabs/nitro/arbstate/daprovider"
 )
 
 const (
 	sequencerMsgOffset = 41
 	MaxBatchSize       = 16_252_897 // largest blob size allowed before payload -> blob padding to 16MiB
 )
-
-func IsEigenDAMessageHeaderByte(header byte) bool {
-	return hasBits(header, daprovider.EigenDAMessageHeaderFlag)
-}
-
-// hasBits returns true if `checking` has all `bits`
-func hasBits(checking byte, bits byte) bool {
-	return (checking & bits) == bits
-}
 
 type EigenDAWriter interface {
 	Store(context.Context, []byte) (*EigenDAV1Cert, error)

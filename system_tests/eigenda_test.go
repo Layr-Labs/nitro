@@ -18,7 +18,6 @@ import (
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/cmd/genericconf"
 	"github.com/offchainlabs/nitro/das"
-	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/solgen/go/precompilesgen"
 	"github.com/offchainlabs/nitro/util/headerreader"
 )
@@ -159,7 +158,7 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 				continue
 			}
 
-			if eigenda.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
+			if daprovider.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
 				eigenDASeen = true
 			} else if daprovider.IsBrotliMessageHeaderByte(serializedBatch[40]) {
 				callDataBatchSeen = true
@@ -336,7 +335,7 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 			continue
 		}
 
-		if eigenda.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
+		if daprovider.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
 			eigenDASeen = true
 		} else if daprovider.IsDASMessageHeaderByte(serializedBatch[40]) {
 			anyTrustSeen = true
