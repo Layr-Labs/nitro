@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	flag "github.com/spf13/pflag"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -25,6 +27,16 @@ type EigenDAReader interface {
 type EigenDAConfig struct {
 	Enable bool   `koanf:"enable"`
 	Rpc    string `koanf:"rpc"`
+}
+
+var DefaultEigenDAConfig = EigenDAConfig{
+	Enable: false,
+	Rpc:    "",
+}
+
+func EigenDAConfigAddOptions(prefix string, f *flag.FlagSet) {
+	f.Bool(prefix+".enable", DefaultEigenDAConfig.Enable, "Whether or not to enable EigenDA feature for batch submissions")
+	f.String(prefix+".rpc", DefaultEigenDAConfig.Rpc, "EigenDA Proxy RPC URL")
 }
 
 type EigenDA struct {
