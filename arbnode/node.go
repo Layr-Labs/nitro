@@ -95,7 +95,7 @@ type Config struct {
 	Bold                 boldstaker.BoldConfig          `koanf:"bold"`
 	SeqCoordinator       SeqCoordinatorConfig           `koanf:"seq-coordinator"`
 	DataAvailability     das.DataAvailabilityConfig     `koanf:"data-availability"`
-	EigenDA              eigenda.EigenDAConfig          `koanf:"eigen-da"`
+	EigenDA              eigenda.EigenDAConfig          `koanf:"eigenda"`
 	SyncMonitor          SyncMonitorConfig              `koanf:"sync-monitor"`
 	Dangerous            DangerousConfig                `koanf:"dangerous"`
 	TransactionStreamer  TransactionStreamerConfig      `koanf:"transaction-streamer" reload:"hot"`
@@ -188,6 +188,7 @@ var ConfigDefault = Config{
 	Bold:                 boldstaker.DefaultBoldConfig,
 	SeqCoordinator:       DefaultSeqCoordinatorConfig,
 	DataAvailability:     das.DefaultDataAvailabilityConfig,
+	EigenDA:              eigenda.DefaultEigenDAConfig,
 	SyncMonitor:          DefaultSyncMonitorConfig,
 	Dangerous:            DefaultDangerousConfig,
 	TransactionStreamer:  DefaultTransactionStreamerConfig,
