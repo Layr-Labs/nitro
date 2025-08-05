@@ -104,6 +104,9 @@ func parseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		}
 
 		if !foundDA {
+			if daprovider.IsEigenDAMessageHeaderByte(payload[0]) {
+				log.Error("No EigenDA Reader configured, but sequencer message found with EigenDA header")
+			}
 			if daprovider.IsDASMessageHeaderByte(payload[0]) {
 				log.Error("No DAS Reader configured, but sequencer message found with DAS header")
 			} else if daprovider.IsBlobHashesHeaderByte(payload[0]) {
