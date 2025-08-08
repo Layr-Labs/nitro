@@ -631,7 +631,7 @@ func createNodeImpl(
 	}
 
 	var dapReaders []daprovider.Reader
-	if eigenDAReader != nil {
+	if config.EigenDA.Enable {
 		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
 	}
 	if daReader != nil {
