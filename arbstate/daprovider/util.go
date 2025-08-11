@@ -146,6 +146,7 @@ var (
 	ErrHashMismatch          = errors.New("result does not match expected hash")
 	ErrBatchToDasFailed      = errors.New("unable to batch to DAS")
 	ErrNoBlobReader          = errors.New("blob batch payload was encountered but no BlobReader was configured")
+	ErrNoEigenDAReader       = errors.New("eigenda batch payload was encountered but no EigenDA reader was configured")
 	ErrInvalidBlobDataFormat = errors.New("blob batch data is not a list of hashes as expected")
 	ErrSeqMsgValidation      = errors.New("error validating recovered payload from batch")
 )
