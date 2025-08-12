@@ -236,13 +236,12 @@ func main() {
 		return wavmio.ReadInboxMessage(batchNum), nil
 	}
 
-	readMessage := func(dasEnabled bool, eigenDAEnabled bool) *arbostypes.MessageWithMetadata {
+	readMessage := func(dasEnabled bool) *arbostypes.MessageWithMetadata {
 		var delayedMessagesRead uint64
 		if lastBlockHeader != nil {
 			delayedMessagesRead = lastBlockHeader.Nonce.Uint64()
 		}
 		var dasReader daprovider.DASReader
-		var eigenDAReader *EigenDAPreimageReader
 		var dasKeysetFetcher daprovider.DASKeysetFetcher
 		if dasEnabled {
 			// DAS batch and keysets are all together in the same preimage binary.
@@ -250,9 +249,6 @@ func main() {
 			dasKeysetFetcher = &PreimageDASReader{}
 		}
 
-		if eigenDAEnabled {
-			eigenDAReader = &EigenDAPreimageReader{}
-		}
 		backend := WavmInbox{}
 		var keysetValidationMode = daprovider.KeysetPanicIfInvalid
 		if backend.GetPositionWithinMessage() > 0 {
@@ -262,9 +258,8 @@ func main() {
 		// NOTE: This dependency ordering must be preserved between replay and node dependency injection
 		// to ensure isomorphism between execution logics when linearly processing batches
 		var dapReaders []daprovider.Reader
-		if eigenDAReader != nil {
-			dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAReader))
-		}
+		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(&EigenDAPreimageReader{}))
+
 		if dasReader != nil {
 			dapReaders = append(dapReaders, daprovider.NewReaderForDAS(dasReader, dasKeysetFetcher))
 		}
@@ -326,7 +321,7 @@ func main() {
 			}
 		}
 
-		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee, chainConfig.ArbitrumChainParams.EigenDA)
+		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee)
 
 		chainContext := WavmChainContext{}
 		newBlock, _, err = arbos.ProduceBlock(message.Message, message.DelayedMessagesRead, lastBlockHeader, statedb, chainContext, chainConfig, false, core.MessageReplayMode)
@@ -335,7 +330,7 @@ func main() {
 		}
 	} else {
 		// Initialize ArbOS with this init message and create the genesis block.
-		message := readMessage(false, false)
+		message := readMessage(false)
 
 		initMessage, err := message.Message.ParseInitMessage()
 		if err != nil {

@@ -360,13 +360,11 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 
 	if useEigenDA {
 		t.Log("Using EigenDA configurations for challenge test")
-		builder.chainConfig.ArbitrumChainParams.EigenDA = true
 		builder.nodeConfig.EigenDA = eigenda.EigenDAConfig{
 			Enable: true,
 			Rpc:    "http://localhost:4242",
 		}
 
-		chainConfig.ArbitrumChainParams.EigenDA = true
 		conf.EigenDA = eigenda.EigenDAConfig{
 			Enable: true,
 			Rpc:    "http://localhost:4242",
