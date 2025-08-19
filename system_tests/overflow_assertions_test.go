@@ -160,11 +160,11 @@ func TestOverflowAssertions(t *testing.T) {
 	totalMessagesPosted := int64(0)
 	numMessagesPerBatch := int64(32)
 	divergeAt := int64(-1)
-	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, honestSeqInboxBinding, honestSeqInbox, numMessagesPerBatch, divergeAt, nil)
+	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, honestSeqInboxBinding, honestSeqInbox, numMessagesPerBatch, divergeAt)
 	totalMessagesPosted += numMessagesPerBatch
 
 	numMessagesPerBatch = int64(13)
-	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, honestSeqInboxBinding, honestSeqInbox, numMessagesPerBatch, divergeAt, nil)
+	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, honestSeqInboxBinding, honestSeqInbox, numMessagesPerBatch, divergeAt)
 	totalMessagesPosted += numMessagesPerBatch
 
 	bc, err := l2node.InboxTracker.GetBatchCount()

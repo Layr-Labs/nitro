@@ -27,7 +27,7 @@ const (
 	proxyURL = "http://127.0.0.1:4242"
 )
 
-func TestEigenDAV1Integration(t *testing.T) {
+func TestEigenDAIntegration(t *testing.T) {
 	// single threaded test execution since conflicts can happen
 	// on proxy memconfig states if ran in parallel.
 	// TODO: https://github.com/Layr-Labs/nitro/issues/73
@@ -41,6 +41,7 @@ func TestEigenDAV1Integration(t *testing.T) {
 	// 2 - EigenDA failover to native Arbitrum DA destinations
 	testFailOverFromEigenDAToAnyTrust(t)
 	testFailOverFromEigenDAToCallData(t)
+
 }
 
 func testEigenDAProxyBatchPosting(t *testing.T) {

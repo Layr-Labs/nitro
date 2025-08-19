@@ -72,9 +72,9 @@ func TestChallengeProtocolBOLD_Bisections(t *testing.T) {
 	// Make two batchs. One with 5 messages, and one with 10 messages.
 	numMessagesPerBatch := int64(5)
 	divergeAt := int64(-1) // No divergence.
-	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, seqInboxBinding, seqInbox, numMessagesPerBatch, divergeAt, nil)
+	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, seqInboxBinding, seqInbox, numMessagesPerBatch, divergeAt)
 	numMessagesPerBatch = int64(10)
-	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, seqInboxBinding, seqInbox, numMessagesPerBatch, divergeAt, nil)
+	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, seqInboxBinding, seqInbox, numMessagesPerBatch, divergeAt)
 
 	bridgeBinding, err := bridgegen.NewBridge(l1info.GetAddress("Bridge"), l1client)
 	Require(t, err)
@@ -188,8 +188,8 @@ func TestChallengeProtocolBOLD_StateProvider(t *testing.T) {
 	// We will make two batches, with 5 messages in each batch.
 	numMessagesPerBatch := int64(5)
 	divergeAt := int64(-1) // No divergence.
-	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, seqInboxBinding, seqInbox, numMessagesPerBatch, divergeAt, nil)
-	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, seqInboxBinding, seqInbox, numMessagesPerBatch, divergeAt, nil)
+	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, seqInboxBinding, seqInbox, numMessagesPerBatch, divergeAt)
+	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, seqInboxBinding, seqInbox, numMessagesPerBatch, divergeAt)
 
 	bridgeBinding, err := bridgegen.NewBridge(l1info.GetAddress("Bridge"), l1client)
 	Require(t, err)
