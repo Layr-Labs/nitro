@@ -14,14 +14,12 @@ import (
 )
 
 func TestChallengeManagerFullAsserterIncorrect(t *testing.T) {
-	t.Parallel()
 	defaultWasmRootDir := ""
 	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, false, defaultWasmRootDir)
 	RunChallengeTest(t, false, false, makeBatch_MsgsPerBatch+1, true, defaultWasmRootDir)
 }
 
 func TestChallengeManagerFullAsserterIncorrectWithPublishedMachine(t *testing.T) {
-	t.Parallel()
 	cr, err := github.LatestConsensusRelease(context.Background())
 	Require(t, err)
 	machPath := populateMachineDir(t, cr)
@@ -30,14 +28,12 @@ func TestChallengeManagerFullAsserterIncorrectWithPublishedMachine(t *testing.T)
 }
 
 func TestChallengeManagerFullAsserterCorrect(t *testing.T) {
-	t.Parallel()
 	defaultWasmRootDir := ""
 	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, false, defaultWasmRootDir)
 	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, true, defaultWasmRootDir)
 }
 
 func TestChallengeManagerFullAsserterCorrectWithPublishedMachine(t *testing.T) {
-	t.Parallel()
 	cr, err := github.LatestConsensusRelease(context.Background())
 	Require(t, err)
 	machPath := populateMachineDir(t, cr)

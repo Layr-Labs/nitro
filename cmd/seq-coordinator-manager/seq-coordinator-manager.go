@@ -49,7 +49,7 @@ func main() {
 		os.Exit(1)
 	}
 	redisURL := args[0]
-	redisutilCoordinator, err := redisutil.NewRedisCoordinator(redisURL)
+	redisutilCoordinator, err := redisutil.NewRedisCoordinator(redisURL, 1)
 	if err != nil {
 		panic(err)
 	}
@@ -166,7 +166,7 @@ func main() {
 	flex.SetDirection(tview.FlexRow).
 		AddItem(priorityHeading, 0, 1, false).
 		AddItem(tview.NewFlex().
-			// fixedSize is maxURLSize plus 20 characters to accomodate ellipsis, statuses and emojis
+			// fixedSize is maxURLSize plus 20 characters to accommodate ellipsis, statuses and emojis
 			AddItem(prioritySeqList, seqManager.maxURLSize+20, 0, true).
 			AddItem(priorityForm, 0, 3, true), 0, 12, true).
 		AddItem(nonPriorityHeading, 0, 1, false).
@@ -281,7 +281,7 @@ func (sm *manager) addSeqPriorityForm(ctx context.Context) *tview.Form {
 		pages.SwitchToPage("Menu")
 	})
 	addSeqForm.AddButton("Add", func() {
-		// check if url is valid, i.e it doesnt already exist in the priority list
+		// check if url is valid, i.e it doesn't already exist in the priority list
 		if _, ok := sm.prioritiesSet[URL]; !ok && URL != "" {
 			sm.prioritiesSet[URL] = true
 			sm.priorityList = append(sm.priorityList, URL)

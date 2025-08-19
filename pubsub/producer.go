@@ -1,10 +1,10 @@
 // Package pubsub implements publisher/subscriber model (one to many).
 // During normal operation, publisher returns "Promise" when publishing a
-// message, which will return resposne from consumer when awaited.
+// message, which will return response from consumer when awaited.
 // If the consumer processing the request becomes inactive, message is
 // re-inserted (if EnableReproduce flag is enabled), and will be picked up by
 // another consumer.
-// We are assuming here that keeepAliveTimeout is set to some sensible value
+// We are assuming here that keepAliveTimeout is set to some sensible value
 // and once consumer becomes inactive, it doesn't activate without restart.
 package pubsub
 
@@ -154,7 +154,7 @@ func (p *Producer[Request, Response]) checkResponses(ctx context.Context) time.D
 			// If we found the error key, then delete it and return the error to the promise and continue.
 			p.client.Del(ctx, errorKey)
 			promise.ProduceError(errors.New(errorResponse))
-			log.Error("error getting response", "error", errorResponse)
+			log.Debug("consumer returned error", "error", errorResponse, "msgId", id)
 			errored++
 			delete(p.promises, id)
 			continue
@@ -169,7 +169,7 @@ func (p *Producer[Request, Response]) checkResponses(ctx context.Context) time.D
 				// The request this producer is waiting for has been past its TTL or is older than current PEL's lower,
 				// so safe to error and stop tracking this promise
 				promise.ProduceError(errors.New("error getting response, request has been waiting for too long"))
-				log.Error("error getting response, request has been waiting past its TTL")
+				log.Debug("request timed out waiting for response", "msgId", id, "allowedOldestId", allowedOldestID)
 				errored++
 				delete(p.promises, id)
 			}
@@ -196,8 +196,8 @@ func (p *Producer[Request, Response]) clearMessages(ctx context.Context) time.Du
 	if err != nil {
 		log.Error("error getting PEL data from xpending, xtrimming is disabled", "err", err)
 	}
-	// XDEL on consumer side already deletes acked messages (mark as deleted) but doesnt claim the memory back, XTRIM helps in claiming this memory in normal conditions
-	// pelData might be outdated when we do the xtrim, but thats ok as the messages are also being trimmed by other producers
+	// XDEL on consumer side already deletes acked messages (mark as deleted) but doesn't claim the memory back, XTRIM helps in claiming this memory in normal conditions
+	// pelData might be outdated when we do the xtrim, but that's ok as the messages are also being trimmed by other producers
 	if pelData != nil && pelData.Lower != "" {
 		trimmed, trimErr := p.client.XTrimMinID(ctx, p.redisStream, pelData.Lower).Result()
 		log.Debug("trimming", "xTrimMinID", pelData.Lower, "trimmed", trimmed, "trim-err", trimErr)
@@ -212,15 +212,15 @@ func (p *Producer[Request, Response]) clearMessages(ctx context.Context) time.Du
 				MinIdle:  0,
 				Messages: []string{pelData.Lower},
 			}).Err(); err != nil {
-				log.Error("error claiming PEL's lower message thats past its TTL", "msgID", pelData.Lower, "err", err)
+				log.Error("error claiming PEL's lower message that's past its TTL", "msgID", pelData.Lower, "err", err)
 				return 5 * p.cfg.CheckResultInterval
 			}
 			if _, err := p.client.XAck(ctx, p.redisStream, p.redisGroup, pelData.Lower).Result(); err != nil {
-				log.Error("error acking PEL's lower message thats past its TTL", "msgID", pelData.Lower, "err", err)
+				log.Error("error acking PEL's lower message that's past its TTL", "msgID", pelData.Lower, "err", err)
 				return 5 * p.cfg.CheckResultInterval
 			}
 			if _, err := p.client.XDel(ctx, p.redisStream, pelData.Lower).Result(); err != nil {
-				log.Error("error deleting PEL's lower message thats past its TTL", "msgID", pelData.Lower, "err", err)
+				log.Error("error deleting PEL's lower message that's past its TTL", "msgID", pelData.Lower, "err", err)
 				return 5 * p.cfg.CheckResultInterval
 			}
 			return 0

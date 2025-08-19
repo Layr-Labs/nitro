@@ -52,6 +52,11 @@ import (
 
 var notFoundError = errors.New("file not found")
 
+// taken from wasmer's lib/types/src/serialize.rs: MetadataHeader::CURRENT_VERSION
+// 8 is a bug (should have been 6) but we're skipping the real version 8 so it does not matter
+const WasmerSerializeVersion = 8
+const InitialWasmerSerializeVersion = 8
+
 func initializeAndDownloadInit(ctx context.Context, initConfig *conf.InitConfig, stack *node.Node) (string, func(), error) {
 	cleanUpTmp := func() {}
 	if initConfig.DownloadPath == "" {
@@ -287,11 +292,12 @@ func joinArchive(parts []string, archivePath string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to open part file %s: %w", part, err)
 		}
-		defer partFile.Close()
 		_, err = io.Copy(archive, partFile)
 		if err != nil {
+			partFile.Close()
 			return "", fmt.Errorf("failed to copy part file %s: %w", part, err)
 		}
+		partFile.Close()
 		log.Info("Joined database part into archive", "part", part)
 	}
 	log.Info("Successfully joined parts into archive", "archive", archivePath)
@@ -431,7 +437,7 @@ func isWasmDb(path string) bool {
 func extractSnapshot(archive string, location string, importWasm bool) error {
 	reader, err := os.Open(archive)
 	if err != nil {
-		return fmt.Errorf("couln't open init '%v' archive: %w", archive, err)
+		return fmt.Errorf("couldn't open init '%v' archive: %w", archive, err)
 	}
 	defer reader.Close()
 	stat, err := reader.Stat()
@@ -450,14 +456,12 @@ func extractSnapshot(archive string, location string, importWasm bool) error {
 	}
 	err = extract.Archive(context.Background(), reader, location, rename)
 	if err != nil {
-		return fmt.Errorf("couln't extract init archive '%v' err: %w", archive, err)
+		return fmt.Errorf("couldn't extract init archive '%v' err: %w", archive, err)
 	}
 	return nil
 }
 
-// removes all entries with keys prefixed with prefixes and of length used in initial version of wasm store schema
-func purgeVersion0WasmStoreEntries(db ethdb.Database) error {
-	prefixes, keyLength := rawdb.DeprecatedPrefixesV0()
+func deleteWasmEntries(db ethdb.Database, prefixes [][]byte, checkKeyLength bool, expectedKeyLength int) error {
 	batch := db.NewBatch()
 	notMatchingLengthKeyLogged := false
 	for _, prefix := range prefixes {
@@ -465,7 +469,7 @@ func purgeVersion0WasmStoreEntries(db ethdb.Database) error {
 		defer it.Release()
 		for it.Next() {
 			key := it.Key()
-			if len(key) != keyLength {
+			if checkKeyLength && len(key) != expectedKeyLength {
 				if !notMatchingLengthKeyLogged {
 					log.Warn("Found key with deprecated prefix but not matching length, skipping removal. (this warning is logged only once)", "key", key)
 					notMatchingLengthKeyLogged = true
@@ -497,13 +501,39 @@ func purgeVersion0WasmStoreEntries(db ethdb.Database) error {
 	return nil
 }
 
+func validateOrUpgradeWasmerSerializeVersion(db ethdb.Database) error {
+	if !databaseIsEmpty(db) {
+		versionInDB, err := rawdb.ReadWasmerSerializeVersion(db)
+		if err != nil {
+			if rawdb.IsDbErrNotFound(err) {
+				versionInDB = InitialWasmerSerializeVersion
+			} else {
+				return fmt.Errorf("Failed to retrieve wasmer serialize version: %w", err)
+			}
+		}
+		if versionInDB != WasmerSerializeVersion {
+			log.Warn("Detected wasmer serialize version %v, expected version %v - removing old wasm entries", versionInDB, WasmerSerializeVersion)
+			prefixes := rawdb.WasmPrefixesExceptWavm()
+			if err := deleteWasmEntries(db, prefixes, false, 0); err != nil {
+				return fmt.Errorf("Failed to purge wasm entries: %w", err)
+			}
+			log.Info("Wasm entries successfully removed.")
+			err = rawdb.WriteWasmerSerializeVersion(db, WasmerSerializeVersion)
+			if err != nil {
+				return fmt.Errorf("Failed to write wasmer serialize version: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
 // if db is not empty, validates if wasm database schema version matches current version
 // otherwise persists current version
 func validateOrUpgradeWasmStoreSchemaVersion(db ethdb.Database) error {
 	if !databaseIsEmpty(db) {
 		version, err := rawdb.ReadWasmSchemaVersion(db)
 		if err != nil {
-			if dbutil.IsErrNotFound(err) {
+			if rawdb.IsDbErrNotFound(err) {
 				version = []byte{0}
 			} else {
 				return fmt.Errorf("Failed to retrieve wasm schema version: %w", err)
@@ -515,10 +545,11 @@ func validateOrUpgradeWasmStoreSchemaVersion(db ethdb.Database) error {
 		// special step for upgrading from version 0 - remove all entries added in version 0
 		if version[0] == 0 {
 			log.Warn("Detected wasm store schema version 0 - removing all old wasm store entries")
-			if err := purgeVersion0WasmStoreEntries(db); err != nil {
+			prefixes, keyLength := rawdb.DeprecatedPrefixesV0()
+			if err := deleteWasmEntries(db, prefixes, true, keyLength); err != nil {
 				return fmt.Errorf("Failed to purge wasm store version 0 entries: %w", err)
 			}
-			log.Info("Wasm store schama version 0 entries successfully removed.")
+			log.Info("Wasm store schema version 0 entries successfully removed.")
 		}
 	}
 	rawdb.WriteWasmSchemaVersion(db)
@@ -546,7 +577,7 @@ func rebuildLocalWasm(ctx context.Context, config *gethexec.Config, l2BlockChain
 		} else {
 			position, err = gethexec.ReadFromKeyValueStore[common.Hash](wasmDb, gethexec.RebuildingPositionKey)
 			if err != nil {
-				log.Info("Unable to get codehash position in rebuilding of wasm store, its possible it isnt initialized yet, so initializing it and starting rebuilding", "err", err)
+				log.Info("Unable to get codehash position in rebuilding of wasm store, its possible it isn't initialized yet, so initializing it and starting rebuilding", "err", err)
 				if err := gethexec.WriteToKeyValueStore(wasmDb, gethexec.RebuildingPositionKey, common.Hash{}); err != nil {
 					return nil, nil, fmt.Errorf("unable to initialize codehash position in rebuilding of wasm store to beginning: %w", err)
 				}
@@ -555,7 +586,7 @@ func rebuildLocalWasm(ctx context.Context, config *gethexec.Config, l2BlockChain
 		if position != gethexec.RebuildingDone {
 			startBlockHash, err := gethexec.ReadFromKeyValueStore[common.Hash](wasmDb, gethexec.RebuildingStartBlockHashKey)
 			if err != nil {
-				log.Info("Unable to get start block hash in rebuilding of wasm store, its possible it isnt initialized yet, so initializing it to latest block hash", "err", err)
+				log.Info("Unable to get start block hash in rebuilding of wasm store, its possible it isn't initialized yet, so initializing it to latest block hash", "err", err)
 				if err := gethexec.WriteToKeyValueStore(wasmDb, gethexec.RebuildingStartBlockHashKey, latestBlock.Hash()); err != nil {
 					return nil, nil, fmt.Errorf("unable to initialize start block hash in rebuilding of wasm store to latest block hash: %w", err)
 				}
@@ -592,10 +623,13 @@ func openInitializeChainDb(ctx context.Context, stack *node.Node, config *NodeCo
 				if err := validateOrUpgradeWasmStoreSchemaVersion(wasmDb); err != nil {
 					return nil, nil, err
 				}
+				if err := validateOrUpgradeWasmerSerializeVersion(wasmDb); err != nil {
+					return nil, nil, err
+				}
 				if err := dbutil.UnfinishedConversionCheck(wasmDb); err != nil {
 					return nil, nil, fmt.Errorf("wasm unfinished database conversion check error: %w", err)
 				}
-				chainDb := rawdb.WrapDatabaseWithWasm(chainData, wasmDb, 1, targetConfig.WasmTargets())
+				chainDb := rawdb.WrapDatabaseWithWasm(chainData, wasmDb)
 				_, err = rawdb.ParseStateScheme(cacheConfig.StateScheme, chainDb)
 				if err != nil {
 					return nil, nil, err
@@ -604,7 +638,7 @@ func openInitializeChainDb(ctx context.Context, stack *node.Node, config *NodeCo
 				if err != nil {
 					return chainDb, nil, fmt.Errorf("error pruning: %w", err)
 				}
-				l2BlockChain, err := gethexec.GetBlockChain(chainDb, cacheConfig, chainConfig, tracer, config.Execution.TxLookupLimit)
+				l2BlockChain, err := gethexec.GetBlockChain(chainDb, cacheConfig, chainConfig, tracer, &config.Execution.TxIndexer)
 				if err != nil {
 					return chainDb, nil, err
 				}
@@ -671,7 +705,7 @@ func openInitializeChainDb(ctx context.Context, stack *node.Node, config *NodeCo
 	if err := validateOrUpgradeWasmStoreSchemaVersion(wasmDb); err != nil {
 		return nil, nil, err
 	}
-	chainDb := rawdb.WrapDatabaseWithWasm(chainData, wasmDb, 1, targetConfig.WasmTargets())
+	chainDb := rawdb.WrapDatabaseWithWasm(chainData, wasmDb)
 	_, err = rawdb.ParseStateScheme(cacheConfig.StateScheme, chainDb)
 	if err != nil {
 		return nil, nil, err
@@ -758,7 +792,7 @@ func openInitializeChainDb(ctx context.Context, stack *node.Node, config *NodeCo
 		if chainConfig == nil {
 			return chainDb, nil, errors.New("no --init.* mode supplied and chain data not in expected directory")
 		}
-		l2BlockChain, err = gethexec.GetBlockChain(chainDb, cacheConfig, chainConfig, tracer, config.Execution.TxLookupLimit)
+		l2BlockChain, err = gethexec.GetBlockChain(chainDb, cacheConfig, chainConfig, tracer, &config.Execution.TxIndexer)
 		if err != nil {
 			return chainDb, nil, err
 		}
@@ -857,7 +891,7 @@ func openInitializeChainDb(ctx context.Context, stack *node.Node, config *NodeCo
 		if !emptyBlockChain && (cacheConfig.StateScheme == rawdb.PathScheme) && config.Init.Force {
 			return chainDb, nil, errors.New("It is not possible to force init with non-empty blockchain when using path scheme")
 		}
-		l2BlockChain, err = gethexec.WriteOrTestBlockChain(chainDb, cacheConfig, initDataReader, chainConfig, genesisArbOSInit, tracer, parsedInitMessage, config.Execution.TxLookupLimit, config.Init.AccountsPerSync)
+		l2BlockChain, err = gethexec.WriteOrTestBlockChain(chainDb, cacheConfig, initDataReader, chainConfig, genesisArbOSInit, tracer, parsedInitMessage, &config.Execution.TxIndexer, config.Init.AccountsPerSync)
 		if err != nil {
 			return chainDb, nil, err
 		}

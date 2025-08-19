@@ -1,5 +1,5 @@
 // Copyright 2021-2022, Offchain Labs, Inc.
-// For license information, see https://github.com/nitro/blob/master/LICENSE
+// For license information, see https://github.com/OffchainLabs/nitro/blob/master/LICENSE.md
 
 package daprovider
 
@@ -70,7 +70,7 @@ const L1AuthenticatedMessageHeaderFlag byte = 0x40
 // ZeroheavyMessageHeaderFlag indicates that this message is zeroheavy-encoded.
 const ZeroheavyMessageHeaderFlag byte = 0x20
 
-// BlobHashesHeaderFlag indicates that this message contains EIP 4844 versioned hashes of the committments calculated over the blob data for the batch data.
+// BlobHashesHeaderFlag indicates that this message contains EIP 4844 versioned hashes of the commitments calculated over the blob data for the batch data.
 const BlobHashesHeaderFlag byte = L1AuthenticatedMessageHeaderFlag | 0x10 // 0x50
 
 // BrotliMessageHeaderByte indicates that the message is brotli-compressed.
