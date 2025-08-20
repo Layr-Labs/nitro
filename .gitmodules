@@ -49,3 +49,9 @@
 	path = contracts-legacy
 	url = https://github.com/Layr-Labs/nitro-contracts.git
 	commit = ece63f6c3a37d2645573f747bdd3cd6209697f2b
+[submodule "contracts-local/lib/openzeppelin-contracts"]
+	path = contracts-local/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "contracts-local/src/precompiles"]
+	path = contracts-local/src/precompiles
+	url = https://github.com/OffchainLabs/nitro-precompile-interfaces.git

@@ -96,7 +96,7 @@ func checkArbOSVersion(t *testing.T, testClient *TestClient, expectedVersion uin
 // since it verifies upgradibility of nitro software from consensus v11
 // to v32. EigenDA x Nitro only provides production guarantees for
 // v32: https://github.com/Layr-Labs/nitro/releases/tag/consensus-eigenda-v32
-// 
+//
 // func TestArbos11To32UpgradeWithMcopy(t *testing.T) {
 // 	t.Parallel()
 
