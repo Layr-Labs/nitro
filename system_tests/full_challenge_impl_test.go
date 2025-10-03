@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -178,7 +179,7 @@ func makeBatch(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, b
 	Require(t, err, "failed to get batch metadata after adding batch:")
 }
 
-func makeBatchEigenDA(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, backend *ethclient.Client, sequencer *bind.TransactOpts, seqInbox *mocks_legacy_gen.SequencerInboxStub, seqInboxAddr common.Address, modStep int64) {
+func makeBatchEigenDAV1(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, backend *ethclient.Client, sequencer *bind.TransactOpts, seqInbox *mocksgen.SequencerInboxStub, seqInboxAddr common.Address, modStep int64) {
 	ctx := context.Background()
 
 	batchBuffer := bytes.NewBuffer([]byte{})
@@ -206,8 +207,15 @@ func makeBatchEigenDA(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTest
 
 	Require(t, err)
 
-	certV1, err := eigenDA.Store(ctx, message)
+	daCommitBytes, err := eigenDA.Store(ctx, message)
 	Require(t, err)
+
+	var certV1 *eigenda.EigenDAV1Cert
+
+	var blobInfo disperser.BlobInfo
+	err = rlp.DecodeBytes(daCommitBytes[1:], &blobInfo)
+	Require(t, err)
+	certV1.Load(&blobInfo)
 
 	// cast EigenDA V1 certificate to a solidity compatible representation for inbox submission
 	bh := mocks_legacy_gen.BatchHeader{
@@ -256,6 +264,56 @@ func makeBatchEigenDA(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTest
 	}
 
 	tx, err := seqInbox.AddSequencerL2BatchFromEigenDA(sequencer, seqNum, daCert, common.Address{}, big.NewInt(1), big.NewInt(0), big.NewInt(0))
+	Require(t, err)
+	receipt, err := EnsureTxSucceeded(ctx, backend, tx)
+	Require(t, err)
+
+	nodeSeqInbox, err := arbnode.NewSequencerInbox(backend, seqInboxAddr, 0)
+	Require(t, err)
+	batches, err := nodeSeqInbox.LookupBatchesInRange(ctx, receipt.BlockNumber, receipt.BlockNumber)
+	Require(t, err)
+	if len(batches) == 0 {
+		Fatal(t, "batch not found after AddSequencerL2BatchFromOrigin")
+	}
+	err = l2Node.InboxTracker.AddSequencerBatches(ctx, backend, batches)
+	Require(t, err)
+	_, err = l2Node.InboxTracker.GetBatchMetadata(0)
+	Require(t, err, "failed to get batch metadata after adding batch:")
+}
+
+func makeBatchEigenDAV2(t *testing.T, l2Node *arbnode.Node, l2Info *BlockchainTestInfo, backend *ethclient.Client, sequencer *bind.TransactOpts, seqInbox *mocksgen.SequencerInboxStub, seqInboxAddr common.Address, modStep int64) {
+	ctx := context.Background()
+
+	batchBuffer := bytes.NewBuffer([]byte{})
+	for i := int64(0); i < makeBatch_MsgsPerBatch; i++ {
+		value := i
+		if i == modStep {
+			value++
+		}
+		err := writeTxToBatch(batchBuffer, l2Info.PrepareTx("Owner", "Destination", 1000000, big.NewInt(value), []byte{}))
+		Require(t, err)
+	}
+	compressed, err := arbcompress.CompressWell(batchBuffer.Bytes())
+	Require(t, err)
+	message := append([]byte{0}, compressed...)
+
+	seqNum := new(big.Int).Lsh(common.Big1, 256)
+	seqNum.Sub(seqNum, common.Big1)
+
+	// disperse batch to eigenda-proxy
+
+	eigenDA, err := eigenda.NewEigenDA(&eigenda.EigenDAConfig{
+		Enable: true,
+		Rpc:    "http://localhost:4242",
+	})
+
+	Require(t, err)
+
+	daCommitBytes, err := eigenDA.Store(ctx, message)
+	Require(t, err)
+
+	seqMsg := append([]byte{daprovider.EigenDAV2MessageHeaderFlag}, daCommitBytes...)
+	tx, err := seqInbox.AddSequencerL2BatchFromOrigin8f111f3c(sequencer, seqNum, seqMsg, big.NewInt(1), common.Address{}, big.NewInt(0), big.NewInt(0))
 	Require(t, err)
 	receipt, err := EnsureTxSucceeded(ctx, backend, tx)
 	Require(t, err)
@@ -425,16 +483,16 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 
 	if useEigenDA {
 		// seqNum := common.Big2
-		makeBatchEigenDA(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
-		makeBatchEigenDA(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-1)
+		makeBatchEigenDAV2(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDAV2(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-1)
 
 		// seqNum.Add(seqNum, common.Big1)
-		makeBatchEigenDA(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
-		makeBatchEigenDA(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch-1)
+		makeBatchEigenDAV2(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDAV2(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch-1)
 
 		// seqNum.Add(seqNum, common.Big1)
-		makeBatchEigenDA(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
-		makeBatchEigenDA(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch*2-1)
+		makeBatchEigenDAV2(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)
+		makeBatchEigenDAV2(t, challengerL2, challengerL2Info, l1Backend, &sequencerTxOpts, challengerSeqInbox, challengerSeqInboxAddr, challengeMsgIdx-makeBatch_MsgsPerBatch*2-1)
 	} else {
 		// seqNum := common.Big2
 		makeBatch(t, asserterL2, asserterL2Info, l1Backend, &sequencerTxOpts, asserterSeqInbox, asserterSeqInboxAddr, -1)

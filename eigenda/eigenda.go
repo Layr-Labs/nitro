@@ -23,7 +23,8 @@ type EigenDAWriter interface {
 }
 
 type EigenDAReader interface {
-	QueryBlob(ctx context.Context, cert *EigenDAV1Cert, domainFilter string) ([]byte, error)
+	QueryBlobV1(ctx context.Context, cert *EigenDAV1Cert) ([]byte, error)
+	QueryBlobV2(ctx context.Context, daCommit []byte) ([]byte, error)
 }
 
 type EigenDAConfig struct {
@@ -66,9 +67,9 @@ func NewEigenDA(config *EigenDAConfig) (*EigenDA, error) {
 	}, nil
 }
 
-// QueryBlob retrieves a blob from EigenDA using the provided EigenDAV1Cert
-func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDAV1Cert, domainFilter string) ([]byte, error) {
-	log.Info("Reading blob from EigenDA", "batchID", cert.BlobVerificationProof.BatchId)
+// QueryBlobV1 retrieves a blob from EigenDA using the provided EigenDAV1Cert
+func (e *EigenDA) QueryBlobV1(ctx context.Context, cert *EigenDAV1Cert) ([]byte, error) {
+	log.Info("Reading blob from EigenDA V1 network", "batchID", cert.BlobVerificationProof.BatchId)
 	info, err := cert.ToDisperserBlobInfo()
 	if err != nil {
 		return nil, err
@@ -95,6 +96,15 @@ func (e *EigenDA) Store(ctx context.Context, data []byte) (*EigenDAV1Cert, error
 	v1Cert.Load(blobInfo)
 
 	return v1Cert, nil
+}
+
+func (e *EigenDA) QueryBlobV2(ctx context.Context, daCommit []byte) ([]byte, error) {
+	data, err := e.client.GetV2(ctx, daCommit)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func (e *EigenDA) Serialize(cert *EigenDAV1Cert) ([]byte, error) {

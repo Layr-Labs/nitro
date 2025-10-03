@@ -215,7 +215,7 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client *ethc
 			return nil, err
 		}
 
-		msgData := []byte{daprovider.EigenDAMessageHeaderFlag}
+		msgData := []byte{daprovider.EigenDAV1MessageHeaderFlag}
 		msgData = append(msgData, b...)
 
 		return msgData, nil

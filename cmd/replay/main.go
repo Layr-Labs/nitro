@@ -167,7 +167,7 @@ type EigenDAPreimageReader struct{}
 
 // QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
 // certificate kzg commitment for identifying the preimage.
-func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDAV1Cert, domain string) ([]byte, error) {
+func (dasReader *EigenDAPreimageReader) QueryBlobV1(ctx context.Context, cert *eigenda.EigenDAV1Cert) ([]byte, error) {
 	hash, err := cert.PreimageHash()
 	if err != nil {
 		return nil, err
@@ -186,6 +186,30 @@ func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eig
 
 	return decodedBlob, nil
 }
+
+func (dasReader *EigenDAPreimageReader) QueryBlobV2(ctx context.Context, b []byte) ([]byte, error) {
+	var cert eigenda.EigenDAV2Cert
+	err := rlp.DecodeBytes(b[1:], &cert)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := cert.PreimageHash()
+	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedBlob, err := eigenda.GenericDecodeBlob(preimage)
+	if err != nil {
+		println("Error decoding blob: ", err)
+		return nil, err
+	}
+
+	return decodedBlob, nil
+
+}
+
 
 // To generate:
 // key, _ := crypto.HexToECDSA("0000000000000000000000000000000000000000000000000000000000000001")

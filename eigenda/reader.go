@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -19,8 +20,8 @@ type readerForEigenDA struct {
 	readerEigenDA EigenDAReader
 }
 
-func (d *readerForEigenDA) IsValidHeaderByte(ctx context.Context, headerByte byte) bool {
-	return daprovider.IsEigenDAMessageHeaderByte(headerByte)
+func (d *readerForEigenDA) IsValidHeaderByte(headerByte byte) bool {
+	return daprovider.IsEigenDAV1HeaderByte(headerByte) || daprovider.IsEigenDAV2HeaderByte(headerByte)
 }
 
 func (d *readerForEigenDA) RecoverPayloadFromBatch(
@@ -30,21 +31,55 @@ func (d *readerForEigenDA) RecoverPayloadFromBatch(
 	sequencerMsg []byte,
 	preimages daprovider.PreimagesMap,
 	validateSeqMsg bool,
-) ([]byte, daprovider.PreimagesMap, error) {
+) ([]byte, error) {
 	if preimages == nil {
 		preimages = make(daprovider.PreimagesMap)
 	}
-	preimageRecorder := daprovider.RecordPreimagesTo(preimages)
-	payload, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder, "binary")
-	return payload, preimages, err
+
+	if daprovider.IsEigenDAV1HeaderByte(sequencerMsg[0]) {
+		return RecoverPayloadFromEigenDAV1Batch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder)
+	} else {
+		return RecoverPayloadFromEigenDAV2Batch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder)
+	}
+
 }
 
-func RecoverPayloadFromEigenDABatch(ctx context.Context,
+func RecoverPayloadFromEigenDAV2Batch(ctx context.Context,
 	sequencerMsg []byte,
 	daReader EigenDAReader,
 	preimageRecoder daprovider.PreimageRecorder,
-	domain string,
 ) ([]byte, error) {
+
+	data, err := daReader.QueryBlobV2(ctx, sequencerMsg)
+	if err != nil {
+		log.Error("Failed to query data from EigenDA", "err", err)
+		return nil, err
+	}
+
+	var v2Cert EigenDAV2Cert
+	println(fmt.Sprintf("v2 certificate rlp encoded bytes: %x", sequencerMsg[1:]))
+	err = rlp.DecodeBytes(sequencerMsg[1:], &v2Cert)
+	if err != nil {
+		return nil, err
+	}
+
+	if preimageRecoder != nil {
+		preimage, err := GenericEncodeBlob(data)
+		if err != nil {
+			return nil, err
+		}
+		preimageRecoder(v2Cert.PreimageHash(), preimage, arbutil.EigenDaPreimageType)
+	}
+	return data, nil
+}
+
+func RecoverPayloadFromEigenDAV1Batch(ctx context.Context,
+	sequencerMsg []byte,
+	daReader EigenDAReader,
+	preimageRecoder daprovider.PreimageRecorder,
+) ([]byte, error) {
+
+	println(fmt.Sprintf("%+x", sequencerMsg[40:]))
 
 	eigenDAV1Cert, err := ParseSequencerMsg(sequencerMsg)
 	if err != nil {
@@ -52,7 +87,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 		return nil, err
 	}
 
-	data, err := daReader.QueryBlob(ctx, eigenDAV1Cert, domain)
+	data, err := daReader.QueryBlobV1(ctx, eigenDAV1Cert)
 	if err != nil {
 		log.Error("Failed to query data from EigenDA", "err", err)
 		return nil, err

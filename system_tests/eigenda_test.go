@@ -39,6 +39,10 @@ func TestEigenDAV1Integration(t *testing.T) {
 	testEigenDAProxyBatchPosting(t)
 
 	// 2 - EigenDA failover to native Arbitrum DA destinations
+
+	RunChallengeTest(t, true, false, makeBatch_MsgsPerBatch+2, true, "")
+
+	// 3 - EigenDA failover to native Arbitrum DA destinations
 	testFailOverFromEigenDAToAnyTrust(t)
 	testFailOverFromEigenDAToCallData(t)
 }

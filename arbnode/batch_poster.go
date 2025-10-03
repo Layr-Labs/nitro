@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	eigenda_proxy "github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/offchainlabs/bold/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/arbnode/dataposter"
 	"github.com/offchainlabs/nitro/arbnode/dataposter/storage"
@@ -1211,8 +1212,11 @@ func (b *BatchPoster) encodeAddBatch(
 		} else {
 			methodName = sequencerBatchPostWithBlobsMethodName
 		}
-	} else if useEigenDA {
+	} else if useEigenDA && eigenDAV1Cert != nil {
 		methodName = sequencerBatchPostWithEigendaMethodName
+
+	} else if useEigenDA {
+		methodName = sequencerBatchPostMethodName
 	} else if delayProof != nil {
 		methodName = sequencerBatchPostDelayProofMethodName
 	} else {
@@ -1231,7 +1235,7 @@ func (b *BatchPoster) encodeAddBatch(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to encode blobs: %w", err)
 		}
-	} else if useEigenDA {
+	} else if useEigenDA && eigenDAV1Cert != nil {
 
 		args = append(args, eigenDAV1Cert)
 		args = append(args, b.config().gasRefunder)
@@ -1757,7 +1761,7 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 			batchPosterDAFailureCounter.Inc(1)
 			return false, fmt.Errorf("%w: nonce changed from %d to %d while creating batch", storage.ErrStorageRace, nonce, gotNonce)
 		}
-		eigenDAV1Cert, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
+		daCommitBytes, err := b.eigenDAWriter.Store(ctx, sequencerMsg)
 
 		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter != nil { // Failover to anytrust commitee if enabled
 			log.Error("EigenDA service is unavailable, failing over to any trust mode")
@@ -1798,6 +1802,22 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 			batchPosterDASuccessCounter.Inc(1)
 			batchPosterDALastSuccessfulActionGauge.Update(time.Now().Unix())
 			eigenDADispersed = true
+
+			// dispersed to EigenDA V1 network
+			if daCommitBytes[0] == 0x0 {
+				var blobInfo disperser.BlobInfo
+				err = rlp.DecodeBytes(daCommitBytes[1:], &blobInfo)
+				if err != nil {
+					return false, fmt.Errorf("failed to decode blob info: %w", err)
+				}
+
+				eigenDAV1Cert = &eigenda.EigenDAV1Cert{}
+				eigenDAV1Cert.Load(&blobInfo)
+					
+			// TODO: clean this up
+			} else { // dispersed to EigenDA V2 network
+				sequencerMsg = append([]byte{daprovider.EigenDAV2MessageHeaderFlag}, daCommitBytes...)
+			}
 		}
 	}
 
