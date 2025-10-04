@@ -22,22 +22,22 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 
-	"github.com/offchainlabs/nitro/arbnode"
-	"github.com/offchainlabs/nitro/arbos/l2pricing"
-	"github.com/offchainlabs/nitro/cmd/chaininfo"
-	"github.com/offchainlabs/nitro/staker"
-	"github.com/offchainlabs/nitro/staker/bold"
-	"github.com/offchainlabs/nitro/util"
-	"github.com/offchainlabs/nitro/validator/valnode"
-
 	protocol "github.com/offchainlabs/bold/chain-abstraction"
 	"github.com/offchainlabs/bold/containers/option"
 	l2stateprovider "github.com/offchainlabs/bold/layer2-state-provider"
-	"github.com/offchainlabs/bold/solgen/go/bridgegen"
-	"github.com/offchainlabs/bold/solgen/go/mocksgen"
 	prefixproofs "github.com/offchainlabs/bold/state-commitments/prefix-proofs"
 	mockmanager "github.com/offchainlabs/bold/testing/mocks/state-provider"
 	"github.com/offchainlabs/bold/testing/setup"
+	"github.com/offchainlabs/nitro/arbnode"
+	"github.com/offchainlabs/nitro/arbos/l2pricing"
+	"github.com/offchainlabs/nitro/cmd/chaininfo"
+	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
+	"github.com/offchainlabs/nitro/solgen/go/mocksgen"
+	"github.com/offchainlabs/nitro/staker"
+	"github.com/offchainlabs/nitro/staker/bold"
+	"github.com/offchainlabs/nitro/util"
+	"github.com/offchainlabs/nitro/validator/server_common"
+	"github.com/offchainlabs/nitro/validator/valnode"
 )
 
 func TestChallengeProtocolBOLD_Bisections(t *testing.T) {
@@ -378,6 +378,8 @@ func setupBoldStateProvider(t *testing.T, ctx context.Context, blockChallengeHei
 	_, valStack := createTestValidationNode(t, ctx, &valnode.TestValidationConfig)
 	blockValidatorConfig := staker.TestBlockValidatorConfig
 
+	locator, err := server_common.NewMachineLocator(valnode.TestValidationConfig.Wasm.RootPath)
+	Require(t, err)
 	stateless, err := staker.NewStatelessBlockValidator(
 		l2node.InboxReader,
 		l2node.InboxTracker,
@@ -387,7 +389,7 @@ func setupBoldStateProvider(t *testing.T, ctx context.Context, blockChallengeHei
 		nil,
 		StaticFetcherFrom(t, &blockValidatorConfig),
 		valStack,
-		valnode.TestValidationConfig.Wasm.RootPath,
+		locator.LatestWasmModuleRoot(),
 	)
 	Require(t, err)
 	Require(t, stateless.Start(ctx))
@@ -414,6 +416,9 @@ func setupBoldStateProvider(t *testing.T, ctx context.Context, blockChallengeHei
 			CheckBatchFinality:     false,
 		},
 		dir,
+		l2node.InboxTracker,
+		l2node.TxStreamer,
+		l2node.InboxReader,
 	)
 	Require(t, err)
 

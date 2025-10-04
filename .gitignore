@@ -10,6 +10,7 @@ node_modules
 .DS_Store
 .idea
 .vscode
+.cursor
 cmd/node/data
 cmd/node/node
 solgen/go/
@@ -24,5 +25,20 @@ system_tests/test-data/*
 system_tests/testdata/*
 arbos/testdata/*
 
-## fork diff
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+# Dependency directories (remove the comment below to include it)
+# vendor/
+.idea
+#other temporaries
+tmp/*
+.env
+
+# fork diff
 index.html

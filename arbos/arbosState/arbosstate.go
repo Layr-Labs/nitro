@@ -213,7 +213,7 @@ func InitializeArbosState(stateDB vm.StateDB, burner burn.Burner, chainConfig *p
 	nativeTokenEnabledFromTime := uint64(0)
 	if genesisArbOSInit != nil && genesisArbOSInit.NativeTokenSupplyManagementEnabled {
 		// Since we're initializing the state from the beginning with the
-		// faeture eanbled, we set the enalbed time to 1 (which will always be)
+		// feature enabled, we set the enabled time to 1 (which will always be)
 		// lower than the timestamp of the first block of the chain.
 		nativeTokenEnabledFromTime = uint64(1)
 	}
@@ -476,11 +476,11 @@ func (state *ArbosState) ChainOwners() *addressSet.AddressSet {
 	return state.chainOwners
 }
 
-func (state *ArbosState) NativeTokenEnabledFromTime() (uint64, error) {
+func (state *ArbosState) NativeTokenManagementFromTime() (uint64, error) {
 	return state.nativeTokenEnabledTime.Get()
 }
 
-func (state *ArbosState) SetNativeTokenEnabledFromTime(val uint64) error {
+func (state *ArbosState) SetNativeTokenManagementFromTime(val uint64) error {
 	return state.nativeTokenEnabledTime.Set(val)
 }
 

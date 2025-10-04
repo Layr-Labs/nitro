@@ -39,8 +39,12 @@ var TestConsumerConfig = ConsumerConfig{
 var ErrAlreadySet = errors.New("redis key already set")
 
 func ConsumerConfigAddOptions(prefix string, f *pflag.FlagSet) {
-	f.Duration(prefix+".response-entry-timeout", DefaultConsumerConfig.ResponseEntryTimeout, "timeout for response entry")
-	f.Duration(prefix+".idletime-to-autoclaim", DefaultConsumerConfig.IdletimeToAutoclaim, "After a message spends this amount of time in PEL (Pending Entries List i.e claimed by another consumer but not Acknowledged) it will be allowed to be autoclaimed by other consumers")
+	ConsumerConfigAddOptionsWithDefaults(prefix, f, DefaultConsumerConfig)
+}
+
+func ConsumerConfigAddOptionsWithDefaults(prefix string, f *pflag.FlagSet, defaultConfig ConsumerConfig) {
+	f.Duration(prefix+".response-entry-timeout", defaultConfig.ResponseEntryTimeout, "timeout for response entry")
+	f.Duration(prefix+".idletime-to-autoclaim", defaultConfig.IdletimeToAutoclaim, "After a message spends this amount of time in PEL (Pending Entries List i.e claimed by another consumer but not Acknowledged) it will be allowed to be autoclaimed by other consumers")
 }
 
 // Consumer implements a consumer for redis stream provides heartbeat to
@@ -199,7 +203,7 @@ func (c *Consumer[Request, Response]) Consume(ctx context.Context) (*Message[Req
 			}).Result(); err != nil {
 				log.Error("Error claiming message, it might be possible that other consumers might pick this request", "msgID", messages[0].ID)
 			} else if len(ids) == 0 {
-				log.Warn("XClaimJustID returned empty response when indicating hearbeat", "msgID", messages[0].ID)
+				log.Warn("XClaimJustID returned empty response when indicating heartbeat", "msgID", messages[0].ID)
 			} else if len(ids) > 1 {
 				log.Error("XClaimJustID returned response with more than entry", "msgIDs", ids)
 			}
@@ -207,7 +211,7 @@ func (c *Consumer[Request, Response]) Consume(ctx context.Context) (*Message[Req
 			case <-ackNotifier:
 				return
 			case <-ctx.Done():
-				log.Info("Context done while claiming message to indicate hearbeat", "messageID", messages[0].ID, "error", ctx.Err().Error())
+				log.Info("Context done while claiming message to indicate heartbeat", "messageID", messages[0].ID, "error", ctx.Err().Error())
 				if c.StopWaiter.GetParentContext().Err() == nil {
 					// Proceeding to set the Idle time of message to IdletimeToAutoclaim to allow it to be picked by other consumers
 					if err := c.client.Do(c.StopWaiter.GetParentContext(), "XCLAIM", c.redisStream, c.redisGroup, c.id, 0, messages[0].ID, "IDLE", c.cfg.IdletimeToAutoclaim.Milliseconds()).Err(); err != nil {

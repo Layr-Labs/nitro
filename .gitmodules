@@ -1,10 +1,6 @@
 [submodule "go-ethereum"]
 	path = go-ethereum
-	url = https://github.com/Layr-Labs/nitro-go-ethereum
-	branch = eigenda-3.1-rebase
-[submodule "fastcache"]
-	path = fastcache
-	url = https://github.com/OffchainLabs/fastcache.git
+	url = https://github.com/OffchainLabs/go-ethereum.git
 [submodule "arbitrator/wasm-libraries/soft-float/SoftFloat"]
 	path = arbitrator/wasm-libraries/soft-float/SoftFloat
 	url = https://github.com/OffchainLabs/SoftFloat.git
@@ -29,10 +25,6 @@
 [submodule "arbitrator/tools/wasmer"]
 	path = arbitrator/tools/wasmer
 	url = https://github.com/OffchainLabs/wasmer.git
-[submodule "bold"]
-	path = bold
-	url = https://github.com/Layr-Labs/bold.git
-	commit = 82e28a894e7f8233e135dc2f342989d20162e06f
 [submodule "arbitrator/langs/rust"]
 	path = arbitrator/langs/rust
 	url = https://github.com/OffchainLabs/stylus-sdk-rs.git
@@ -49,3 +41,9 @@
 	path = contracts-legacy
 	url = https://github.com/Layr-Labs/nitro-contracts.git
 	commit = ece63f6c3a37d2645573f747bdd3cd6209697f2b
+[submodule "contracts-local/lib/openzeppelin-contracts"]
+	path = contracts-local/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "contracts-local/src/precompiles"]
+	path = contracts-local/src/precompiles
+	url = https://github.com/OffchainLabs/nitro-precompile-interfaces.git
