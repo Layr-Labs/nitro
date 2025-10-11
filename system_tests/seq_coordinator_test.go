@@ -13,9 +13,14 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/offchainlabs/nitro/arbnode"
+	"github.com/offchainlabs/nitro/arbos/arbostypes"
+	"github.com/offchainlabs/nitro/arbutil"
+	"github.com/offchainlabs/nitro/execution"
+	"github.com/offchainlabs/nitro/execution/gethexec"
 	"github.com/offchainlabs/nitro/util/redisutil"
 	"github.com/offchainlabs/nitro/util/testhelpers"
 )
@@ -39,249 +44,249 @@ func initRedisForTest(t *testing.T, ctx context.Context, redisUrl string, nodeNa
 	redisClient.Del(ctx, redisutil.CHOSENSEQ_KEY, redisutil.MSG_COUNT_KEY)
 }
 
-// NOTE: This test was labelled flakey in https://github.com/OffchainLabs/nitro/pull/3758/files
-//       Will be brought back once rebasing to upcoming v3.8.0
-// func TestRedisSeqCoordinatorPriorities(t *testing.T) {
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
+func TestRedisSeqCoordinatorPrioritiesFlaky(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-// 	builder := NewNodeBuilder(ctx).DefaultConfig(t, false).DontParalellise()
-// 	builder.takeOwnership = false
-// 	builder.nodeConfig.SeqCoordinator.Enable = true
-// 	builder.nodeConfig.SeqCoordinator.RedisUrl = redisutil.CreateTestRedis(ctx, t)
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, false).DontParalellise()
+	builder.takeOwnership = false
+	builder.nodeConfig.SeqCoordinator.Enable = true
+	builder.nodeConfig.SeqCoordinator.RedisUrl = redisutil.CreateTestRedis(ctx, t)
+	builder.nodeConfig.ConsensusExecutionSyncer.SyncInterval = 10 * time.Millisecond
+	builder.execConfig.SyncMonitor.MsgLag = 10 * time.Millisecond
 
-// 	l2Info := builder.L2Info
+	l2Info := builder.L2Info
 
-// 	// stdio protocol makes sure forwarder initialization doesn't fail
-// 	nodeNames := []string{"stdio://A", "stdio://B", "stdio://C", "stdio://D", "stdio://E"}
+	// stdio protocol makes sure forwarder initialization doesn't fail
+	nodeNames := []string{"stdio://A", "stdio://B", "stdio://C", "stdio://D", "stdio://E"}
 
-// 	testNodes := make([]*TestClient, len(nodeNames))
+	testNodes := make([]*TestClient, len(nodeNames))
 
-// 	// init DB to known state
-// 	initRedisForTest(t, ctx, builder.nodeConfig.SeqCoordinator.RedisUrl, nodeNames)
+	// init DB to known state
+	initRedisForTest(t, ctx, builder.nodeConfig.SeqCoordinator.RedisUrl, nodeNames)
 
-// 	createStartNode := func(nodeNum int) {
-// 		builder.nodeConfig.SeqCoordinator.MyUrl = nodeNames[nodeNum]
-// 		builder.L2Info = l2Info
-// 		builder.dataDir = t.TempDir() // set new data dir for each node
-// 		builder.l2StackConfig = testhelpers.CreateStackConfigForTest(builder.dataDir)
-// 		builder.parallelise = false
-// 		builder.Build(t)
-// 		testNodes[nodeNum] = builder.L2
-// 	}
+	createStartNode := func(nodeNum int) {
+		builder.nodeConfig.SeqCoordinator.MyUrl = nodeNames[nodeNum]
+		builder.L2Info = l2Info
+		builder.dataDir = t.TempDir() // set new data dir for each node
+		builder.l2StackConfig = testhelpers.CreateStackConfigForTest(builder.dataDir)
+		builder.parallelise = false
+		builder.Build(t)
+		testNodes[nodeNum] = builder.L2
+	}
 
-// 	trySequencing := func(nodeNum int) bool {
-// 		node := testNodes[nodeNum].ConsensusNode
-// 		curMsgs, err := node.TxStreamer.GetMessageCountSync(t)
-// 		Require(t, err)
-// 		emptyMessage := arbostypes.MessageWithMetadata{
-// 			Message: &arbostypes.L1IncomingMessage{
-// 				Header: &arbostypes.L1IncomingMessageHeader{
-// 					Kind:        0,
-// 					Poster:      common.Address{},
-// 					BlockNumber: 0,
-// 					Timestamp:   0,
-// 					RequestId:   &common.Hash{},
-// 					L1BaseFee:   common.Big0,
-// 				},
-// 				L2msg: nil,
-// 			},
-// 			DelayedMessagesRead: 1,
-// 		}
-// 		err = node.SeqCoordinator.SequencingMessage(curMsgs, &emptyMessage, nil)
-// 		if errors.Is(err, execution.ErrRetrySequencer) {
-// 			return false
-// 		}
-// 		Require(t, err)
-// 		Require(t, node.TxStreamer.AddMessages(curMsgs, false, []arbostypes.MessageWithMetadata{emptyMessage}, nil))
-// 		return true
-// 	}
+	trySequencing := func(nodeNum int) bool {
+		node := testNodes[nodeNum].ConsensusNode
+		curMsgs, err := node.TxStreamer.GetMessageCountSync(t)
+		Require(t, err)
+		emptyMessage := arbostypes.MessageWithMetadata{
+			Message: &arbostypes.L1IncomingMessage{
+				Header: &arbostypes.L1IncomingMessageHeader{
+					Kind:        0,
+					Poster:      common.Address{},
+					BlockNumber: 0,
+					Timestamp:   0,
+					RequestId:   &common.Hash{},
+					L1BaseFee:   common.Big0,
+				},
+				L2msg: nil,
+			},
+			DelayedMessagesRead: 1,
+		}
+		err = node.SeqCoordinator.SequencingMessage(curMsgs, &emptyMessage, nil)
+		if errors.Is(err, execution.ErrRetrySequencer) {
+			return false
+		}
+		Require(t, err)
+		Require(t, node.TxStreamer.AddMessages(curMsgs, false, []arbostypes.MessageWithMetadata{emptyMessage}, nil))
+		return true
+	}
 
-// 	// node(n) has higher prio than node(n+1), so should be impossible for more than one to succeed
-// 	trySequencingEverywhere := func() int {
-// 		succeeded := -1
-// 		for nodeNum, testNode := range testNodes {
-// 			node := testNode.ConsensusNode
-// 			if node == nil {
-// 				continue
-// 			}
-// 			if trySequencing(nodeNum) {
-// 				if succeeded >= 0 {
-// 					t.Fatal("sequnced succeeded in parallel",
-// 						"index1:", succeeded, "debug", testNodes[succeeded].ConsensusNode.SeqCoordinator.DebugPrint(),
-// 						"index2:", nodeNum, "debug", node.SeqCoordinator.DebugPrint(),
-// 						"now", time.Now().UnixMilli())
-// 				}
-// 				succeeded = nodeNum
-// 			}
-// 		}
-// 		return succeeded
-// 	}
+	// node(n) has higher prio than node(n+1), so should be impossible for more than one to succeed
+	trySequencingEverywhere := func() int {
+		succeeded := -1
+		for nodeNum, testNode := range testNodes {
+			node := testNode.ConsensusNode
+			if node == nil {
+				continue
+			}
+			if trySequencing(nodeNum) {
+				if succeeded >= 0 {
+					t.Fatal("sequnced succeeded in parallel",
+						"index1:", succeeded, "debug", testNodes[succeeded].ConsensusNode.SeqCoordinator.DebugPrint(),
+						"index2:", nodeNum, "debug", node.SeqCoordinator.DebugPrint(),
+						"now", time.Now().UnixMilli())
+				}
+				succeeded = nodeNum
+			}
+		}
+		return succeeded
+	}
 
-// 	waitForMsgEverywhere := func(msgNum arbutil.MessageIndex) {
-// 		for _, testNode := range testNodes {
-// 			currentNode := testNode.ConsensusNode
-// 			if currentNode == nil {
-// 				continue
-// 			}
-// 			for attempts := 1; ; attempts++ {
-// 				msgCount, err := currentNode.TxStreamer.GetMessageCountSync(t)
-// 				Require(t, err)
-// 				if msgCount >= msgNum {
-// 					break
-// 				}
-// 				if attempts > 10 {
-// 					Fatal(t, "timeout waiting for msg ", msgNum, " debug: ", currentNode.SeqCoordinator.DebugPrint())
-// 				}
-// 				<-time.After(builder.nodeConfig.SeqCoordinator.UpdateInterval / 3)
-// 			}
-// 		}
-// 	}
+	waitForMsgEverywhere := func(msgNum arbutil.MessageIndex) {
+		for _, testNode := range testNodes {
+			currentNode := testNode.ConsensusNode
+			if currentNode == nil {
+				continue
+			}
+			for attempts := 1; ; attempts++ {
+				msgCount, err := currentNode.TxStreamer.GetMessageCountSync(t)
+				Require(t, err)
+				if msgCount >= msgNum {
+					break
+				}
+				if attempts > 10 {
+					Fatal(t, "timeout waiting for msg ", msgNum, " debug: ", currentNode.SeqCoordinator.DebugPrint())
+				}
+				<-time.After(builder.nodeConfig.SeqCoordinator.UpdateInterval / 3)
+			}
+		}
+	}
 
-// 	var needsStop []*arbnode.Node
-// 	killNode := func(nodeNum int) {
-// 		if nodeNum%3 == 0 {
-// 			testNodes[nodeNum].ConsensusNode.SeqCoordinator.PrepareForShutdown()
-// 			needsStop = append(needsStop, testNodes[nodeNum].ConsensusNode)
-// 		} else {
-// 			testNodes[nodeNum].ConsensusNode.StopAndWait()
-// 		}
-// 		testNodes[nodeNum].ConsensusNode = nil
-// 	}
+	var needsStop []*arbnode.Node
+	killNode := func(nodeNum int) {
+		if nodeNum%3 == 0 {
+			testNodes[nodeNum].ConsensusNode.SeqCoordinator.PrepareForShutdown()
+			needsStop = append(needsStop, testNodes[nodeNum].ConsensusNode)
+		} else {
+			testNodes[nodeNum].ConsensusNode.StopAndWait()
+		}
+		testNodes[nodeNum].ConsensusNode = nil
+	}
 
-// 	nodeForwardTarget := func(nodeNum int) int {
-// 		execNode := testNodes[nodeNum].ExecNode
-// 		preChecker, ok := execNode.TxPublisher.(*gethexec.TxPreChecker)
-// 		if !ok {
-// 			return -1
-// 		}
-// 		sequencer, ok := preChecker.TransactionPublisher.(*gethexec.Sequencer)
-// 		if !ok {
-// 			return -1
-// 		}
-// 		fwTarget := sequencer.ForwardTarget()
-// 		if fwTarget == "" {
-// 			return -1
-// 		}
-// 		for cNum, name := range nodeNames {
-// 			if name == fwTarget {
-// 				return cNum
-// 			}
-// 		}
-// 		t.Fatal("Bad FW target")
-// 		return -2
-// 	}
+	nodeForwardTarget := func(nodeNum int) int {
+		execNode := testNodes[nodeNum].ExecNode
+		preChecker, ok := execNode.TxPublisher.(*gethexec.TxPreChecker)
+		if !ok {
+			return -1
+		}
+		sequencer, ok := preChecker.TransactionPublisher.(*gethexec.Sequencer)
+		if !ok {
+			return -1
+		}
+		fwTarget := sequencer.ForwardTarget()
+		if fwTarget == "" {
+			return -1
+		}
+		for cNum, name := range nodeNames {
+			if name == fwTarget {
+				return cNum
+			}
+		}
+		t.Fatal("Bad FW target")
+		return -2
+	}
 
-// 	messagesPerRound := arbutil.MessageIndex(10)
-// 	currentSequencer := 0
-// 	sequencedMesssages := arbutil.MessageIndex(1) // we start with 1 so messageCountKey will be written
+	messagesPerRound := arbutil.MessageIndex(10)
+	currentSequencer := 0
+	sequencedMesssages := arbutil.MessageIndex(1) // we start with 1 so messageCountKey will be written
 
-// 	t.Log("Starting node 0")
-// 	// give node 0 room to set himself primary
-// 	createStartNode(0)
+	t.Log("Starting node 0")
+	// give node 0 room to set himself primary
+	createStartNode(0)
 
-// 	for attempts := 1; !trySequencing(0); attempts++ {
-// 		if attempts > 10 {
-// 			t.Fatal("failed first sequencing")
-// 		}
-// 		time.Sleep(time.Millisecond * 200)
-// 	}
-// 	sequencedMesssages++
+	for attempts := 1; !trySequencing(0); attempts++ {
+		if attempts > 10 {
+			t.Fatal("failed first sequencing")
+		}
+		time.Sleep(time.Millisecond * 200)
+	}
+	sequencedMesssages++
 
-// 	t.Log("Starting other nodes")
+	t.Log("Starting other nodes")
 
-// 	for i := 1; i < len(testNodes); i++ {
-// 		createStartNode(i)
-// 	}
+	for i := 1; i < len(testNodes); i++ {
+		createStartNode(i)
+	}
 
-// 	addNodes := false
+	addNodes := false
 
-// 	// remove sequencers one by one
+	// remove sequencers one by one
 
-// 	for {
+	for {
 
-// 		// all remaining nodes know which is the chosen one
-// 		for i := currentSequencer + 1; i < len(testNodes); i++ {
-// 			for attempts := 1; nodeForwardTarget(i) != currentSequencer; attempts++ {
-// 				if attempts > 10 {
-// 					t.Fatal("initial forward target not set")
-// 				}
-// 				time.Sleep(time.Millisecond * 100)
-// 			}
-// 		}
+		// all remaining nodes know which is the chosen one
+		for i := currentSequencer + 1; i < len(testNodes); i++ {
+			for attempts := 1; nodeForwardTarget(i) != currentSequencer; attempts++ {
+				if attempts > 10 {
+					t.Fatal("initial forward target not set")
+				}
+				time.Sleep(time.Millisecond * 100)
+			}
+		}
 
-// 		// sequencing succeeds only on the leder
-// 		for i := arbutil.MessageIndex(0); i < messagesPerRound; i++ {
-// 			if sequencer := trySequencingEverywhere(); sequencer != currentSequencer {
-// 				Fatal(t, "unexpected sequencer. expected: ", currentSequencer, " got ", sequencer)
-// 			}
-// 			sequencedMesssages++
-// 		}
+		// sequencing succeeds only on the leder
+		for i := arbutil.MessageIndex(0); i < messagesPerRound; i++ {
+			if sequencer := trySequencingEverywhere(); sequencer != currentSequencer {
+				Fatal(t, "unexpected sequencer. expected: ", currentSequencer, " got ", sequencer)
+			}
+			sequencedMesssages++
+		}
 
-// 		lastSequencer := currentSequencer
-// 		if currentSequencer == len(testNodes)-1 {
-// 			addNodes = true
-// 		}
-// 		if addNodes {
-// 			if currentSequencer == 0 {
-// 				break
-// 			}
-// 			t.Log("adding node")
-// 			currentSequencer--
-// 			createStartNode(currentSequencer)
-// 		} else {
-// 			t.Log("killing node")
-// 			killNode(currentSequencer)
-// 			currentSequencer++
-// 		}
+		lastSequencer := currentSequencer
+		if currentSequencer == len(testNodes)-1 {
+			addNodes = true
+		}
+		if addNodes {
+			if currentSequencer == 0 {
+				break
+			}
+			t.Log("adding node")
+			currentSequencer--
+			createStartNode(currentSequencer)
+		} else {
+			t.Log("killing node")
+			killNode(currentSequencer)
+			currentSequencer++
+		}
 
-// 		// cannot sequence until up to date with all messages
-// 		for attempts := 0; ; attempts++ {
-// 			sequencer := trySequencingEverywhere()
-// 			if sequencer == -1 && attempts > 15 {
-// 				Fatal(t, "failed to sequence")
-// 			}
-// 			if sequencer != -1 {
-// 				sequencedMesssages++
-// 			}
-// 			if sequencer == currentSequencer {
-// 				break
-// 			}
-// 			if addNodes && sequencer != lastSequencer {
-// 				// adding nodes - can only be the new or prev node (others have lower prio)
-// 				Fatal(t, "unexpected sequencer", "expected", currentSequencer, "got", sequencer, "messages", sequencedMesssages, "last", lastSequencer, "adding", addNodes)
-// 			}
-// 			if !addNodes && sequencer < lastSequencer {
-// 				// removing nodes - could be any other live node, intermittently
-// 				Fatal(t, "unexpected sequencer", "expected", currentSequencer, "got", sequencer, "messages", sequencedMesssages, "last", lastSequencer, "adding", addNodes)
-// 			}
-// 			time.Sleep(builder.nodeConfig.SeqCoordinator.LockoutDuration / 5)
-// 		}
+		// cannot sequence until up to date with all messages
+		for attempts := 0; ; attempts++ {
+			sequencer := trySequencingEverywhere()
+			if sequencer == -1 && attempts > 15 {
+				Fatal(t, "failed to sequence")
+			}
+			if sequencer != -1 {
+				sequencedMesssages++
+			}
+			if sequencer == currentSequencer {
+				break
+			}
+			if addNodes && sequencer != lastSequencer {
+				// adding nodes - can only be the new or prev node (others have lower prio)
+				Fatal(t, "unexpected sequencer", "expected", currentSequencer, "got", sequencer, "messages", sequencedMesssages, "last", lastSequencer, "adding", addNodes)
+			}
+			if !addNodes && sequencer < lastSequencer {
+				// removing nodes - could be any other live node, intermittently
+				Fatal(t, "unexpected sequencer", "expected", currentSequencer, "got", sequencer, "messages", sequencedMesssages, "last", lastSequencer, "adding", addNodes)
+			}
+			time.Sleep(builder.nodeConfig.SeqCoordinator.LockoutDuration / 5)
+		}
 
-// 		// all nodes get messages
-// 		waitForMsgEverywhere(sequencedMesssages)
+		// all nodes get messages
+		waitForMsgEverywhere(sequencedMesssages)
 
-// 		// can sequence after up to date
-// 		for i := arbutil.MessageIndex(0); i < messagesPerRound; i++ {
-// 			sequencer := trySequencingEverywhere()
-// 			if sequencer != currentSequencer {
-// 				Fatal(t, "unexpected sequencer", "expected", currentSequencer, "got", sequencer, "messages", sequencedMesssages)
-// 			}
-// 			sequencedMesssages++
-// 		}
+		// can sequence after up to date
+		for i := arbutil.MessageIndex(0); i < messagesPerRound; i++ {
+			sequencer := trySequencingEverywhere()
+			if sequencer != currentSequencer {
+				Fatal(t, "unexpected sequencer", "expected", currentSequencer, "got", sequencer, "messages", sequencedMesssages)
+			}
+			sequencedMesssages++
+		}
 
-// 		// all nodes get messages
-// 		waitForMsgEverywhere(sequencedMesssages)
-// 	}
+		// all nodes get messages
+		waitForMsgEverywhere(sequencedMesssages)
+	}
 
-// 	for nodeNum := range testNodes {
-// 		killNode(nodeNum)
-// 	}
-// 	for _, node := range needsStop {
-// 		node.StopAndWait()
-// 	}
+	for nodeNum := range testNodes {
+		killNode(nodeNum)
+	}
+	for _, node := range needsStop {
+		node.StopAndWait()
+	}
 
-// }
+}
 
 func testCoordinatorMessageSync(t *testing.T, successCase bool) {
 	logHandler := testhelpers.InitTestLog(t, log.LvlTrace)
@@ -389,6 +394,9 @@ func TestRedisSwitchover(t *testing.T) {
 	defer cancel()
 
 	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
+	if redisutil.IsSharedTestRedisInstance() {
+		builder.DontParalellise()
+	}
 	builder.nodeConfig.SeqCoordinator.Enable = true
 	builder.nodeConfig.SeqCoordinator.RedisUrl = redisutil.CreateTestRedis(ctx, t)
 	builder.nodeConfig.SeqCoordinator.NewRedisUrl = redisutil.CreateTestRedis(ctx, t)

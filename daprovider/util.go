@@ -1,4 +1,4 @@
-// Copyright 2021-2022, Offchain Labs, Inc.
+// Copyright 2021-2025, Offchain Labs, Inc.
 // For license information, see https://github.com/OffchainLabs/nitro/blob/master/LICENSE.md
 
 package daprovider
@@ -79,6 +79,10 @@ const BrotliMessageHeaderByte byte = 0
 // EigenDAMessageHeaderFlag indicates that this message contains EigenDA blob data.
 const EigenDAMessageHeaderFlag byte = 0xed
 
+// DACertificateMessageHeaderFlag indicates that this message uses a custom data availability system.
+// Anytrust uses the legacy TreeDASMessageHeaderFlag instead despite also having a certificate.
+const DACertificateMessageHeaderFlag byte = 0x01
+
 // KnownHeaderBits is all header bits with known meaning to this nitro version
 const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAMessageHeaderFlag
 
@@ -117,6 +121,10 @@ func IsZeroheavyEncodedHeaderByte(header byte) bool {
 
 func IsBlobHashesHeaderByte(header byte) bool {
 	return hasBits(header, BlobHashesHeaderFlag)
+}
+
+func IsDACertificateMessageHeaderByte(header byte) bool {
+	return header == DACertificateMessageHeaderFlag
 }
 
 func IsBrotliMessageHeaderByte(b uint8) bool {
