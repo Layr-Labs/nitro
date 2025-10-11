@@ -12,4 +12,5 @@ const (
 	Sha2_256PreimageType
 	EthVersionedHashPreimageType
 	EigenDaPreimageType
+	DACertificatePreimageType
 )
