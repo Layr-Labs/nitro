@@ -9,15 +9,6 @@ concurrency:
 on:
   workflow_dispatch:
   pull_request:
-  push:
-    branches:
-      - eigenda-v3.6.4
-      - eigenda
-
-jobs:
-  test:
-    name: Go Tests
-    runs-on: linux-2xl
 
 jobs:
   # --- Determine which files have changed ---
