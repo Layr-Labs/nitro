@@ -309,6 +309,7 @@ impl Hostio {
                 opcode!(LocalGet, 0);
                 opcode!(LocalGet, 1);
                 opcode!(ReadPreImage, PreimageType::EigenDAHash);
+            }
             WavmReadDACertificatePreimage => {
                 opcode!(LocalGet, 0);
                 opcode!(LocalGet, 1);
