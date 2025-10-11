@@ -49,8 +49,8 @@ import (
 	"github.com/offchainlabs/nitro/solgen/go/precompilesgen"
 	"github.com/offchainlabs/nitro/staker"
 	"github.com/offchainlabs/nitro/staker/bold"
-	"github.com/offchainlabs/nitro/staker/legacy"
-	"github.com/offchainlabs/nitro/staker/multi_protocol"
+	legacystaker "github.com/offchainlabs/nitro/staker/legacy"
+	multiprotocolstaker "github.com/offchainlabs/nitro/staker/multi_protocol"
 	"github.com/offchainlabs/nitro/staker/validatorwallet"
 	"github.com/offchainlabs/nitro/util/containers"
 	"github.com/offchainlabs/nitro/util/contracts"
@@ -663,7 +663,7 @@ func getDAS(
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-		dapReaders.SetupEigenDAV1Reader(eigenDAService)
+		dapReaders.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDAService))
 		eigenDAWriter = eigenDAService
 	}
 
@@ -671,15 +671,15 @@ func getDAS(
 		promise := daClient.GetSupportedHeaderBytes()
 		result, err := promise.Await(ctx)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get supported header bytes from DA client: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to get supported header bytes from DA client: %w", err)
 		}
 		if err := dapReaders.RegisterAll(result.HeaderBytes, daClient); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to register DA client: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to register DA client: %w", err)
 		}
 	}
 	if blobReader != nil {
 		if err := dapReaders.SetupBlobReader(daprovider.NewReaderForBlobReader(blobReader)); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to register blob reader: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to register blob reader: %w", err)
 		}
 	}
 	// AnyTrust now always uses the daClient, which is already registered,

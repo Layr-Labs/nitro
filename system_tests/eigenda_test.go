@@ -97,8 +97,7 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 	}()
 
 	// Setup L1 chain and contracts
-	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
-	builder.parallelise = false
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
 	builder.BuildL1(t)
 	// Setup DAS servers
 	l1NodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest()
@@ -190,9 +189,8 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 	)
 
 	// Setup L1 chain and contracts
-	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
 	builder.chainConfig = chaininfo.ArbitrumDevTestDASChainConfig()
-	builder.parallelise = false
 	builder.BuildL1(t)
 
 	arbSys, _ := precompilesgen.NewArbSys(types.ArbSysAddress, builder.L1.Client)
@@ -201,13 +199,9 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 	l1Reader.Start(ctx)
 	defer l1Reader.StopAndWait()
 
-	keyDir, fileDataDir, dbDataDir := t.TempDir(), t.TempDir(), t.TempDir()
+	keyDir, fileDataDir := t.TempDir(), t.TempDir()
 	pubkey, _, err := das.GenerateAndStoreKeys(keyDir)
 	Require(t, err)
-
-	dbConfig := das.DefaultLocalDBStorageConfig
-	dbConfig.Enable = true
-	dbConfig.DataDir = dbDataDir
 
 	serverConfig := das.DataAvailabilityConfig{
 		Enable: true,
@@ -219,7 +213,6 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 			DataDir:      fileDataDir,
 			MaxRetention: das.DefaultLocalFileStorageConfig.MaxRetention,
 		},
-		LocalDBStorage: dbConfig,
 
 		Key: das.KeyConfig{
 			KeyDir: keyDir,

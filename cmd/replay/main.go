@@ -171,7 +171,7 @@ type EigenDAPreimageReader struct{}
 
 // QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
 // certificate kzg commitment for identifying the preimage.
-func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDAV1Cert, domain string) ([]byte, error) {
+func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDAV1Cert) ([]byte, error) {
 	hash, err := cert.PreimageHash()
 	if err != nil {
 		return nil, err

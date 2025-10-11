@@ -32,7 +32,7 @@ import (
 	"github.com/offchainlabs/nitro/solgen/go/osp_legacy_gen"
 	"github.com/offchainlabs/nitro/solgen/go/yulgen"
 	"github.com/offchainlabs/nitro/staker"
-	"github.com/offchainlabs/nitro/staker/legacy"
+	legacystaker "github.com/offchainlabs/nitro/staker/legacy"
 	"github.com/offchainlabs/nitro/validator"
 	"github.com/offchainlabs/nitro/validator/server_common"
 )
@@ -512,12 +512,12 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 
 	confirmLatestBlock(ctx, t, l1Info, l1Backend)
 
-	readers := make([]daprovider.Reader, 1)
+	readers := daprovider.NewReaderRegistry()
 	if useEigenDA {
 		eigenDA, err := eigenda.NewEigenDA(&conf.EigenDA)
 
 		Require(t, err)
-		readers[0] = eigenda.NewReaderForEigenDA(eigenDA)
+		readers.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDA))
 	}
 
 	locator, err := server_common.NewMachineLocator(builder.valnodeConfig.Wasm.RootPath)

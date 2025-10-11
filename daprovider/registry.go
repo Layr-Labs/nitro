@@ -75,3 +75,8 @@ func (r *ReaderRegistry) SetupBlobReader(reader Reader) error {
 func (r *ReaderRegistry) SetupDACertificateReader(reader Reader) error {
 	return r.Register(DACertificateMessageHeaderFlag, reader)
 }
+
+// SetupEigenDAV1Reader registers an EigenDA reader for the eigenda message header byte
+func (r *ReaderRegistry) SetupEigenDAV1Reader(reader Reader) error {
+	return r.Register(EigenDAMessageHeaderFlag, reader)
+}

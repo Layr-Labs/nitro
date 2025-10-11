@@ -1740,7 +1740,6 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 		return false, nil
 	}
 	var sequencerMsg []byte
-
 	var eigenDAV1Cert *eigenda.EigenDAV1Cert
 	eigenDADispersed := false
 	failOver := false
@@ -1759,7 +1758,7 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 			batchPosterDAFailureCounter.Inc(1)
 			return false, fmt.Errorf("%w: nonce changed from %d to %d while creating batch", storage.ErrStorageRace, nonce, gotNonce)
 		}
-		eigenDAV1Cert, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
+		eigenDAV1Cert, err = b.eigenDAWriter.Store(ctx, batchData)
 
 		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter != nil { // Failover to anytrust commitee if enabled
 			log.Error("EigenDA service is unavailable, failing over to any trust mode")

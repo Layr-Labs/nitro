@@ -23,7 +23,7 @@ type EigenDAWriter interface {
 }
 
 type EigenDAReader interface {
-	QueryBlob(ctx context.Context, cert *EigenDAV1Cert, domainFilter string) ([]byte, error)
+	QueryBlob(ctx context.Context, cert *EigenDAV1Cert) ([]byte, error)
 }
 
 type EigenDAConfig struct {
@@ -67,7 +67,7 @@ func NewEigenDA(config *EigenDAConfig) (*EigenDA, error) {
 }
 
 // QueryBlob retrieves a blob from EigenDA using the provided EigenDAV1Cert
-func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDAV1Cert, domainFilter string) ([]byte, error) {
+func (e *EigenDA) QueryBlob(ctx context.Context, cert *EigenDAV1Cert) ([]byte, error) {
 	log.Info("Reading blob from EigenDA", "batchID", cert.BlobVerificationProof.BatchId)
 	info, err := cert.ToDisperserBlobInfo()
 	if err != nil {
