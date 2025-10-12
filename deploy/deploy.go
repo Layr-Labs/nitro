@@ -299,7 +299,7 @@ func DeployLegacyOnParentChain(ctx context.Context, parentChainReader *headerrea
 		// THIS creates an insecure testing environment for /system_tests
 		// testing a secure E2E Stage1 integration with EigenDA currently can only be done on
 		// a holesky testnet environment
-		EigenDACertVerifier:     common.HexToAddress("0x0"),
+		EigenDACertVerifier: common.HexToAddress("0x0"),
 	}
 
 	tx, err := rollupCreator.CreateRollup(

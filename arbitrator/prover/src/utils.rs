@@ -10,7 +10,6 @@ use c_kzg::Blob;
 use digest::Digest;
 use eyre::{eyre, Result};
 use kzgbn254::{blob::Blob as EigenDABlob, polynomial::PolynomialFormat};
-use nom::Err;
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;

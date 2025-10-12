@@ -11,9 +11,9 @@ import (
 	"log/slog"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
-	"net/http"
 	"testing"
 	"time"
 
