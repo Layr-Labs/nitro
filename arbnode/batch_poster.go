@@ -16,9 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	eigenda_proxy "github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/andybalholm/brotli"
-	"github.com/spf13/pflag"
-
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -32,8 +31,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/spf13/pflag"
 
-	eigenda_proxy "github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/offchainlabs/nitro/arbnode/dataposter"
 	"github.com/offchainlabs/nitro/arbnode/dataposter/storage"
 	"github.com/offchainlabs/nitro/arbnode/parent"
@@ -1760,7 +1759,7 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 		}
 		eigenDAV1Cert, err = b.eigenDAWriter.Store(ctx, batchData)
 
-		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter != nil { // Failover to anytrust commitee if enabled
+		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter != nil { // Failover to anytrust committee if enabled
 			log.Error("EigenDA service is unavailable, failing over to any trust mode")
 			b.building.useEigenDA = false
 			failOver = true
@@ -1768,14 +1767,14 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 
 		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter == nil { // Failover to ETH DA if enabled
 			// when failing over to ETHDA (i.e 4844, calldata), we may need to re-encode the batch. To do this in compliance with the existing code, it's easiest
-			// to update an internal field and retrigger the poster's event loop. Since the batch poster can be distributed across mulitple nodes, there could be
+			// to update an internal field and retrigger the poster's event loop. Since the batch poster can be distributed across multiple nodes, there could be
 			// degraded temporary performance as each batch poster will re-encode the batch on another event loop tick using the coordination lock which could worst case
 			// could require every batcher instance to fail dispersal to EigenDA.
 			// However, this is a rare event and the performance impact is minimal.
 
 			log.Error("EigenDA service is unavailable and anytrust is disabled, failing over to ETH DA")
 
-			// if the batch's size exceeds the native DA max size limit, we must re-encode the batch to accomodate the AnyTrust, calldata, and 4844 size limits
+			// if the batch's size exceeds the native DA max size limit, we must re-encode the batch to accommodate the AnyTrust, calldata, and 4844 size limits
 			if (len(sequencerMsg) > b.config().MaxSize && !b.building.use4844) || (len(sequencerMsg) > b.config().Max4844BatchSize && b.building.use4844) {
 				batchPosterDAFailureCounter.Inc(1)
 				batchPosterDAFailoverCount.Inc(1)

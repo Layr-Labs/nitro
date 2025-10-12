@@ -663,7 +663,9 @@ func getDAS(
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-		dapReaders.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDAService))
+		if err := dapReaders.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDAService)); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to setup EigenDA reader: %w", err)
+		}
 		eigenDAWriter = eigenDAService
 	}
 

@@ -63,6 +63,7 @@ func (e *EigenDAV1Cert) Load(blobInfo *disperser.BlobInfo) {
 	e.BlobHeader.DataLength = blobInfo.GetBlobHeader().GetDataLength()
 
 	for _, quorumBlobParam := range blobInfo.GetBlobHeader().GetBlobQuorumParams() {
+		// #nosec G115 -- These values come from the EigenDA protocol and are expected to fit in uint8
 		e.BlobHeader.QuorumBlobParams = append(e.BlobHeader.QuorumBlobParams, cv_binding.EigenDATypesV1QuorumBlobParam{
 			QuorumNumber:                    uint8(quorumBlobParam.QuorumNumber),
 			AdversaryThresholdPercentage:    uint8(quorumBlobParam.AdversaryThresholdPercentage),

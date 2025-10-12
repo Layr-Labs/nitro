@@ -119,7 +119,7 @@ jobs:
   notify-on-failure:
     name: Notify Slack on failure
     needs: [tests-scheduled]
-    runs-on: ubuntu-4
+    runs-on: linux-2xl
     if: ${{ failure() }}
     env:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -517,7 +517,8 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 		eigenDA, err := eigenda.NewEigenDA(&conf.EigenDA)
 
 		Require(t, err)
-		readers.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDA))
+		err = readers.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDA))
+		Require(t, err)
 	}
 
 	locator, err := server_common.NewMachineLocator(builder.valnodeConfig.Wasm.RootPath)

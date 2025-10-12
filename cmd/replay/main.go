@@ -267,7 +267,10 @@ func main() {
 			keysetValidationMode = daprovider.KeysetDontValidate
 		}
 		dapReaders := daprovider.NewReaderRegistry()
-		dapReaders.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(&EigenDAPreimageReader{}))
+		err = dapReaders.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(&EigenDAPreimageReader{}))
+		if err != nil {
+			panic(fmt.Sprintf("Failed to register EigenDA reader: %v", err))
+		}
 
 		if dasReader != nil {
 			err = dapReaders.SetupDASReader(dasutil.NewReaderForDAS(dasReader, dasKeysetFetcher, keysetValidationMode))

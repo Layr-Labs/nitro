@@ -43,6 +43,9 @@ func Test_StripZeroPrefixAndEnsure32Bytes(t *testing.T) {
 	testArr = append([]byte{0x0, 0x0, 0x0}, testArr...)
 
 	out2, err := stripZeroPrefixAndEnsure32Bytes(testArr)
+	if err != nil {
+		t.Fatalf("failed to strip zero prefix: %v", err)
+	}
 
 	if !bytes.Equal(out1, out2) {
 		t.Fatalf("not equal; in %v, out %v", out1, out2)

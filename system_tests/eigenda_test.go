@@ -139,7 +139,8 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 
 		// 3 - Emulate EigenDA becoming healthy again and ensure that the system starts using it for DA
 		memCfg.PutReturnsFailoverError = false
-		memCfgClient.UpdateConfig(ctx, memCfg)
+		_, err = memCfgClient.UpdateConfig(ctx, memCfg)
+		Require(t, err)
 
 		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(3000000000000), l2B.Client)
 
@@ -150,6 +151,7 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 		latestBlock, err := builder.L1.Client.BlockNumber(ctx)
 		Require(t, err)
 
+		// #nosec G115 -- Block numbers are unlikely to exceed int64's maximum value
 		batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
 		Require(t, err)
 		// ensure that sequencer inbox contains both eigenda and calldata batches
@@ -304,6 +306,7 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 
 	memCfg.PutReturnsFailoverError = true
 	_, err = memCfgClient.UpdateConfig(ctx, memCfg)
+	Require(t, err)
 
 	checkBatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*2), l2B.Client)
 	// 3 - Emulate EigenDA becoming healthy again and ensure that the system starts using it for DA
@@ -321,6 +324,7 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 	latestBlock, err := builder.L1.Client.BlockNumber(ctx)
 	Require(t, err)
 
+	// #nosec G115 -- Block numbers are unlikely to exceed int64's maximum value
 	batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
 	Require(t, err)
 
