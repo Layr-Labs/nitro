@@ -173,7 +173,7 @@ func testChallengeProtocolBOLD(t *testing.T, eigenDAOpts *EigenDABoldBatchOpts, 
 	_, valStack := createTestValidationNode(t, ctx, &valCfg)
 	blockValidatorConfig := staker.TestBlockValidatorConfig
 
-	var dapReaders []daprovider.Reader = nil
+	var dapReaders = daprovider.NewReaderRegistry()
 	if eigenDAOpts != nil {
 		eigenDAService, err := eigenda.NewEigenDA(
 			&eigenda.EigenDAConfig{
@@ -183,7 +183,10 @@ func testChallengeProtocolBOLD(t *testing.T, eigenDAOpts *EigenDABoldBatchOpts, 
 		if err != nil {
 			panic(err)
 		}
-		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAService))
+		err = dapReaders.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDAService))
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	locator, err := server_common.NewMachineLocator(valCfg.Wasm.RootPath)
