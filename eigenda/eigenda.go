@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 
+	flag "github.com/spf13/pflag"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	flag "github.com/spf13/pflag"
 )
 
 const (

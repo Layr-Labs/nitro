@@ -5,14 +5,13 @@ import (
 	"math/big"
 
 	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	cv_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
-
-	cv_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // EigenDAV1Cert is an internal representation of the encoded cert commitment (i.e, disperser.BlobInfo)
