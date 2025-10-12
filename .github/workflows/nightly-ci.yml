@@ -8,7 +8,6 @@ on:
   pull_request:
   push:
     branches:
-      - eigenda-v3.6.4
       - eigenda
   schedule:
     # Run at 00:00 AM UTC
