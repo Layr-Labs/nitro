@@ -7,6 +7,8 @@ jobs:
   go-tests:
     name: Full Go tests (matrix)
     runs-on: linux-2xl
+    container:
+      image: ubuntu:22.04
     strategy:
       fail-fast: false
       matrix:
