@@ -38,7 +38,7 @@ func (b *readerForEigenDA) CollectPreimages(
 		preimages = make(daprovider.PreimagesMap)
 		preimageRecorder = daprovider.RecordPreimagesTo(preimages)
 
-		_, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg, b.readerEigenDA, preimageRecorder)
+		_, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], b.readerEigenDA, preimageRecorder)
 		if err != nil {
 			promise.ProduceError(err)
 		} else {
@@ -73,7 +73,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 
 	eigenDAV1Cert, err := ParseSequencerMsg(sequencerMsg)
 	if err != nil {
-		log.Error("Failed to parse sequencer message", "err", err)
+		log.Error("Failed to parse sequencer message into eigenda v1 cert", "err", err)
 		return nil, err
 	}
 
