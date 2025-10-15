@@ -11,6 +11,6 @@ const (
 	Keccak256PreimageType PreimageType = iota
 	Sha2_256PreimageType
 	EthVersionedHashPreimageType
-	EigenDaPreimageType
+	EigenDaPreimageType // TODO(#129): Preimage type conflict with EigenDAHash and CustomDA both assuming value 3
 	DACertificatePreimageType
 )
