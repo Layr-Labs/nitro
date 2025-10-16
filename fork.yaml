@@ -5,13 +5,13 @@ footer: |  # define the footer with markdown
 base:
   name: OffchainLabs/nitro
   url: https://github.com/OffchainLabs/nitro
-  ## v3.6.4 upstream pin
-  hash: 28199cd7d53c7cd782104f4920e53d6af0dd6179
+  ## v3.8.0-rc7 upstream pin
+  hash: ef47e289dcdd3eb387f6ba9c64dfbf73d980c1e5 
 fork:
   name: Layr-Labs/nitro
   url: https://github.com/Layr-Labs/nitro
-  ## latest v3.6.4 downstream pin
-  hash: eebc39ea3a94a3602bf1d85cd605733b75d95ce6
+  ## latest v3.8.0-rc7 downstream fork commit pin
+  hash: a8de9b68c8a01bafb7bfc0c2db457ed0ecb35680
 def:
     title: "EigenDA x Arbitrum Nitro Fork Diff Overview"
     description: | # description in markdown
@@ -90,11 +90,11 @@ def:
 
           - title: "DA writer/reader interface"
             description: |
-              * Implements the Arbitrum native Data Availability `Reader` [interface](https://github.com/Layr-Labs/nitro/blob/070313b901ea55e131534850bfc791ec4e588668/arbstate/daprovider/reader.go#L16-L29) for EigenDA. 
+              * Implements the Arbitrum native Data Availability `Reader` [interface](https://github.com/OffchainLabs/nitro/blob/v3.8.0-rc.7/daprovider/reader.go#L43-L57) for EigenDA. 
                 When recording a batch payload to the preimage oracle for stateless validation, the blob is generic encoded to a BN254-Compatible format (i.e., [EncodedPayload](https://layr-labs.github.io/eigenda/integration/spec/3-data-structs.html#encodedpayload)) as a precursor for injection. 
                 Sequencer messages are decoded from their ABI encoded format into a `BlobInfo` type for compatible communication with the proxy service.
 
-              * Implements the Arbitrum native Data Availability `Writer` [interface](https://github.com/Layr-Labs/nitro/blob/070313b901ea55e131534850bfc791ec4e588668/arbstate/daprovider/writer.go#L13-L22) for EigenDA.
+              * Implements the Arbitrum native Data Availability `Writer` [interface](https://github.com/OffchainLabs/nitro/blob/v3.8.0-rc.7/daprovider/writer.go#L10-L17) for EigenDA.
                 This Writer simply overlays the lightweight proxy http client for doing dispersals against the `/put` route.
 
             globs:
@@ -192,6 +192,16 @@ def:
               - "system_tests/full_challenge_mock_test.go"
               - "system_tests/full_challenge_impl_test.go"
 
+          - title: "E2E BoLD challenge tests"
+            description: |
+              Extended E2E BoLD challenge tests to ensure successful convergence of a `READINBOXMESSAGE` challenge for an
+              EigenDA certificate where two validators hold an alternative view of the sequencer inbox state.
+            globs:
+              - system_tests/bold_challenge_protocol_test.go
+              - system_tests/bold_state_provider_test.go
+              - system_tests/overflow_assertions_test.go
+
+
       - title: "Batch posting & derivation via EigenDA"
         description: |
           Added the ability to post batches via rollup payloads to EigenDA V1 and securely derive them when syncing 
@@ -231,6 +241,7 @@ def:
 
               Returns `ErrMissingEigenDAReader` on EigenDA header without configured reader
             globs:
+              - "staker/stateless_block_validator.go"
               - "arbnode/sequencer_inbox.go"
               - "arbstate/inbox.go"
 
@@ -241,6 +252,7 @@ def:
               chain resources are exposed in the system testing framework, we can't programatically test EigenDA -> 4844 failover.
             globs:
               - "system_tests/eigenda_test.go"
+              - "system_tests/das_test.go"
 
       - title: "Security Audits"
         description: |
@@ -271,3 +283,4 @@ ignore:
   - "arbitrator/jit/src/test.rs"
   - "validator/server_jit/jit_machine.go"
   - fork.yaml
+  
