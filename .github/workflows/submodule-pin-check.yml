@@ -22,7 +22,7 @@ permissions:
 jobs:
   submodule-pin-check:
     name: Check Submodule Pin
-    runs-on: ubuntu-4
+    runs-on: linux-2xl
     steps:
       - name: Checkout
         uses: actions/checkout@v5
