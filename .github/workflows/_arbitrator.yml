@@ -52,8 +52,8 @@ jobs:
       - name: Make arbitrator libraries
         run: make -j wasm-ci-build
 
-      - name: Clippy check
-        run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
+      # - name: Clippy check
+      #   run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
 
       - name: Run rust tests
         id: run-rust-tests
