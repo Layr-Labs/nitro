@@ -1,3 +1,4 @@
+---
 name: ShellCheck CI
 run-name: ShellCheck CI triggered from @${{ github.actor }} of ${{ github.head_ref }}
 
@@ -6,8 +7,7 @@ on:
   merge_group:
   pull_request:
   push:
-    branches:
-      - master
+    branches: [master, main]
 
 jobs:
   shellcheck:

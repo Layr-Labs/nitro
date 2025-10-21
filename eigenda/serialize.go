@@ -43,6 +43,7 @@ func decodeBlob(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy unpadded data into final buffer, length: %d, bytes read: %d", length, n)
 	}
+	// #nosec G115 -- n is from Read which returns non-negative int, safe to convert to uint32 for comparison with length
 	if uint32(n) != length {
 		return nil, fmt.Errorf("data length does not match length prefix")
 	}
@@ -72,6 +73,7 @@ func encodeBlob(rawData []byte) ([]byte, error) {
 	codecBlobHeader[1] = byte(0x0)
 
 	// encode length as uint32
+	// #nosec G115 -- len(rawData) is checked to be <= math.MaxUint32 above, so this conversion is safe
 	binary.BigEndian.PutUint32(codecBlobHeader[2:6], uint32(len(rawData))) // uint32 should be more than enough to store the length (approx 4gb)
 
 	// encode raw data modulo bn254
@@ -112,7 +114,7 @@ func padPow2(data []byte) ([]byte, error) {
 func stripZeroPrefixAndEnsure32Bytes(arr []byte) ([]byte, error) {
 	if len(arr) < 32 {
 		// pad zeros to preserve value at exactly 32 bytes
-		zeroBuffer := make([]byte, 32 - len(arr))
+		zeroBuffer := make([]byte, 32-len(arr))
 		return append(zeroBuffer, arr...), nil
 	}
 

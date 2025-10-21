@@ -3,68 +3,81 @@
 
 package arbtest
 
-// NOTE: This test was labelled flakey in https://github.com/OffchainLabs/nitro/pull/3758/files
-// Will be brought back once rebasing to upcoming v3.8.0
-// func TestAliasing(t *testing.T) {
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
+import (
+	"context"
+	"math/big"
+	"strings"
+	"testing"
 
-// 	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
-// 	cleanup := builder.Build(t)
-// 	defer cleanup()
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 
-// 	auth := builder.L2Info.GetDefaultTransactOpts("Owner", ctx)
-// 	user := builder.L1Info.GetDefaultTransactOpts("User", ctx)
-// 	builder.L2.TransferBalanceTo(t, "Owner", util.RemapL1Address(user.From), big.NewInt(1e18), builder.L2Info)
+	"github.com/offchainlabs/nitro/arbos/util"
+	"github.com/offchainlabs/nitro/solgen/go/localgen"
+	"github.com/offchainlabs/nitro/solgen/go/precompilesgen"
+)
 
-// 	simpleAddr, simple := builder.L2.DeploySimple(t, auth)
-// 	simpleContract, err := abi.JSON(strings.NewReader(localgen.SimpleABI))
-// 	Require(t, err)
+func TestAliasingFlaky(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-// 	// Test direct calls
-// 	arbsys, err := precompilesgen.NewArbSys(types.ArbSysAddress, builder.L2.Client)
-// 	Require(t, err)
-// 	top, err := arbsys.IsTopLevelCall(nil)
-// 	Require(t, err)
-// 	was, err := arbsys.WasMyCallersAddressAliased(nil)
-// 	Require(t, err)
-// 	alias, err := arbsys.MyCallersAddressWithoutAliasing(nil)
-// 	Require(t, err)
-// 	if !top {
-// 		Fatal(t, "direct call is not top level")
-// 	}
-// 	if was || alias != (common.Address{}) {
-// 		Fatal(t, "direct call has an alias", was, alias)
-// 	}
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
+	cleanup := builder.Build(t)
+	defer cleanup()
 
-// 	testL2Signed := func(top, direct, static, delegate, callcode, call bool) {
-// 		t.Helper()
+	auth := builder.L2Info.GetDefaultTransactOpts("Owner", ctx)
+	user := builder.L1Info.GetDefaultTransactOpts("User", ctx)
+	builder.L2.TransferBalanceTo(t, "Owner", util.RemapL1Address(user.From), big.NewInt(1e18), builder.L2Info)
 
-// 		// check via L2
-// 		tx, err := simple.CheckCalls(&auth, top, direct, static, delegate, callcode, call)
-// 		Require(t, err)
-// 		_, err = builder.L2.EnsureTxSucceeded(tx)
-// 		Require(t, err)
+	simpleAddr, simple := builder.L2.DeploySimple(t, auth)
+	simpleContract, err := abi.JSON(strings.NewReader(localgen.SimpleABI))
+	Require(t, err)
 
-// 		// check signed txes via L1
-// 		data, err := simpleContract.Pack("checkCalls", top, direct, static, delegate, callcode, call)
-// 		Require(t, err)
-// 		tx = builder.L2Info.PrepareTxTo("Owner", &simpleAddr, 500000, big.NewInt(0), data)
-// 		builder.L1.SendSignedTx(t, builder.L2.Client, tx, builder.L1Info)
-// 	}
+	// Test direct calls
+	arbsys, err := precompilesgen.NewArbSys(types.ArbSysAddress, builder.L2.Client)
+	Require(t, err)
+	top, err := arbsys.IsTopLevelCall(nil)
+	Require(t, err)
+	was, err := arbsys.WasMyCallersAddressAliased(nil)
+	Require(t, err)
+	alias, err := arbsys.MyCallersAddressWithoutAliasing(nil)
+	Require(t, err)
+	if !top {
+		Fatal(t, "direct call is not top level")
+	}
+	if was || alias != (common.Address{}) {
+		Fatal(t, "direct call has an alias", was, alias)
+	}
 
-// 	testUnsigned := func(top, direct, static, delegate, callcode, call bool) {
-// 		t.Helper()
+	testL2Signed := func(top, direct, static, delegate, callcode, call bool) {
+		t.Helper()
 
-// 		// check unsigned txes via L1
-// 		data, err := simpleContract.Pack("checkCalls", top, direct, static, delegate, callcode, call)
-// 		Require(t, err)
-// 		tx := builder.L2Info.PrepareTxTo("Owner", &simpleAddr, 500000, big.NewInt(0), data)
-// 		builder.L1.SendUnsignedTx(t, builder.L2.Client, tx, builder.L1Info)
-// 	}
+		// check via L2
+		tx, err := simple.CheckCalls(&auth, top, direct, static, delegate, callcode, call)
+		Require(t, err)
+		_, err = builder.L2.EnsureTxSucceeded(tx)
+		Require(t, err)
 
-// 	testL2Signed(true, true, false, false, false, false)
-// 	testL2Signed(false, false, false, false, false, false)
-// 	testUnsigned(true, true, false, false, false, false)
-// 	testUnsigned(false, true, false, true, false, false)
-// }
+		// check signed txes via L1
+		data, err := simpleContract.Pack("checkCalls", top, direct, static, delegate, callcode, call)
+		Require(t, err)
+		tx = builder.L2Info.PrepareTxTo("Owner", &simpleAddr, 500000, big.NewInt(0), data)
+		builder.L1.SendSignedTx(t, builder.L2.Client, tx, builder.L1Info)
+	}
+
+	testUnsigned := func(top, direct, static, delegate, callcode, call bool) {
+		t.Helper()
+
+		// check unsigned txes via L1
+		data, err := simpleContract.Pack("checkCalls", top, direct, static, delegate, callcode, call)
+		Require(t, err)
+		tx := builder.L2Info.PrepareTxTo("Owner", &simpleAddr, 500000, big.NewInt(0), data)
+		builder.L1.SendUnsignedTx(t, builder.L2.Client, tx, builder.L1Info)
+	}
+
+	testL2Signed(true, true, false, false, false, false)
+	testL2Signed(false, false, false, false, false, false)
+	testUnsigned(true, true, false, false, false, false)
+	testUnsigned(false, true, false, true, false, false)
+}

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/arbitrum/multigas"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -75,7 +76,13 @@ func activateProgram(
 	runCtx *core.MessageRunContext,
 ) (*activationInfo, error) {
 	moduleActivationMandatory := true
-	info, asmMap, err := activateProgramInternal(program, codehash, wasm, page_limit, stylusVersion, arbosVersionForGas, debug, burner.GasLeft(), runCtx.WasmTargets(), moduleActivationMandatory)
+	suppliedGas := burner.GasLeft()
+	gasLeft := suppliedGas
+	info, asmMap, err := activateProgramInternal(program, codehash, wasm, page_limit, stylusVersion, arbosVersionForGas, debug, &gasLeft, runCtx.WasmTargets(), moduleActivationMandatory)
+	if gasLeft < suppliedGas {
+		// Ignore the out-of-gas error because we want to return the error above
+		burner.Burn(multigas.ResourceKindComputation, suppliedGas-gasLeft) //nolint:errcheck
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -213,14 +220,18 @@ func activateProgramInternal(
 	for _, target := range nativeTargets {
 		target := target
 		go func() {
-			cranelift := false
-			timeout := time.Second * 15
-			asm, err := compileNative(wasm, stylusVersion, debug, target, cranelift, timeout)
-			if err != nil {
-				log.Warn("initial stylus compilation failed", "address", addressForLogging, "cranelift", cranelift, "timeout", timeout, "err", err)
-				asm, err = compileNative(wasm, stylusVersion, debug, target, !cranelift, timeout)
+			if target == rawdb.TargetWasm {
+				results <- result{target, wasm, nil}
+			} else {
+				cranelift := false
+				timeout := time.Second * 15
+				asm, err := compileNative(wasm, stylusVersion, debug, target, cranelift, timeout)
+				if err != nil {
+					log.Warn("initial stylus compilation failed", "address", addressForLogging, "cranelift", cranelift, "timeout", timeout, "err", err)
+					asm, err = compileNative(wasm, stylusVersion, debug, target, !cranelift, timeout)
+				}
+				results <- result{target, asm, err}
 			}
-			results <- result{target, asm, err}
 		}()
 	}
 	expectedResults := len(nativeTargets)
@@ -232,7 +243,7 @@ func activateProgramInternal(
 	for i := 0; i < expectedResults; i++ {
 		res := <-results
 		if res.err != nil {
-			err = errors.Join(res.err, fmt.Errorf("%s:%w", res.target, err))
+			err = errors.Join(err, fmt.Errorf("%s: %w", res.target, res.err))
 		} else {
 			asmMap[res.target] = res.asm
 		}
@@ -321,7 +332,7 @@ func callProgram(
 	moduleHash common.Hash,
 	localAsm []byte,
 	scope *vm.ScopeContext,
-	interpreter *vm.EVMInterpreter,
+	evm *vm.EVM,
 	tracingInfo *util.TracingInfo,
 	calldata []byte,
 	evmData *EvmData,
@@ -329,7 +340,7 @@ func callProgram(
 	memoryModel *MemoryModel,
 	runCtx *core.MessageRunContext,
 ) ([]byte, error) {
-	db := interpreter.Evm().StateDB
+	db := evm.StateDB
 	debug := stylusParams.DebugMode
 
 	if len(localAsm) == 0 {
@@ -346,7 +357,7 @@ func callProgram(
 		}
 	}
 
-	evmApi := newApi(interpreter, tracingInfo, scope, memoryModel)
+	evmApi := newApi(evm, tracingInfo, scope, memoryModel)
 	defer evmApi.drop()
 
 	output := &rustBytes{}
@@ -362,7 +373,7 @@ func callProgram(
 		u32(runCtx.WasmCacheTag()),
 	))
 
-	depth := interpreter.Depth()
+	depth := evm.Depth()
 	data, msg, err := status.toResult(rustBytesIntoBytes(output), debug)
 	if status == userFailure && debug {
 		log.Warn("program failure", "err", err, "msg", msg, "program", address, "depth", depth)

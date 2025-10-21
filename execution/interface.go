@@ -3,8 +3,10 @@ package execution
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 
 	"github.com/offchainlabs/nitro/arbos/arbostypes"
@@ -33,6 +35,14 @@ type InboxBatch struct {
 	Found    bool
 }
 
+// ConsensusSyncData contains sync status information pushed from consensus to execution
+type ConsensusSyncData struct {
+	Synced          bool
+	MaxMessageCount arbutil.MessageIndex
+	SyncProgressMap map[string]interface{} // Only populated when !Synced for debugging
+	UpdatedAt       time.Time
+}
+
 var ErrRetrySequencer = errors.New("please retry transaction")
 var ErrSequencerInsertLockTaken = errors.New("insert lock taken")
 
@@ -45,6 +55,7 @@ type ExecutionClient interface {
 	MessageIndexToBlockNumber(messageNum arbutil.MessageIndex) containers.PromiseInterface[uint64]
 	BlockNumberToMessageIndex(blockNum uint64) containers.PromiseInterface[arbutil.MessageIndex]
 	SetFinalityData(ctx context.Context, safeFinalityData *arbutil.FinalityData, finalizedFinalityData *arbutil.FinalityData, validatedFinalityData *arbutil.FinalityData) containers.PromiseInterface[struct{}]
+	SetConsensusSyncData(ctx context.Context, syncData *ConsensusSyncData) containers.PromiseInterface[struct{}]
 	MarkFeedStart(to arbutil.MessageIndex) containers.PromiseInterface[struct{}]
 
 	TriggerMaintenance() containers.PromiseInterface[struct{}]
@@ -61,6 +72,7 @@ type ExecutionRecorder interface {
 		ctx context.Context,
 		pos arbutil.MessageIndex,
 		msg *arbostypes.MessageWithMetadata,
+		wasmTargets []rawdb.WasmTarget,
 	) (*RecordResult, error)
 	MarkValid(pos arbutil.MessageIndex, resultHash common.Hash)
 	PrepareForRecord(ctx context.Context, start, end arbutil.MessageIndex) error
@@ -91,9 +103,6 @@ type BatchFetcher interface {
 }
 
 type ConsensusInfo interface {
-	Synced() containers.PromiseInterface[bool]
-	FullSyncProgressMap() containers.PromiseInterface[map[string]interface{}]
-	SyncTargetMessageCount() containers.PromiseInterface[arbutil.MessageIndex]
 	BlockMetadataAtMessageIndex(msgIdx arbutil.MessageIndex) containers.PromiseInterface[common.BlockMetadata]
 }
 
