@@ -48,8 +48,6 @@ type StatelessBlockValidator struct {
 	dapReaders           *daprovider.ReaderRegistry
 	stack                *node.Node
 	latestWasmModuleRoot common.Hash
-
-	historicalEigenDAWasmRoots map[common.Hash]interface{}
 }
 
 type BlockValidatorRegistrer interface {
@@ -334,7 +332,6 @@ func (v *StatelessBlockValidator) readFullBatch(ctx context.Context, batchNum ui
 			// See if historical EigenDA WASM root contains the latest WASM Root, if so
 			// use old preimage type
 			if useLegacyOracle && daprovider.IsEigenDAMessageHeaderByte(headerByte) {
-				println("Signifier byte being set!")
 				postedData[40] = eigenda.HistoricalEigenDAPreimageSignalByte
 			}
 

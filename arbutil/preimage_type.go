@@ -9,9 +9,9 @@ type PreimageType uint8
 // and the if statement in `contracts/src/osp/OneStepProverHostIo.sol` (search for "UNKNOWN_PREIMAGE_TYPE").
 const (
 	Keccak256PreimageType        PreimageType = 0
-	Sha2_256PreimageType                      = 1
-	EthVersionedHashPreimageType              = 2
-	DACertificatePreimageType                 = 3
+	Sha2_256PreimageType         PreimageType = 1
+	EthVersionedHashPreimageType PreimageType = 2
+	DACertificatePreimageType    PreimageType = 3
 
-	EigenDaPreimageType = 69
+	EigenDaPreimageType PreimageType = 69
 )

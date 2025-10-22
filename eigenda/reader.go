@@ -43,9 +43,6 @@ func (b *readerForEigenDA) CollectPreimages(
 			useLegacyPreimageType = true
 			sequencerMsg[40] = daprovider.EigenDAMessageHeaderFlag
 		}
-
-		println("Use legacy preimage type: %b", useLegacyPreimageType)
-
 		_, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], b.readerEigenDA, preimageRecorder, useLegacyPreimageType)
 		if err != nil {
 			promise.ProduceError(err)
@@ -105,11 +102,9 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 		}
 
 		if useLegacyPreimageType {
-			println("Recording legacy eigenda preimage type")
 			preimageRecoder(*hash, preimage, 3)
 
 		}
-		println("Recording new eigenda preimage type")
 		preimageRecoder(*hash, preimage, arbutil.EigenDaPreimageType)
 	}
 	return data, nil
