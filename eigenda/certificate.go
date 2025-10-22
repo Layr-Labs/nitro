@@ -5,14 +5,13 @@ import (
 	"math/big"
 
 	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	cv_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
-
-	cv_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // EigenDAV1Cert is an internal representation of the encoded cert commitment (i.e, disperser.BlobInfo)
@@ -63,6 +62,7 @@ func (e *EigenDAV1Cert) Load(blobInfo *disperser.BlobInfo) {
 	e.BlobHeader.DataLength = blobInfo.GetBlobHeader().GetDataLength()
 
 	for _, quorumBlobParam := range blobInfo.GetBlobHeader().GetBlobQuorumParams() {
+		// #nosec G115 -- These values come from the EigenDA protocol and are expected to fit in uint8
 		e.BlobHeader.QuorumBlobParams = append(e.BlobHeader.QuorumBlobParams, cv_binding.EigenDATypesV1QuorumBlobParam{
 			QuorumNumber:                    uint8(quorumBlobParam.QuorumNumber),
 			AdversaryThresholdPercentage:    uint8(quorumBlobParam.AdversaryThresholdPercentage),

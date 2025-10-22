@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	eigenda_proxy "github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/andybalholm/brotli"
 	"github.com/spf13/pflag"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	eigenda_proxy "github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/offchainlabs/nitro/arbnode/dataposter"
 	"github.com/offchainlabs/nitro/arbnode/dataposter/storage"
 	"github.com/offchainlabs/nitro/arbnode/parent"
@@ -116,14 +116,12 @@ type BatchPoster struct {
 	gasRefunderAddr    common.Address
 	building           *buildingBatch
 	dapWriter          daprovider.Writer
-	// This deviates from the DA spec but is necessary for the batch poster to work efficiently
-	// since we need to an extended method on the SequencerInbox contract for posting EigenDA certificates
-	eigenDAWriter     eigenda.EigenDAWriter
-	dapReaders        []daprovider.Reader
-	dataPoster        *dataposter.DataPoster
-	redisLock         *redislock.Simple
-	messagesPerBatch  *arbmath.MovingAverage[uint64]
-	non4844BatchCount int // Count of consecutive non-4844 batches posted
+	eigenDAWriter      eigenda.EigenDAWriter
+	dapReaders         *daprovider.ReaderRegistry
+	dataPoster         *dataposter.DataPoster
+	redisLock          *redislock.Simple
+	messagesPerBatch   *arbmath.MovingAverage[uint64]
+	non4844BatchCount  int // Count of consecutive non-4844 batches posted
 	// This is an atomic variable that should only be accessed atomically.
 	// An estimate of the number of batches we want to post but haven't yet.
 	// This doesn't include batches which we don't want to post yet due to the L1 bounds.
@@ -334,6 +332,7 @@ var TestBatchPosterConfig = BatchPosterConfig{
 	L1BlockBound:                   "",
 	L1BlockBoundBypass:             time.Hour,
 	UseAccessLists:                 true,
+	RedisLock:                      redislock.TestCfg,
 	GasEstimateBaseFeeMultipleBips: arbmath.OneInUBips * 3 / 2,
 	CheckBatchCorrectness:          true,
 	DelayBufferThresholdMargin:     0,
@@ -378,7 +377,7 @@ type BatchPosterOpts struct {
 	DAPWriter     daprovider.Writer
 	ParentChainID *big.Int
 	EigenDAWriter eigenda.EigenDAWriter
-	DAPReaders    []daprovider.Reader
+	DAPReaders    *daprovider.ReaderRegistry
 }
 
 func NewBatchPoster(ctx context.Context, opts *BatchPosterOpts) (*BatchPoster, error) {
@@ -1729,16 +1728,18 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 		return false, nil
 	}
 
-	sequencerMsg, err := b.building.segments.CloseAndGetBytes()
+	batchData, err := b.building.segments.CloseAndGetBytes()
+	defer func() {
+		b.building = nil // a closed batchSegments can't be reused
+	}()
 	if err != nil {
 		return false, err
 	}
-	if sequencerMsg == nil {
+	if batchData == nil {
 		log.Debug("BatchPoster: batch nil", "sequence nr.", batchPosition.NextSeqNum, "from", batchPosition.MessageCount, "prev delayed", batchPosition.DelayedMessageCount)
-		b.building = nil // a closed batchSegments can't be reused
 		return false, nil
 	}
-
+	var sequencerMsg []byte
 	var eigenDAV1Cert *eigenda.EigenDAV1Cert
 	eigenDADispersed := false
 	failOver := false
@@ -1757,9 +1758,9 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 			batchPosterDAFailureCounter.Inc(1)
 			return false, fmt.Errorf("%w: nonce changed from %d to %d while creating batch", storage.ErrStorageRace, nonce, gotNonce)
 		}
-		eigenDAV1Cert, err = b.eigenDAWriter.Store(ctx, sequencerMsg)
+		eigenDAV1Cert, err = b.eigenDAWriter.Store(ctx, batchData)
 
-		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter != nil { // Failover to anytrust commitee if enabled
+		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter != nil { // Failover to anytrust committee if enabled
 			log.Error("EigenDA service is unavailable, failing over to any trust mode")
 			b.building.useEigenDA = false
 			failOver = true
@@ -1767,14 +1768,14 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 
 		if err != nil && errors.Is(err, eigenda_proxy.ErrServiceUnavailable) && b.config().EnableEigenDAFailover && b.dapWriter == nil { // Failover to ETH DA if enabled
 			// when failing over to ETHDA (i.e 4844, calldata), we may need to re-encode the batch. To do this in compliance with the existing code, it's easiest
-			// to update an internal field and retrigger the poster's event loop. Since the batch poster can be distributed across mulitple nodes, there could be
+			// to update an internal field and retrigger the poster's event loop. Since the batch poster can be distributed across multiple nodes, there could be
 			// degraded temporary performance as each batch poster will re-encode the batch on another event loop tick using the coordination lock which could worst case
 			// could require every batcher instance to fail dispersal to EigenDA.
 			// However, this is a rare event and the performance impact is minimal.
 
 			log.Error("EigenDA service is unavailable and anytrust is disabled, failing over to ETH DA")
 
-			// if the batch's size exceeds the native DA max size limit, we must re-encode the batch to accomodate the AnyTrust, calldata, and 4844 size limits
+			// if the batch's size exceeds the native DA max size limit, we must re-encode the batch to accommodate the AnyTrust, calldata, and 4844 size limits
 			if (len(sequencerMsg) > b.config().MaxSize && !b.building.use4844) || (len(sequencerMsg) > b.config().Max4844BatchSize && b.building.use4844) {
 				batchPosterDAFailureCounter.Inc(1)
 				batchPosterDAFailoverCount.Inc(1)
@@ -1818,19 +1819,34 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 			batchPosterDAFailureCounter.Inc(1)
 			return false, err
 		}
-		if nonce != gotNonce || !bytes.Equal(batchPositionBytes, gotMeta) {
+		if nonce != gotNonce {
 			batchPosterDAFailureCounter.Inc(1)
 			return false, fmt.Errorf("%w: nonce changed from %d to %d while creating batch", storage.ErrStorageRace, nonce, gotNonce)
 		}
-		// #nosec G115
-		sequencerMsg, err = b.dapWriter.Store(ctx, sequencerMsg, uint64(time.Now().Add(config.DASRetentionPeriod).Unix()), config.DisableDapFallbackStoreDataOnChain)
-		if err != nil {
+		if !bytes.Equal(batchPositionBytes, gotMeta) {
 			batchPosterDAFailureCounter.Inc(1)
-			return false, err
+			var actualBatchPosition batchPosterPosition
+			if err := rlp.DecodeBytes(gotMeta, &actualBatchPosition); err != nil {
+				return false, fmt.Errorf("%w: received unexpected batch position bytes", err)
+			}
+			return false, fmt.Errorf("%w: batch position changed from %v to %v while creating batch", storage.ErrStorageRace, batchPosition, actualBatchPosition)
+		}
+		// #nosec G115
+		sequencerMsg, err = b.dapWriter.Store(batchData, uint64(time.Now().Add(config.DASRetentionPeriod).Unix())).Await(ctx)
+		if err != nil {
+			if config.DisableDapFallbackStoreDataOnChain {
+				batchPosterDAFailureCounter.Inc(1)
+				return false, err
+			} else {
+				// DAP on-chain fallback storage
+				sequencerMsg = batchData
+			}
 		}
 
 		batchPosterDASuccessCounter.Inc(1)
 		batchPosterDALastSuccessfulActionGauge.Update(time.Now().Unix())
+	} else {
+		sequencerMsg = batchData
 	}
 
 	prevMessageCount := batchPosition.MessageCount
@@ -1938,9 +1954,36 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 	}
 
 	if config.CheckBatchCorrectness {
-		dapReaders := b.dapReaders
+		// Create a new registry for checking batch correctness
+		// We need to copy existing readers and potentially add a simulated blob reader
+		dapReaders := daprovider.NewReaderRegistry()
+
+		// Copy all existing readers from the batch poster's registry
+		// These readers can fetch data that was already posted to
+		// external DA systems (eg AnyTrust) before this batch transaction
+		if b.dapReaders != nil {
+			for _, headerByte := range b.dapReaders.SupportedHeaderBytes() {
+				// Skip blob reader, we'll add simulated reader instead after this loop
+				if headerByte == daprovider.BlobHashesHeaderFlag {
+					continue
+				}
+				if reader, found := b.dapReaders.GetByHeaderByte(headerByte); found {
+					if err := dapReaders.Register(headerByte, reader); err != nil {
+						return false, fmt.Errorf("failed to register reader for header byte 0x%02x: %w", headerByte, err)
+					}
+				}
+			}
+		}
+
+		// For EIP-4844 blob transactions, the blobs are created locally and will be
+		// included with the L1 transaction itself (as blob sidecars). Since these blobs
+		// don't exist on L1 yet, we need a simulated reader that can "read" from the
+		// local kzgBlobs we just created. This is different from other DA systems where
+		// data is posted externally first and only a reference is included in the L1 tx.
 		if b.building.use4844 {
-			dapReaders = append(dapReaders, daprovider.NewReaderForBlobReader(&simulatedBlobReader{kzgBlobs}))
+			if err := dapReaders.SetupBlobReader(daprovider.NewReaderForBlobReader(&simulatedBlobReader{kzgBlobs})); err != nil {
+				return false, fmt.Errorf("failed to register simulated blob reader: %w", err)
+			}
 		}
 		seqMsg := binary.BigEndian.AppendUint64([]byte{}, l1BoundMinTimestamp)
 		seqMsg = binary.BigEndian.AppendUint64(seqMsg, l1BoundMaxTimestamp)
@@ -1959,15 +2002,17 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 				return false, fmt.Errorf("error getting message from simulated inbox multiplexer (Pop) when testing correctness of batch: %w", err)
 			}
 			if msg.DelayedMessagesRead != b.building.muxBackend.allMsgs[i].DelayedMessagesRead {
-				b.building = nil
 				return false, fmt.Errorf("simulated inbox multiplexer failed to produce correct delayedMessagesRead field for msg with seqNum: %d. Got: %d, Want: %d", i, msg.DelayedMessagesRead, b.building.muxBackend.allMsgs[i].DelayedMessagesRead)
 			}
 			if !msg.Message.Equals(b.building.muxBackend.allMsgs[i].Message) {
-				b.building = nil
 				return false, fmt.Errorf("simulated inbox multiplexer failed to produce correct message field for msg with seqNum: %d", i)
 			}
 		}
 		log.Debug("Successfully checked that the batch produces correct messages when ran through inbox multiplexer", "sequenceNumber", batchPosition.NextSeqNum)
+	}
+
+	if !b.redisLock.AttemptLock(ctx) {
+		return false, errAttemptLockFailed
 	}
 
 	tx, err := b.dataPoster.PostTransaction(ctx,
@@ -2046,7 +2091,6 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 		backlog = 0
 	}
 	b.backlog.Store(backlog)
-	b.building = nil
 
 	// If we aren't queueing up transactions, wait for the receipt before moving on to the next batch.
 	if config.DataPoster.UseNoOpStorage {

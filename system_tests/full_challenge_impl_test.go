@@ -333,7 +333,7 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).WithPreBoldDeployment().DontParalellise()
 	initialBalance := new(big.Int).Lsh(big.NewInt(1), 200)
 	l1Info := builder.L1Info
 	l1Info.GenerateGenesisAccount("deployer", initialBalance)
@@ -512,12 +512,13 @@ func RunChallengeTest(t *testing.T, asserterIsCorrect bool, useStubs bool, chall
 
 	confirmLatestBlock(ctx, t, l1Info, l1Backend)
 
-	readers := make([]daprovider.Reader, 1)
+	readers := daprovider.NewReaderRegistry()
 	if useEigenDA {
 		eigenDA, err := eigenda.NewEigenDA(&conf.EigenDA)
 
 		Require(t, err)
-		readers[0] = eigenda.NewReaderForEigenDA(eigenDA)
+		err = readers.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDA))
+		Require(t, err)
 	}
 
 	locator, err := server_common.NewMachineLocator(builder.valnodeConfig.Wasm.RootPath)

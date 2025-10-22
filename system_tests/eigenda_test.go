@@ -97,8 +97,7 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 	}()
 
 	// Setup L1 chain and contracts
-	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
-	builder.parallelise = false
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
 	builder.BuildL1(t)
 	// Setup DAS servers
 	l1NodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest()
@@ -140,7 +139,8 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 
 		// 3 - Emulate EigenDA becoming healthy again and ensure that the system starts using it for DA
 		memCfg.PutReturnsFailoverError = false
-		memCfgClient.UpdateConfig(ctx, memCfg)
+		_, err = memCfgClient.UpdateConfig(ctx, memCfg)
+		Require(t, err)
 
 		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(3000000000000), l2B.Client)
 
@@ -151,6 +151,7 @@ func testFailOverFromEigenDAToCallData(t *testing.T) {
 		latestBlock, err := builder.L1.Client.BlockNumber(ctx)
 		Require(t, err)
 
+		// #nosec G115 -- Block numbers are unlikely to exceed int64's maximum value
 		batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
 		Require(t, err)
 		// ensure that sequencer inbox contains both eigenda and calldata batches
@@ -190,9 +191,8 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 	)
 
 	// Setup L1 chain and contracts
-	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
 	builder.chainConfig = chaininfo.ArbitrumDevTestDASChainConfig()
-	builder.parallelise = false
 	builder.BuildL1(t)
 
 	arbSys, _ := precompilesgen.NewArbSys(types.ArbSysAddress, builder.L1.Client)
@@ -201,13 +201,9 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 	l1Reader.Start(ctx)
 	defer l1Reader.StopAndWait()
 
-	keyDir, fileDataDir, dbDataDir := t.TempDir(), t.TempDir(), t.TempDir()
+	keyDir, fileDataDir := t.TempDir(), t.TempDir()
 	pubkey, _, err := das.GenerateAndStoreKeys(keyDir)
 	Require(t, err)
-
-	dbConfig := das.DefaultLocalDBStorageConfig
-	dbConfig.Enable = true
-	dbConfig.DataDir = dbDataDir
 
 	serverConfig := das.DataAvailabilityConfig{
 		Enable: true,
@@ -219,7 +215,6 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 			DataDir:      fileDataDir,
 			MaxRetention: das.DefaultLocalFileStorageConfig.MaxRetention,
 		},
-		LocalDBStorage: dbConfig,
 
 		Key: das.KeyConfig{
 			KeyDir: keyDir,
@@ -311,6 +306,7 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 
 	memCfg.PutReturnsFailoverError = true
 	_, err = memCfgClient.UpdateConfig(ctx, memCfg)
+	Require(t, err)
 
 	checkBatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*2), l2B.Client)
 	// 3 - Emulate EigenDA becoming healthy again and ensure that the system starts using it for DA
@@ -328,6 +324,7 @@ func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
 	latestBlock, err := builder.L1.Client.BlockNumber(ctx)
 	Require(t, err)
 
+	// #nosec G115 -- Block numbers are unlikely to exceed int64's maximum value
 	batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
 	Require(t, err)
 

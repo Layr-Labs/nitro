@@ -31,20 +31,20 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	protocol "github.com/offchainlabs/bold/chain-abstraction"
-	solimpl "github.com/offchainlabs/bold/chain-abstraction/sol-implementation"
-	challengemanager "github.com/offchainlabs/bold/challenge-manager"
-	modes "github.com/offchainlabs/bold/challenge-manager/types"
-	l2stateprovider "github.com/offchainlabs/bold/layer2-state-provider"
-	challengetesting "github.com/offchainlabs/bold/testing"
-	"github.com/offchainlabs/bold/testing/setup"
-	butil "github.com/offchainlabs/bold/util"
 	"github.com/offchainlabs/nitro/arbcompress"
 	"github.com/offchainlabs/nitro/arbnode"
 	"github.com/offchainlabs/nitro/arbnode/dataposter/storage"
 	"github.com/offchainlabs/nitro/arbos"
 	"github.com/offchainlabs/nitro/arbos/l2pricing"
 	"github.com/offchainlabs/nitro/arbstate"
+	protocol "github.com/offchainlabs/nitro/bold/chain-abstraction"
+	solimpl "github.com/offchainlabs/nitro/bold/chain-abstraction/sol-implementation"
+	challengemanager "github.com/offchainlabs/nitro/bold/challenge-manager"
+	modes "github.com/offchainlabs/nitro/bold/challenge-manager/types"
+	l2stateprovider "github.com/offchainlabs/nitro/bold/layer2-state-provider"
+	challenge_testing "github.com/offchainlabs/nitro/bold/testing"
+	"github.com/offchainlabs/nitro/bold/testing/setup"
+	butil "github.com/offchainlabs/nitro/bold/util"
 	"github.com/offchainlabs/nitro/cmd/chaininfo"
 	"github.com/offchainlabs/nitro/daprovider"
 	"github.com/offchainlabs/nitro/eigenda"
@@ -173,7 +173,7 @@ func testChallengeProtocolBOLD(t *testing.T, eigenDAOpts *EigenDABoldBatchOpts, 
 	_, valStack := createTestValidationNode(t, ctx, &valCfg)
 	blockValidatorConfig := staker.TestBlockValidatorConfig
 
-	var dapReaders []daprovider.Reader = nil
+	var dapReaders = daprovider.NewReaderRegistry()
 	if eigenDAOpts != nil {
 		eigenDAService, err := eigenda.NewEigenDA(
 			&eigenda.EigenDAConfig{
@@ -183,7 +183,10 @@ func testChallengeProtocolBOLD(t *testing.T, eigenDAOpts *EigenDABoldBatchOpts, 
 		if err != nil {
 			panic(err)
 		}
-		dapReaders = append(dapReaders, eigenda.NewReaderForEigenDA(eigenDAService))
+		err = dapReaders.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(eigenDAService))
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	locator, err := server_common.NewMachineLocator(valCfg.Wasm.RootPath)
@@ -589,9 +592,6 @@ func createTestNodeOnL1ForBoldProtocol(
 		l2info = NewArbTestInfo(t, chainConfig.ChainID)
 	}
 
-	l1info.GenerateAccount("RollupOwner")
-	l1info.GenerateAccount("Sequencer")
-	l1info.GenerateAccount("User")
 	l1info.GenerateAccount("Asserter")
 	l1info.GenerateAccount("EvilAsserter")
 
@@ -639,7 +639,7 @@ func createTestNodeOnL1ForBoldProtocol(
 	execConfig := ExecConfigDefaultNonSequencerTest(t, rawdb.HashScheme)
 	Require(t, execConfig.Validate())
 	initMessage := getInitMessage(ctx, t, l1client, addresses)
-	_, l2stack, l2chainDb, l2arbDb, l2blockchain = createNonL1BlockChainWithStackConfig(t, l2info, "", chainConfig, nil, initMessage, nil, execConfig, true)
+	_, l2stack, l2chainDb, l2arbDb, l2blockchain = createNonL1BlockChainWithStackConfig(t, l2info, "", chainConfig, nil, initMessage, nil, execConfig)
 	var sequencerTxOptsPtr *bind.TransactOpts
 	var dataSigner signature.DataSignerFunc
 	if isSequencer {
@@ -655,11 +655,11 @@ func createTestNodeOnL1ForBoldProtocol(
 
 	AddValNodeIfNeeded(t, ctx, nodeConfig, true, "", "")
 
+	parentChainId, err := l1client.ChainID(ctx)
 	execConfigFetcher := func() *gethexec.Config { return execConfig }
-	execNode, err := gethexec.CreateExecutionNode(ctx, l2stack, l2chainDb, l2blockchain, l1client, execConfigFetcher, 0)
+	execNode, err := gethexec.CreateExecutionNode(ctx, l2stack, l2chainDb, l2blockchain, l1client, execConfigFetcher, parentChainId, 0)
 	Require(t, err)
 
-	parentChainId, err := l1client.ChainID(ctx)
 	Require(t, err)
 	locator, err := server_common.NewMachineLocator("")
 	Require(t, err)
@@ -724,7 +724,7 @@ func deployContractsOnly(
 	genesisInboxCount := big.NewInt(0)
 	anyTrustFastConfirmer := common.Address{}
 	miniStakeValues := []*big.Int{big.NewInt(5), big.NewInt(4), big.NewInt(3), big.NewInt(2), big.NewInt(1)}
-	cfg := challengetesting.GenerateRollupConfig(
+	cfg := challenge_testing.GenerateRollupConfig(
 		false,
 		wasmModuleRoot,
 		l1TransactionOpts.From,
@@ -735,13 +735,13 @@ func deployContractsOnly(
 		genesisExecutionState,
 		genesisInboxCount,
 		anyTrustFastConfirmer,
-		challengetesting.WithLayerZeroHeights(&protocol.LayerZeroHeights{
+		challenge_testing.WithLayerZeroHeights(&protocol.LayerZeroHeights{
 			BlockChallengeHeight:     protocol.Height(blockChallengeLeafHeight),
 			BigStepChallengeHeight:   protocol.Height(bigStepChallengeLeafHeight),
 			SmallStepChallengeHeight: protocol.Height(smallStepChallengeLeafHeight),
 		}),
-		challengetesting.WithNumBigStepLevels(uint8(3)),       // TODO: Hardcoded.
-		challengetesting.WithConfirmPeriodBlocks(uint64(120)), // TODO: Hardcoded.
+		challenge_testing.WithNumBigStepLevels(uint8(3)),       // TODO: Hardcoded.
+		challenge_testing.WithConfirmPeriodBlocks(uint64(120)), // TODO: Hardcoded.
 	)
 	config, err := json.Marshal(chaininfo.ArbitrumDevTestChainConfig())
 	Require(t, err)
@@ -873,9 +873,9 @@ func create2ndNodeWithConfigForBoldProtocol(
 	Require(t, err)
 
 	execConfigFetcher := func() *gethexec.Config { return execConfig }
-	execNode, err := gethexec.CreateExecutionNode(ctx, l2stack, l2chainDb, l2blockchain, l1client, execConfigFetcher, 0)
-	Require(t, err)
 	l1ChainId, err := l1client.ChainID(ctx)
+	Require(t, err)
+	execNode, err := gethexec.CreateExecutionNode(ctx, l2stack, l2chainDb, l2blockchain, l1client, execConfigFetcher, l1ChainId, 0)
 	Require(t, err)
 	locator, err := server_common.NewMachineLocator("")
 	Require(t, err)

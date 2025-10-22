@@ -7,8 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/daprovider"
+	"github.com/offchainlabs/nitro/util/containers"
 )
 
 func NewReaderForEigenDA(reader EigenDAReader) *readerForEigenDA {
@@ -23,36 +25,59 @@ func (d *readerForEigenDA) IsValidHeaderByte(ctx context.Context, headerByte byt
 	return daprovider.IsEigenDAMessageHeaderByte(headerByte)
 }
 
-func (d *readerForEigenDA) RecoverPayloadFromBatch(
-	ctx context.Context,
+// CollectPreimages collects preimages from the DA provider
+func (b *readerForEigenDA) CollectPreimages(
 	batchNum uint64,
 	batchBlockHash common.Hash,
 	sequencerMsg []byte,
-	preimages daprovider.PreimagesMap,
-	validateSeqMsg bool,
-) ([]byte, daprovider.PreimagesMap, error) {
-	if preimages == nil {
+) containers.PromiseInterface[daprovider.PreimagesResult] {
+	promise, ctx := containers.NewPromiseWithContext[daprovider.PreimagesResult](context.Background())
+	go func() {
+		var preimages daprovider.PreimagesMap
+		var preimageRecorder daprovider.PreimageRecorder
 		preimages = make(daprovider.PreimagesMap)
-	}
-	preimageRecorder := daprovider.RecordPreimagesTo(preimages)
-	payload, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, preimageRecorder, "binary")
-	return payload, preimages, err
+		preimageRecorder = daprovider.RecordPreimagesTo(preimages)
+
+		_, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], b.readerEigenDA, preimageRecorder)
+		if err != nil {
+			promise.ProduceError(err)
+		} else {
+			promise.Produce(daprovider.PreimagesResult{Preimages: preimages})
+		}
+	}()
+	return promise
+}
+
+func (d *readerForEigenDA) RecoverPayload(
+	batchNum uint64,
+	batchBlockHash common.Hash,
+	sequencerMsg []byte,
+) containers.PromiseInterface[daprovider.PayloadResult] {
+	promise, ctx := containers.NewPromiseWithContext[daprovider.PayloadResult](context.Background())
+	go func() {
+		payload, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, nil)
+		if err != nil {
+			promise.ProduceError(err)
+		} else {
+			promise.Produce(daprovider.PayloadResult{Payload: payload})
+		}
+	}()
+	return promise
 }
 
 func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	sequencerMsg []byte,
 	daReader EigenDAReader,
 	preimageRecoder daprovider.PreimageRecorder,
-	domain string,
 ) ([]byte, error) {
 
 	eigenDAV1Cert, err := ParseSequencerMsg(sequencerMsg)
 	if err != nil {
-		log.Error("Failed to parse sequencer message", "err", err)
+		log.Error("Failed to parse sequencer message into eigenda v1 cert", "err", err)
 		return nil, err
 	}
 
-	data, err := daReader.QueryBlob(ctx, eigenDAV1Cert, domain)
+	data, err := daReader.QueryBlob(ctx, eigenDAV1Cert)
 	if err != nil {
 		log.Error("Failed to query data from EigenDA", "err", err)
 		return nil, err

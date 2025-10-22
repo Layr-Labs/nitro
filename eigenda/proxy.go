@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
