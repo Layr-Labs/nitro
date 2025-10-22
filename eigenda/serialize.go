@@ -112,7 +112,7 @@ func padPow2(data []byte) ([]byte, error) {
 func stripZeroPrefixAndEnsure32Bytes(arr []byte) ([]byte, error) {
 	if len(arr) < 32 {
 		// pad zeros to preserve value at exactly 32 bytes
-		zeroBuffer := make([]byte, 32 - len(arr))
+		zeroBuffer := make([]byte, 32-len(arr))
 		return append(zeroBuffer, arr...), nil
 	}
 
