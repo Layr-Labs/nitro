@@ -468,7 +468,7 @@ func (m *ChallengeManager) createExecutionBackend(ctx context.Context, step uint
 		return nil
 	}
 	m.executionChallengeBackend = nil
-	entry, err := m.validator.CreateReadyValidationEntry(ctx, initialCount)
+	entry, err := m.validator.CreateReadyValidationEntry(ctx, m.wasmModuleRoot, initialCount)
 	if err != nil {
 		return fmt.Errorf("error creating validation entry for challenge %v msg %v for execution challenge: %w", m.challengeIndex, initialCount, err)
 	}

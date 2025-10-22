@@ -21,6 +21,7 @@ import (
 	"github.com/offchainlabs/nitro/arbos/arbostypes"
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/daprovider"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/util/rpcclient"
 	"github.com/offchainlabs/nitro/validator"
@@ -47,6 +48,8 @@ type StatelessBlockValidator struct {
 	dapReaders           *daprovider.ReaderRegistry
 	stack                *node.Node
 	latestWasmModuleRoot common.Hash
+
+	historicalEigenDAWasmRoots map[common.Hash]interface{}
 }
 
 type BlockValidatorRegistrer interface {
@@ -307,7 +310,7 @@ func (v *StatelessBlockValidator) BOLDExecutionSpawners() []validator.BOLDExecut
 	return v.boldExecSpawners
 }
 
-func (v *StatelessBlockValidator) readFullBatch(ctx context.Context, batchNum uint64) (bool, *FullBatchInfo, error) {
+func (v *StatelessBlockValidator) readFullBatch(ctx context.Context, batchNum uint64, useLegacyOracle bool) (bool, *FullBatchInfo, error) {
 	batchCount, err := v.inboxTracker.GetBatchCount()
 	if err != nil {
 		return false, nil, err
@@ -327,6 +330,14 @@ func (v *StatelessBlockValidator) readFullBatch(ctx context.Context, batchNum ui
 	if len(postedData) > 40 && v.dapReaders != nil {
 		headerByte := postedData[40]
 		if dapReader, found := v.dapReaders.GetByHeaderByte(headerByte); found {
+
+			// See if historical EigenDA WASM root contains the latest WASM Root, if so
+			// use old preimage type
+			if useLegacyOracle && daprovider.IsEigenDAMessageHeaderByte(headerByte) {
+				println("Signifier byte being set!")
+				postedData[40] = eigenda.HistoricalEigenDAPreimageSignalByte
+			}
+
 			promise := dapReader.CollectPreimages(batchNum, batchBlockHash, postedData)
 			result, err := promise.Await(ctx)
 			if err != nil {
@@ -440,7 +451,7 @@ func (v *StatelessBlockValidator) GlobalStatePositionsAtCount(count arbutil.Mess
 	return GlobalStatePositionsAtCount(v.inboxTracker, count, batch)
 }
 
-func (v *StatelessBlockValidator) CreateReadyValidationEntry(ctx context.Context, pos arbutil.MessageIndex, wasmTargets ...rawdb.WasmTarget) (*validationEntry, error) {
+func (v *StatelessBlockValidator) CreateReadyValidationEntry(ctx context.Context, wasmRoot common.Hash, pos arbutil.MessageIndex, wasmTargets ...rawdb.WasmTarget) (*validationEntry, error) {
 	msg, err := v.streamer.GetMessage(pos)
 	if err != nil {
 		return nil, err
@@ -469,7 +480,9 @@ func (v *StatelessBlockValidator) CreateReadyValidationEntry(ctx context.Context
 	}
 	start := BuildGlobalState(*prevResult, startPos)
 	end := BuildGlobalState(*result, endPos)
-	found, fullBatchInfo, err := v.readFullBatch(ctx, start.Batch)
+
+	_, useLegacyOracle := eigenda.HistoricalEigenDAWasmRoots[wasmRoot]
+	found, fullBatchInfo, err := v.readFullBatch(ctx, start.Batch, useLegacyOracle)
 	if err != nil {
 		return nil, err
 	}
@@ -507,7 +520,7 @@ func (v *StatelessBlockValidator) CreateReadyValidationEntry(ctx context.Context
 func (v *StatelessBlockValidator) ValidateResult(
 	ctx context.Context, pos arbutil.MessageIndex, useExec bool, moduleRoot common.Hash,
 ) (bool, *validator.GoGlobalState, error) {
-	entry, err := v.CreateReadyValidationEntry(ctx, pos)
+	entry, err := v.CreateReadyValidationEntry(ctx, moduleRoot, pos)
 	if err != nil {
 		return false, nil, err
 	}
@@ -547,7 +560,11 @@ func (v *StatelessBlockValidator) ValidateResult(
 }
 
 func (v *StatelessBlockValidator) ValidationInputsAt(ctx context.Context, pos arbutil.MessageIndex, wasmTargets ...rawdb.WasmTarget) (server_api.InputJSON, error) {
-	entry, err := v.CreateReadyValidationEntry(ctx, pos, wasmTargets...)
+	// this breaks here since we don't propagate the wavmRoot via function arg. this is ok though since this
+	// function is only ever callable by the block validator debug API which assumes the non-critical
+	// arbdebug namespace for the validation server. this is a regression but this API would only be callable
+	// during real-time debugging which doesn't warrant the overhead introduced by breaking the function signature.
+	entry, err := v.CreateReadyValidationEntry(ctx, common.HexToHash("0x0"), pos, wasmTargets...)
 	if err != nil {
 		return server_api.InputJSON{}, err
 	}

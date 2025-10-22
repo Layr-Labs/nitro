@@ -38,7 +38,15 @@ func (b *readerForEigenDA) CollectPreimages(
 		preimages = make(daprovider.PreimagesMap)
 		preimageRecorder = daprovider.RecordPreimagesTo(preimages)
 
-		_, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], b.readerEigenDA, preimageRecorder)
+		useLegacyPreimageType := false
+		if sequencerMsg[40] == HistoricalEigenDAPreimageSignalByte {
+			useLegacyPreimageType = true
+			sequencerMsg[40] = daprovider.EigenDAMessageHeaderFlag
+		}
+
+		println("Use legacy preimage type: %b", useLegacyPreimageType)
+
+		_, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], b.readerEigenDA, preimageRecorder, useLegacyPreimageType)
 		if err != nil {
 			promise.ProduceError(err)
 		} else {
@@ -55,7 +63,7 @@ func (d *readerForEigenDA) RecoverPayload(
 ) containers.PromiseInterface[daprovider.PayloadResult] {
 	promise, ctx := containers.NewPromiseWithContext[daprovider.PayloadResult](context.Background())
 	go func() {
-		payload, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, nil)
+		payload, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, nil, false)
 		if err != nil {
 			promise.ProduceError(err)
 		} else {
@@ -69,6 +77,7 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 	sequencerMsg []byte,
 	daReader EigenDAReader,
 	preimageRecoder daprovider.PreimageRecorder,
+	useLegacyPreimageType bool,
 ) ([]byte, error) {
 
 	eigenDAV1Cert, err := ParseSequencerMsg(sequencerMsg)
@@ -94,6 +103,13 @@ func RecoverPayloadFromEigenDABatch(ctx context.Context,
 		if err != nil {
 			return nil, err
 		}
+
+		if useLegacyPreimageType {
+			println("Recording legacy eigenda preimage type")
+			preimageRecoder(*hash, preimage, 3)
+
+		}
+		println("Recording new eigenda preimage type")
 		preimageRecoder(*hash, preimage, arbutil.EigenDaPreimageType)
 	}
 	return data, nil

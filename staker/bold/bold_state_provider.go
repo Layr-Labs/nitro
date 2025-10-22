@@ -16,13 +16,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/offchainlabs/nitro/arbutil"
-	"github.com/offchainlabs/nitro/bold/chain-abstraction"
+	protocol "github.com/offchainlabs/nitro/bold/chain-abstraction"
 	"github.com/offchainlabs/nitro/bold/containers/option"
-	"github.com/offchainlabs/nitro/bold/layer2-state-provider"
+	l2stateprovider "github.com/offchainlabs/nitro/bold/layer2-state-provider"
 	"github.com/offchainlabs/nitro/bold/state-commitments/history"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/staker"
-	"github.com/offchainlabs/nitro/staker/challenge-cache"
+	challengecache "github.com/offchainlabs/nitro/staker/challenge-cache"
 	"github.com/offchainlabs/nitro/validator"
 	"github.com/offchainlabs/nitro/validator/server_arb"
 )
@@ -368,7 +368,7 @@ func (s *BOLDStateProvider) CollectMachineHashes(
 			return nil, err
 		}
 	}
-	entry, err := s.statelessValidator.CreateReadyValidationEntry(ctx, messageNum)
+	entry, err := s.statelessValidator.CreateReadyValidationEntry(ctx, cacheKey.WavmModuleRoot, messageNum)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +486,7 @@ func (s *BOLDStateProvider) CollectProof(
 		)
 		return m.ProveNextStep(), nil
 	}
-	entry, err := s.statelessValidator.CreateReadyValidationEntry(ctx, messageNum)
+	entry, err := s.statelessValidator.CreateReadyValidationEntry(ctx, assertionMetadata.WasmModuleRoot, messageNum)
 	if err != nil {
 		return nil, err
 	}

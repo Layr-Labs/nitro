@@ -8,9 +8,10 @@ type PreimageType uint8
 // These values must be kept in sync with `arbitrator/arbutil/src/types.rs`,
 // and the if statement in `contracts/src/osp/OneStepProverHostIo.sol` (search for "UNKNOWN_PREIMAGE_TYPE").
 const (
-	Keccak256PreimageType PreimageType = iota
-	Sha2_256PreimageType
-	EthVersionedHashPreimageType
-	EigenDaPreimageType // TODO(#129): Preimage type conflict with EigenDAHash and CustomDA both assuming value 3
-	DACertificatePreimageType
+	Keccak256PreimageType        PreimageType = 0
+	Sha2_256PreimageType                      = 1
+	EthVersionedHashPreimageType              = 2
+	DACertificatePreimageType                 = 3
+
+	EigenDaPreimageType = 69
 )

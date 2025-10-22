@@ -13,6 +13,10 @@ import (
 )
 
 const (
+	// used to signify that the preimage oracle needs legacy enrichment by populating with a value 3
+	// preimage type for EigenDA.
+	HistoricalEigenDAPreimageSignalByte = 0xFE
+
 	sequencerMsgOffset = 41
 	MaxBatchSize       = 16_252_897 // largest blob size allowed before payload -> blob padding to 16MiB
 )

@@ -21,8 +21,9 @@ pub enum PreimageType {
     Keccak256 = 0,
     Sha2_256 = 1,
     EthVersionedHash = 2,
-    EigenDAHash = 3, // TODO(#129): Preimage type conflict with EigenDAHash and CustomDA both assuming value 3
-    DACertificate = 4,
+    DACertificate = 3,
+    EigenDAHash = 69,
+
 }
 
 /// cbindgen:field-names=[bytes]

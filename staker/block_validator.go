@@ -25,6 +25,7 @@ import (
 
 	"github.com/offchainlabs/nitro/arbnode/resourcemanager"
 	"github.com/offchainlabs/nitro/arbutil"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/execution"
 	"github.com/offchainlabs/nitro/util"
 	"github.com/offchainlabs/nitro/util/containers"
@@ -654,7 +655,22 @@ func (v *BlockValidator) createNextValidationEntry(ctx context.Context) (bool, e
 	}
 	if v.nextCreateStartGS.PosInBatch == 0 || v.nextCreateBatchReread {
 		// new batch
-		found, fullBatchInfo, err := v.readFullBatch(ctx, v.nextCreateStartGS.Batch)
+		// determine whether or not to use a legacy EigenDAPreimageType key (i.e, 3)
+		// when populating preimage oracle mapping for wire transit to validation server
+		//
+		// there is notion of at most two wasm roots when doing validations:
+		// "current": what's been set by rollup governance in the onchain Rollup system config contract
+		// "pending": what's next or will soon be canonicalized as current. this is an optionally configured value
+		//            with a default config that loads the `/latest` subdirectory when using `nitro-devnode` containers
+		//
+		// therefore legacy population should happen if either "current" or "pending" is within the historical roots set
+		// given validation runs happen using the same preimage oracle mapping when referencing both wasm roots over wire to validation
+		// server which is why both key expressions (i.e, 3, 69) must be used to "overload" or support cross-compatibility
+		_, currentIsLegacy := eigenda.HistoricalEigenDAWasmRoots[v.currentWasmModuleRoot]
+		_, pendingIsLegacy := eigenda.HistoricalEigenDAWasmRoots[v.pendingWasmModuleRoot]
+		useLegacy := currentIsLegacy || pendingIsLegacy
+
+		found, fullBatchInfo, err := v.readFullBatch(ctx, v.nextCreateStartGS.Batch, useLegacy)
 		if !found {
 			return false, err
 		}
