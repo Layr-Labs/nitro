@@ -28,7 +28,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-mode: [legacychallenge, long, challenge, l3challenge, execution-spec-tests]
+        # execution-spec-tests are currently disabled due to version incompatibility between
+        # the EigenDA fork and nitro-devnode. Since EigenDA operates at the DA layer (affecting
+        # batching/derivation) rather than the execution layer, these EL-focused tests are not
+        # critical to validate. See: https://github.com/Layr-Labs/nitro/issues/130
+        test-mode: [legacychallenge, long, challenge, l3challenge]
 
     steps:
       - name: Checkout
