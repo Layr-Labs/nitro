@@ -4,6 +4,11 @@ run-name: Nightly CI tests triggered from @${{ github.actor }} of ${{ github.hea
 
 on:
   workflow_dispatch:
+  merge_group:
+  pull_request:
+  push:
+    branches:
+      - eigenda
   schedule:
     # Run at 00:00 AM UTC
     - cron: '0 0 * * *'
@@ -12,7 +17,7 @@ jobs:
   # Only run on schedule
   tests-scheduled:
     name: Scheduled tests
-    runs-on: arbitrator-ci
+    runs-on: linux-2xl
 
     services:
       redis:
@@ -23,7 +28,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-mode: [legacychallenge, long, challenge, l3challenge, execution-spec-tests]
+        # execution-spec-tests are currently disabled due to version incompatibility between
+        # the EigenDA fork and nitro-devnode. Since EigenDA operates at the DA layer (affecting
+        # batching/derivation) rather than the execution layer, these EL-focused tests are not
+        # critical to validate. See: https://github.com/Layr-Labs/nitro/issues/130
+        test-mode: [legacychallenge, long, challenge, l3challenge]
 
     steps:
       - name: Checkout
@@ -34,11 +43,28 @@ jobs:
       - name: Setup CI
         uses: ./.github/actions/ci-setup
 
-      - name: Build
-        run: make build test-go-deps -j
+      - name: Build (retry up to 3 times)
+        run: |
+          set -e
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            if CARGO_BUILD_JOBS=2 make build test-go-deps -j; then
+              echo "✅ Build succeeded on attempt $i"
+              break
+            elif [ "$i" -eq 3 ]; then
+              echo "❌ Build failed after 3 attempts"
+              exit 1
+            else
+              echo "⚠️ Build failed, retrying in 10 seconds..."
+              sleep 10
+            fi
+          done
 
       - name: Build all lint dependencies
         run: make -j build-node-deps
+
+      - name: Spinup eigenda-proxy
+        run: ./scripts/start-eigenda-proxy.sh
 
       - name: Lint
         uses: golangci/golangci-lint-action@v8
@@ -99,18 +125,21 @@ jobs:
           name: ${{ matrix.test-mode }}-full.log
           path: full.log
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          fail_ci_if_error: false
-          files: ./coverage.txt,./coverage-redis.txt
-          verbose: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+      # NOTE: Maintaining code coverage is something that the EigenDA team need not
+      #       do
+      #
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v2
+      #   with:
+      #     fail_ci_if_error: false
+      #     files: ./coverage.txt,./coverage-redis.txt
+      #     verbose: false
+      #     token: ${{ secrets.CODECOV_TOKEN }}
 
   notify-on-failure:
     name: Notify Slack on failure
     needs: [tests-scheduled]
-    runs-on: ubuntu-4
+    runs-on: linux-2xl
     if: ${{ failure() }}
     env:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

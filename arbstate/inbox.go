@@ -47,7 +47,7 @@ type SequencerMessage struct {
 	Segments             [][]byte
 }
 
-const MaxDecompressedLen int = 1024 * 1024 * 16 // 16 MiB
+const MaxDecompressedLen int = 1024 * 1024 * 40 // 40 MiB
 const maxZeroheavyDecompressedLen = 101*MaxDecompressedLen/100 + 64
 const MaxSegmentsPerSequencerMessage = 100 * 1024
 
@@ -63,6 +63,7 @@ func ParseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 		AfterDelayedMessages: binary.BigEndian.Uint64(data[32:40]),
 		Segments:             [][]byte{},
 	}
+
 	payload := data[40:]
 
 	// Stage 0: Check if our node is out of date and we don't understand this batch type
@@ -100,6 +101,9 @@ func ParseSequencerMessage(ctx context.Context, batchNum uint64, batchBlockHash 
 				return parsedMsg, nil
 			}
 		} else {
+			if daprovider.IsEigenDAMessageHeaderByte(payload[0]) {
+				return nil, daprovider.ErrNoEigenDAReader
+			}
 			// No reader found for this header byte - check if it's a known type
 			if daprovider.IsDASMessageHeaderByte(payload[0]) {
 				return nil, fmt.Errorf("no DAS reader configured for DAS message (header byte 0x%02x)", payload[0])

@@ -38,5 +38,8 @@ arbos/testdata/*
 #other temporaries
 tmp/*
 .env
+
+# fork diff
+index.html
 go.work
 go.work.sum

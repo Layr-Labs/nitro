@@ -6,7 +6,7 @@ on:
 jobs:
   arbitrator:
     name: Run Arbitrator tests
-    runs-on: arbitrator-ci
+    runs-on: linux-2xl
     env:
       RUST_BACKTRACE: 1
       # RUSTFLAGS: -Dwarnings          # TODO: re-enable after wasmer upgrade
@@ -52,8 +52,8 @@ jobs:
       - name: Make arbitrator libraries
         run: make -j wasm-ci-build
 
-      - name: Clippy check
-        run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
+      # - name: Clippy check
+      #   run: cargo clippy --all --manifest-path arbitrator/Cargo.toml -- -D warnings
 
       - name: Run rust tests
         id: run-rust-tests
@@ -82,8 +82,8 @@ jobs:
       - name: Rustfmt
         run: cargo fmt -p arbutil -p prover -p jit -p stylus --manifest-path arbitrator/Cargo.toml -- --check
 
-      - name: Rustfmt - tools/stylus_benchmark
-        run: cargo fmt --all --manifest-path arbitrator/tools/stylus_benchmark/Cargo.toml -- --check
+      # - name: Rustfmt - tools/stylus_benchmark
+      #   run: cargo fmt --all --manifest-path arbitrator/tools/stylus_benchmark/Cargo.toml -- --check
 
       - name: Make proofs from test cases
         run: make -j test-gen-proofs

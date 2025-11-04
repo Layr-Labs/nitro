@@ -1,0 +1,286 @@
+title: "layr-labs/nitro"  # Define the HTML page title
+logo: "logo.png"
+footer: |  # define the footer with markdown
+  [EigenDA Nitro](https://github.com/Layr-Labs/nitro) fork overview &middot created with [Forkdiff](https://github.com/protolambda/forkdiff)
+base:
+  name: OffchainLabs/nitro
+  url: https://github.com/OffchainLabs/nitro
+  ## v3.8.0-rc7 upstream pin
+  hash: ef47e289dcdd3eb387f6ba9c64dfbf73d980c1e5 
+fork:
+  name: Layr-Labs/nitro
+  url: https://github.com/Layr-Labs/nitro
+  ## latest v3.8.0-rc7 downstream fork commit pin
+  hash: a8de9b68c8a01bafb7bfc0c2db457ed0ecb35680
+def:
+    title: "EigenDA x Arbitrum Nitro Fork Diff Overview"
+    description: | # description in markdown
+      The original nitro codebase can be found at [`github.com/OffchainLabs/nitro`](https://github.com/OffchainLabs/nitro).
+      And the EigenDA fork at [`github.com/Layr-Labs/nitro`](https://github.com/Layr-Labs/nitro).
+  
+    sub:
+      - title: "CI/CD"
+        description: | 
+          Updated container orchestration and github actions workflows to best support EigenDA-specific build and test steps.
+        sub:
+          - title: "GitHub workflows"
+            description: | 
+              Updated GitHub workflows to include EigenDA-specific build, runners (i.e, linux-2xl), and test steps. Some existing upstream jobs have been disabled (i.e, codecov, lint, notify on failure)
+              and some dispatch policies have been modified to use downstream specific branches.
+
+              Also added a custom EigenDA Proxy startup script (i.e., [scripts/start-eigenda-proxy.sh](https://github.com/Layr-Labs/nitro/blob/4af86f85f415d2e9d817b1d806cfc98b5a019bf4/scripts/start-eigenda-proxy.sh)) for spinning up containerized resource to be used by integration 
+              tests. Instance assumes single thread access since stateful updates are made using [memconfig](https://github.com/Layr-Labs/eigenda/tree/master/api/proxy/store/generated_key/memstore#config-rest-api); resulting in tests ran serially.
+
+            globs:
+              - ".github/workflows/arbitrator-ci.yml"
+              - ".github/workflows/shellcheck-ci.yml"
+              - ".github/workflows/arbitrator-skip-ci.yml"
+              - ".github/workflows/ci.yml"
+              - ".github/workflows/codeql-analysis.yml"
+              - ".github/workflows/docker.yml"
+              - ".github/workflows/release-ci.yml"
+              - "scripts/start-eigenda-proxy.sh"
+              - ".github/workflows/nightly-ci.yml"
+
+          - title: "Docker builds"
+            description: | 
+              Updated Dockerfile to use EigenDA consensus replay artifact and disregard historical 
+              vanilla Arbitrum ones (i.e, consensus-v1..., consensus-v31) that would never be used when migrating to EigenDA fork.
+              
+              Also added github action for building and publishing images ([nitro-node](https://github.com/Layr-Labs/nitro/pkgs/container/nitro%2Fnitro-node), [nitro-node-dev](https://github.com/Layr-Labs/nitro/pkgs/container/nitro%2Fnitro-node-dev)) to GHCR.
+            globs:
+              - "Dockerfile"
+              - ".github/workflows/docker-upload.yml"
+              - ".github/actions/docker-image/action.yml"
+              - "scripts/download-machine-eigenda.sh"
+
+          - title: "Hosting fork summaries"
+            description: |
+              Added a job for generating and serving fork summaries (i.e., the page you're reading now) via github pages.
+            globs:
+              - .github/workflows/pages.yml
+              - fork.yaml
+
+      - title: "EigenDA V1 header byte"
+        description: | 
+          We introduced an EigenDA V1 header byte with the value `0xED`. 
+          In hindsight, this was a poor choice: the bit pattern of `0xED` conflicts with the high-order bits used by other message header bytes, causing EigenDA messages to be misclassified and processed by non-EigenDA Readers.
+          The issue was patched by updating the `hasBits` check to include an explicit conditional check for the EigenDA header byte before performing the bitmask.
+
+        globs:
+          - "daprovider/util.go"
+          - "daprovider/das/dasutil/dasutil.go"
+          - "daprovider/util_test.go"
+
+      - title: "EigenDA V1 package"
+        description: |
+          The EigenDA V1 package includes interface implementations, proxy communication wrappers, and blob serialization necessary for 
+          securely wiring EigenDA V1 as a feature into the nitro codebase. This package also provides a set of lower level constructions which are referenced during
+          fraud proving and batch posting/derivation.
+        sub:
+          - title: "Proxy client"
+            description: |
+              Introduced a wrapper over the EigenDA Proxy [client](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/client%2Fv0.1.0) which
+              RLP encodes and decodes the batch contents when communicating with the proxy service. The wrapper naively assumes that the preceeding
+              [Standard DA Commitment](https://github.com/Layr-Labs/eigenda/tree/57ed95ce77a57c53341cad10233ca2f29b29c0f5/api/proxy#standard-commitment-mode)'s version byte will never be used for any meaningful context processing. While poorly designed, this assumption is ok given the eventual deprecation
+              of this codepath entirely in-favor of EigenDA V2 integration with ALT DA.
+            globs:
+              - "eigenda/proxy.go"
+              - "eigenda/proxy_mock.go"
+
+          - title: "DA writer/reader interface"
+            description: |
+              * Implements the Arbitrum native Data Availability `Reader` [interface](https://github.com/OffchainLabs/nitro/blob/v3.8.0-rc.7/daprovider/reader.go#L43-L57) for EigenDA. 
+                When recording a batch payload to the preimage oracle for stateless validation, the blob is generic encoded to a BN254-Compatible format (i.e., [EncodedPayload](https://layr-labs.github.io/eigenda/integration/spec/3-data-structs.html#encodedpayload)) as a precursor for injection. 
+                Sequencer messages are decoded from their ABI encoded format into a `BlobInfo` type for compatible communication with the proxy service.
+
+              * Implements the Arbitrum native Data Availability `Writer` [interface](https://github.com/OffchainLabs/nitro/blob/v3.8.0-rc.7/daprovider/writer.go#L10-L17) for EigenDA.
+                This Writer simply overlays the lightweight proxy http client for doing dispersals against the `/put` route.
+
+            globs:
+              - "eigenda/reader.go"
+              - "eigenda/init.go"
+              - "eigenda/eigenda.go"
+          
+          - title: "Blob serialization"
+            description: |
+              EigenDA blobs are serialized and deserialized for fraud proving:
+
+                - Serialization (`GenericEncodeBlob`) occurs when recording a batch payload to the preimage oracle for stateless validation. This serialization logic is only called when preimage recording for performing
+                  validations or re-executions and is ignored during standard golang compiled ARBOS execution.
+              
+                - Deserialization (`GenericDecodeBlob`) occurs when referencing the blob in the replay script being run by the Arbitrator prover or JIT machine binary.
+
+              These domain morphisms are necessary so that the off-chain proof generation done for an EigenDA `READPREIMAGE` opcode is using the 
+              same data format as used by the EigenDA encoder for generating KZG commitments and evaluation proofs.
+            
+            globs:
+              - "eigenda/serialize.go"
+              - "eigenda/serialize_test.go"
+
+          - title: "EigenDA certificate"
+            description: |
+              Introduces a structured `EigenDAV1Cert` type which wraps [EigenDACertVerifier](https://github.com/Layr-Labs/eigenda/blob/d6339ebb7cd12ec7483fc5c31c1b12bc97d3401c/contracts/src/core/EigenDACertVerifier.sol)
+              Go binding types for ABI-compatible struct packing for with `addSequencerL2BatchFromEigenDA` inbox method. Also provides transformation functions
+              to convert into/from the `BlobStatusInfo` struct returned by EigenDA Proxy.
+
+            globs:
+              - "eigenda/certificate.go"
+  
+      - title: "Fraud Proving"
+        description: |
+          To securely enable fraud proofs with EigenDA V1, we've extended the proving system to support a new `READPREIMAGE` opcode variation 
+          and targeting of said opcode within the compiled replay script used for re-executing the L2 STF. This requires changes in the onchain 
+          fraud proof VM, offchain fraud proof VM, and replay script.
+        sub:
+          - title: "EigenDA preimage opcode"
+            description: | 
+              Extended core prover machine's interpreter loop logic to target EigenDA `READPREIMAGE` opcode when serializing machine state proofs (if applicable).
+              Extended preimage verification invariants to recompute EigenDA preimages when doing a re-execution over an L2 block contained in an EigenDA V1 batch. When running in JIT for validations, the
+              hash recomputation check is ignored (like 4844 given recomputing commmitments slows validation pipeline).
+
+              Also extended WASM -> WAVM transpilation logic to support routing to the new opcode type (i.e., from wasm host function to 
+              `READPREIMAGE` span across 32 byte offsets).
+
+            globs:
+              - "arbitrator/arbutil/src/types.rs"
+              - "arbitrator/jit/src/wavmio.rs"
+              - "arbitrator/prover/src/host.rs"
+              - "arbutil/preimage_type.go"
+              - "arbitrator/wasm-libraries/host-io/src/lib.rs"
+              - "arbitrator/prover/Cargo.toml"
+
+          - title: "Opcode proof serialization"
+            description: | 
+              Extended the core interpreter logic to handle the EigenDA `READPREIMAGE` opcode when serializing machine state proofs, using the [rust-kzg-bn254 library](https://github.com/Layr-Labs/rust-kzg-bn254) 
+              to compute KZG commitments and witness proofs. This integration also requires embedding the trusted setup’s SRS points into the Nitro Docker containers.
+
+            globs:
+              - "arbitrator/prover/src/kzgbn254.rs"
+              - "arbitrator/prover/src/lib.rs"
+              - "arbitrator/prover/src/mainnet-files/*"
+              - "arbitrator/prover/src/test-files/*"
+              - "arbitrator/prover/src/utils.rs"
+              - "arbitrator/prover/src/machine.rs"
+
+          - title: "Replay Script"
+            description: | 
+              Updated replay script logic to use a restricted EigenDA reader type (i.e, no I/O, FD access) which resolves EigenDA Preimage types against preimage oracle when an EigenDA Message Header Byte is seen when
+              deriving a batch from message in the inbox.
+            globs:
+              - "cmd/replay/main.go"
+
+          - title: "Proof Serialization Tests"
+            description: | 
+              Tests necessary for asserting offchain proof serialization <-> onchain verification x equivalence for one step proofs. These test scripts target HostIO opcodes (e.g, `READPREIMAGE`, `READINBOXMESSAGE`)
+              and utilize different proving strategies defined within the `arbitrator's` machine logic to serialize machine state proofs across different instructions triggered when executing the test scripts.
+              These serialized proofs are collected into intermediary JSON files and are ran against the onchain one step prover to ensure proof verification succeeds and the output resultant machine state hash is equivalent between onchain/offchain execution domains.
+              We've updated these test scripts to target `READPREIMAGE` resolution for EigenDA V1 with test preimages generated via the the `create-test-preimages.py` script.
+
+            globs:
+              - "arbitrator/prover/test-cases/go/main.go"
+              - "arbitrator/prover/src/test-files/*"
+              - "arbitrator/prover/test-cases/rust/src/bin/host-io.rs"
+              - "scripts/create-test-preimages.py"
+
+          - title: "E2E pre-BoLD challenge tests"
+            description: |
+              Extended E2E pre-BoLD challenge tests to ensure successful convergence of a `READINBOXMESSAGE` challenge for an
+              EigenDA certificate where two validators hold an alternative view of the sequencer inbox state.
+            globs:
+              - "system_tests/full_challenge_test.go"
+              - "system_tests/full_challenge_mock_test.go"
+              - "system_tests/full_challenge_impl_test.go"
+
+          - title: "E2E BoLD challenge tests"
+            description: |
+              Extended E2E BoLD challenge tests to ensure successful convergence of a `READINBOXMESSAGE` challenge for an
+              EigenDA certificate where two validators hold an alternative view of the sequencer inbox state.
+            globs:
+              - system_tests/bold_challenge_protocol_test.go
+              - system_tests/bold_state_provider_test.go
+              - system_tests/overflow_assertions_test.go
+
+
+      - title: "Batch posting & derivation via EigenDA"
+        description: |
+          Added the ability to post batches via rollup payloads to EigenDA V1 and securely derive them when syncing 
+          from the sequencer inbox. All EigenDA interactions are abstracted away by the EigenDA Proxy [sidecar](https://github.com/Layr-Labs/eigenda/tree/57ed95ce77a57c53341cad10233ca2f29b29c0f5/api/proxy#readme).
+        sub:
+          - title: "Config Ingestion"
+            description: |
+              Extended config processing logic to create and propagate EigenDA specific client reader/writer instances. Also added key invariants
+              to ensure proper expression of EigenDA in accordance with existing feature flags; ie:
+
+                - EigenDA can only be enabled with AnyTrust if failover is explicitly enabled
+                - Max transaction size can be set arbitrarily high with EignDA enabled
+
+            globs:
+              - "arbnode/node.go"
+              - "cmd/nitro/nitro.go"
+
+          - title: "Batch Posting"
+            description: |
+              Added EigenDA-specific batch posting logic to the Arbitrum Nitro batch poster as well as EigenDA-specific max batch size limit (i.e, `poster.max-eigenda-batch-size`). This includes utilizing the 
+              custom `addSequencerL2BatchFromEigenDA` entrypoint in the `SequencerInbox` contract for submitting EigenDA V1 certificate txs
+              as well as an opt-in `failover` mechanism for automatic fallback to native Arbitrum DA (i.e., AnyTrust (if enabled) -> 4844 -> calldata) 
+              in the event of EigenDA service unavailability (i.e, [ErrServiceUnavailable](https://github.com/Layr-Labs/eigenda/blob/57ed95ce77a57c53341cad10233ca2f29b29c0f5/api/proxy/clients/standard_client/client.go#L24)).
+              Failover can be toggled via the boolean `poster.enable-eigenda-failover` flag.
+            
+
+              The `MaxDecompressedLen` field was also raised to 40 `mib` so that EigenDA's max blob size (i.e., 16 mib) could be realized. Initially
+              this constraint would cause batches to prematurely complete and never exceed 5-6 mib.
+
+            globs:
+              - "arbnode/batch_poster.go"
+
+          - title: "Inbox Reading (Batch Derivation)"
+            description: |
+              Transforms a sequencer inbox transaction to extract the inputted RLP-Encoded EigenDA certificate that was check-pointed 
+              against the onchain accumulator. 
+
+              Returns `ErrMissingEigenDAReader` on EigenDA header without configured reader
+            globs:
+              - "staker/stateless_block_validator.go"
+              - "arbnode/sequencer_inbox.go"
+              - "arbstate/inbox.go"
+
+          - title: "Integration Tests"
+            description: |
+              Added tests to assert the correctness batch posting/derivation when using EigenDA. Also test failover circumstances to ensure
+              batch poster can fallback to native Arbitrum DA (i.e, AnyTrust, Calldata) with no impacts to safe/final head syncing. Since no local beacon
+              chain resources are exposed in the system testing framework, we can't programatically test EigenDA -> 4844 failover.
+            globs:
+              - "system_tests/eigenda_test.go"
+              - "system_tests/das_test.go"
+
+      - title: "Security Audits"
+        description: |
+          Adds Sigma Prime audit reports (Nov & Dec 2024).
+        globs:
+          - "docs/Sigma_Prime_EigenLayer_EigenDA_Arbitrum_Security_Assessment_Report_December_2024.pdf"
+          - "docs/Sigma_Prime_EigenLayer_EigenDA_Arbitrum_Security_Assessment_Report_November_2024.pdf"
+
+
+      - title: "Claude Code"
+        description: |
+          The EigenDA integrations team has been leveraging the Claude code programming agent for assisting with downstream
+          fork management. Currently we've built some high level context for when using Claude in the repository when rebasing submodule dependencies
+          and performing trivial engineering tasks.
+
+        globs:
+          - CLAUDE.md
+          - git-submodule-dependency-document.md
+
+
+ignore:
+  - "*.sum"
+  - "arbitrator/Cargo.lock"
+  - "arbitrator/wasm-libraries/Cargo.lock" 
+  - "cmd/replay/db.go"
+  - "arbnode/inbox_tracker.go"
+  - "arbitrator/prover/src/main.rs"
+  - "arbitrator/jit/src/test.rs"
+  - "validator/server_jit/jit_machine.go"
+  - fork.yaml
+  

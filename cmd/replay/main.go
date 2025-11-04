@@ -35,6 +35,7 @@ import (
 	"github.com/offchainlabs/nitro/daprovider"
 	"github.com/offchainlabs/nitro/daprovider/das/dastree"
 	"github.com/offchainlabs/nitro/daprovider/das/dasutil"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/gethhook"
 	"github.com/offchainlabs/nitro/wavmio"
 )
@@ -166,6 +167,30 @@ func (r *BlobPreimageReader) Initialize(ctx context.Context) error {
 	return nil
 }
 
+type EigenDAPreimageReader struct{}
+
+// QueryBlob returns the blob for the given cert from the preimage oracle using the hash of the
+// certificate kzg commitment for identifying the preimage.
+func (dasReader *EigenDAPreimageReader) QueryBlob(ctx context.Context, cert *eigenda.EigenDAV1Cert) ([]byte, error) {
+	hash, err := cert.PreimageHash()
+	if err != nil {
+		return nil, err
+	}
+
+	preimage, err := wavmio.ResolveTypedPreimage(arbutil.EigenDaPreimageType, *hash)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedBlob, err := eigenda.GenericDecodeBlob(preimage)
+	if err != nil {
+		println("Error decoding blob: ", err)
+		return nil, err
+	}
+
+	return decodedBlob, nil
+}
+
 // To generate:
 // key, _ := crypto.HexToECDSA("0000000000000000000000000000000000000000000000000000000000000001")
 // sig, _ := crypto.Sign(make([]byte, 32), key)
@@ -235,12 +260,18 @@ func main() {
 			dasReader = &PreimageDASReader{}
 			dasKeysetFetcher = &PreimageDASReader{}
 		}
+
 		backend := WavmInbox{}
 		var keysetValidationMode = daprovider.KeysetPanicIfInvalid
 		if backend.GetPositionWithinMessage() > 0 {
 			keysetValidationMode = daprovider.KeysetDontValidate
 		}
 		dapReaders := daprovider.NewReaderRegistry()
+		err = dapReaders.SetupEigenDAV1Reader(eigenda.NewReaderForEigenDA(&EigenDAPreimageReader{}))
+		if err != nil {
+			panic(fmt.Sprintf("Failed to register EigenDA reader: %v", err))
+		}
+
 		if dasReader != nil {
 			err = dapReaders.SetupDASReader(dasutil.NewReaderForDAS(dasReader, dasKeysetFetcher, keysetValidationMode))
 			if err != nil {

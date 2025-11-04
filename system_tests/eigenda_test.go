@@ -1,0 +1,401 @@
+// Copyright 2021-2022, Offchain Labs, Inc.
+// For license information, see https://github.com/nitro/blob/master/LICENSE
+
+package arbtest
+
+import (
+	"context"
+	"math/big"
+	"net"
+	"testing"
+	"time"
+
+	"github.com/Layr-Labs/eigenda-proxy/clients/memconfig_client"
+
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+
+	"github.com/offchainlabs/nitro/arbnode"
+	"github.com/offchainlabs/nitro/cmd/chaininfo"
+	"github.com/offchainlabs/nitro/cmd/genericconf"
+	"github.com/offchainlabs/nitro/daprovider"
+	"github.com/offchainlabs/nitro/daprovider/das"
+	"github.com/offchainlabs/nitro/solgen/go/precompilesgen"
+	"github.com/offchainlabs/nitro/util/headerreader"
+)
+
+const (
+	// TODO: https://github.com/Layr-Labs/nitro/issues/73
+	proxyURL = "http://127.0.0.1:4242"
+)
+
+func TestEigenDAV1Integration(t *testing.T) {
+	// single threaded test execution since conflicts can happen
+	// on proxy memconfig states if ran in parallel.
+	// TODO: https://github.com/Layr-Labs/nitro/issues/73
+
+	// 0 - Test that the proxy is reachable
+	testEigenDAProxyReachability(t)
+
+	// 1 - Batch posting / derivation
+	testEigenDAProxyBatchPosting(t)
+
+	// 2 - EigenDA failover to native Arbitrum DA destinations
+	testFailOverFromEigenDAToAnyTrust(t)
+	testFailOverFromEigenDAToCallData(t)
+}
+
+func testEigenDAProxyBatchPosting(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+
+	// Setup L1 chain and contracts
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
+	builder.parallelise = false
+	builder.BuildL1(t)
+
+	// Setup DAS servers
+	l1NodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest()
+
+	{
+
+		// Setup DAS config
+		builder.nodeConfig.EigenDA.Enable = true
+		builder.nodeConfig.EigenDA.Rpc = proxyURL
+
+		// Setup L2 chain
+		builder.L2Info.GenerateAccount("User2")
+		builder.BuildL2OnL1(t)
+
+		// Setup second node
+		l1NodeConfigB.BlockValidator.Enable = false
+		l1NodeConfigB.EigenDA.Enable = true
+		l1NodeConfigB.EigenDA.Rpc = proxyURL
+
+		nodeBParams := SecondNodeParams{
+			nodeConfig: l1NodeConfigB,
+			initData:   &builder.L2Info.ArbInitData,
+		}
+		l2B, cleanupB := builder.Build2ndNode(t, &nodeBParams)
+		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12), l2B.Client)
+
+		builder.L2.cleanup()
+		cleanupB()
+	}
+}
+
+func testFailOverFromEigenDAToCallData(t *testing.T) {
+	memCfgClient := memconfig_client.New(
+		&memconfig_client.Config{URL: proxyURL},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+
+	// Setup L1 chain and contracts
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
+	builder.BuildL1(t)
+	// Setup DAS servers
+	l1NodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest()
+	{
+
+		// Setup DAS config
+		builder.nodeConfig.EigenDA.Enable = true
+		builder.nodeConfig.EigenDA.Rpc = proxyURL
+		builder.nodeConfig.BatchPoster.EnableEigenDAFailover = true
+
+		// Setup L2 chain
+		builder.L2Info.GenerateAccount("User2")
+		builder.BuildL2OnL1(t)
+
+		// Setup second node
+		l1NodeConfigB.BlockValidator.Enable = false
+		l1NodeConfigB.EigenDA.Enable = true
+		l1NodeConfigB.EigenDA.Rpc = proxyURL
+		l1NodeConfigB.BatchPoster.EnableEigenDAFailover = true
+
+		nodeBParams := SecondNodeParams{
+			nodeConfig: l1NodeConfigB,
+			initData:   &builder.L2Info.ArbInitData,
+		}
+		l2B, cleanupB := builder.Build2ndNode(t, &nodeBParams)
+
+		// 1 - Ensure that batches can be submitted and read via EigenDA batch posting
+		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12), l2B.Client)
+
+		// 2 - Cause EigenDA to fail and ensure that the system falls back to anytrust in the presence of 503 eigenda-proxy errors
+		memCfg, err := memCfgClient.GetConfig(ctx)
+		Require(t, err)
+
+		memCfg.PutReturnsFailoverError = true
+		_, err = memCfgClient.UpdateConfig(ctx, memCfg)
+		Require(t, err)
+
+		checkBatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(2000000000000), l2B.Client)
+
+		// 3 - Emulate EigenDA becoming healthy again and ensure that the system starts using it for DA
+		memCfg.PutReturnsFailoverError = false
+		_, err = memCfgClient.UpdateConfig(ctx, memCfg)
+		Require(t, err)
+
+		checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(3000000000000), l2B.Client)
+
+		// ensure that sequencer inbox contains both eigenda and AnyTrust certificates
+		seqInbox, err := arbnode.NewSequencerInbox(builder.L1.Client, builder.addresses.SequencerInbox, 0)
+		Require(t, err)
+
+		latestBlock, err := builder.L1.Client.BlockNumber(ctx)
+		Require(t, err)
+
+		// #nosec G115 -- Block numbers are unlikely to exceed int64's maximum value
+		batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
+		Require(t, err)
+		// ensure that sequencer inbox contains both eigenda and calldata batches
+		var eigenDASeen, callDataBatchSeen bool = false, false
+
+		for _, batch := range batches {
+			serializedBatch, err := batch.Serialize(ctx, builder.L1.Client)
+			Require(t, err)
+
+			if len(serializedBatch) <= 40 {
+				continue
+			}
+
+			if daprovider.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
+				eigenDASeen = true
+			} else if daprovider.IsBrotliMessageHeaderByte(serializedBatch[40]) {
+				callDataBatchSeen = true
+			}
+		}
+
+		if !eigenDASeen || !callDataBatchSeen {
+			t.Fatal("expected both eigenda and calldata batches to be seen within Sequencer Inbox")
+		}
+
+		builder.L2.cleanup()
+		cleanupB()
+	}
+}
+
+func testFailOverFromEigenDAToAnyTrust(t *testing.T) {
+	initEigenDATest(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	memCfgClient := memconfig_client.New(
+		&memconfig_client.Config{URL: proxyURL},
+	)
+
+	// Setup L1 chain and contracts
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
+	builder.chainConfig = chaininfo.ArbitrumDevTestDASChainConfig()
+	builder.BuildL1(t)
+
+	arbSys, _ := precompilesgen.NewArbSys(types.ArbSysAddress, builder.L1.Client)
+	l1Reader, err := headerreader.New(ctx, builder.L1.Client, func() *headerreader.Config { return &headerreader.TestConfig }, arbSys)
+	Require(t, err)
+	l1Reader.Start(ctx)
+	defer l1Reader.StopAndWait()
+
+	keyDir, fileDataDir := t.TempDir(), t.TempDir()
+	pubkey, _, err := das.GenerateAndStoreKeys(keyDir)
+	Require(t, err)
+
+	serverConfig := das.DataAvailabilityConfig{
+		Enable: true,
+
+		LocalCache: das.TestCacheConfig,
+
+		LocalFileStorage: das.LocalFileStorageConfig{
+			Enable:       true,
+			DataDir:      fileDataDir,
+			MaxRetention: das.DefaultLocalFileStorageConfig.MaxRetention,
+		},
+
+		Key: das.KeyConfig{
+			KeyDir: keyDir,
+		},
+
+		RequestTimeout: 5 * time.Second,
+		// L1NodeURL: normally we would have to set this but we are passing in the already constructed client and addresses to the factory
+	}
+
+	daReader, daWriter, signatureVerifier, daHealthChecker, lifecycleManager, err := das.CreateDAComponentsForDaserver(ctx, &serverConfig, l1Reader, &builder.addresses.SequencerInbox)
+	Require(t, err)
+	defer lifecycleManager.StopAndWaitUntil(time.Second)
+	rpcLis, err := net.Listen("tcp", "localhost:0")
+	Require(t, err)
+	_, err = das.StartDASRPCServerOnListener(ctx, rpcLis, genericconf.HTTPServerTimeoutConfigDefault, genericconf.HTTPServerBodyLimitDefault, daReader, daWriter, daHealthChecker, signatureVerifier)
+	Require(t, err)
+	restLis, err := net.Listen("tcp", "localhost:0")
+	Require(t, err)
+	restServer, err := das.NewRestfulDasServerOnListener(restLis, genericconf.HTTPServerTimeoutConfigDefault, daReader, daHealthChecker)
+	Require(t, err)
+
+	pubkeyA := pubkey
+	authorizeDASKeyset(t, ctx, pubkeyA, builder.L1Info, builder.L1.Client)
+
+	// Set AnyTrust params into L2 node config
+	builder.nodeConfig.DataAvailability = das.DataAvailabilityConfig{
+		Enable: true,
+
+		// AggregatorConfig set up below
+		RequestTimeout: 5 * time.Second,
+	}
+	beConfigA := das.BackendConfig{
+		URL:    "http://" + rpcLis.Addr().String(),
+		Pubkey: blsPubToBase64(pubkey),
+	}
+	builder.nodeConfig.DataAvailability.RPCAggregator = aggConfigForBackend(beConfigA)
+	builder.nodeConfig.DataAvailability.RestAggregator = das.DefaultRestfulClientAggregatorConfig
+	builder.nodeConfig.DataAvailability.RestAggregator.Enable = true
+	builder.nodeConfig.DataAvailability.RestAggregator.Urls = []string{"http://" + restLis.Addr().String()}
+	builder.nodeConfig.DataAvailability.ParentChainNodeURL = "none"
+
+	// set EigenDA params into L2 sequencer config
+	builder.nodeConfig.EigenDA.Enable = true
+	builder.nodeConfig.EigenDA.Rpc = proxyURL
+	builder.nodeConfig.BatchPoster.EnableEigenDAFailover = true
+
+	// Setup L2 chain
+	builder.L2Info = NewArbTestInfo(t, builder.chainConfig.ChainID)
+	builder.L2Info.GenerateAccount("User2")
+	cleanup := builder.BuildL2OnL1(t)
+
+	defer cleanup()
+
+	// Create node to sync from chain
+	childNodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest().WithEigenDATestConfigParams()
+	childNodeConfigB.DataAvailability = das.DataAvailabilityConfig{
+		Enable: true,
+
+		// AggregatorConfig set up below
+
+		ParentChainNodeURL: "none",
+		RequestTimeout:     5 * time.Second,
+	}
+
+	childNodeConfigB.BlockValidator.Enable = false
+	childNodeConfigB.DataAvailability.Enable = true
+	childNodeConfigB.DataAvailability.RestAggregator = das.DefaultRestfulClientAggregatorConfig
+	childNodeConfigB.DataAvailability.RestAggregator.Enable = true
+	childNodeConfigB.DataAvailability.RestAggregator.Urls = []string{"http://" + restLis.Addr().String()}
+	childNodeConfigB.DataAvailability.ParentChainNodeURL = "none"
+	childNodeConfigB.EigenDA.Enable = true
+	childNodeConfigB.EigenDA.Rpc = proxyURL
+	childNodeConfigB.BatchPoster.EnableEigenDAFailover = true
+	childNodeConfigB.BatchPoster.CheckBatchCorrectness = true
+
+	nodeBParams := SecondNodeParams{
+		nodeConfig: childNodeConfigB,
+		initData:   &builder.L2Info.ArbInitData,
+	}
+	l2B, cleanupB := builder.Build2ndNode(t, &nodeBParams)
+	defer cleanupB()
+
+	// 1 - Ensure that batches can be submitted and read via EigenDA batch posting
+	checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12), l2B.Client)
+	// 2 - Cause EigenDA to fail and ensure that the system falls back to anytrust in the presence of 503 eigenda-proxy errors
+
+	memCfg, err := memCfgClient.GetConfig(ctx)
+	Require(t, err)
+
+	memCfg.PutReturnsFailoverError = true
+	_, err = memCfgClient.UpdateConfig(ctx, memCfg)
+	Require(t, err)
+
+	checkBatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*2), l2B.Client)
+	// 3 - Emulate EigenDA becoming healthy again and ensure that the system starts using it for DA
+
+	memCfg.PutReturnsFailoverError = false
+	_, err = memCfgClient.UpdateConfig(ctx, memCfg)
+	Require(t, err)
+
+	checkEigenDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client, builder.L1Info, builder.L2Info, big.NewInt(1e12*3), l2B.Client)
+
+	// wire up an inbox reader to extract all submitted batches from sequencer inbox
+	seqInbox, err := arbnode.NewSequencerInbox(builder.L1.Client, builder.addresses.SequencerInbox, 0)
+	Require(t, err)
+
+	latestBlock, err := builder.L1.Client.BlockNumber(ctx)
+	Require(t, err)
+
+	// #nosec G115 -- Block numbers are unlikely to exceed int64's maximum value
+	batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
+	Require(t, err)
+
+	// ensure that sequencer inbox contains both eigenda and AnyTrust certificates
+	var eigenDASeen, anyTrustSeen bool = false, false
+
+	for _, batch := range batches {
+		serializedBatch, err := batch.Serialize(ctx, builder.L1.Client)
+		Require(t, err)
+
+		if len(serializedBatch) <= 40 {
+			continue
+		}
+
+		if daprovider.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
+			eigenDASeen = true
+		} else if daprovider.IsDASMessageHeaderByte(serializedBatch[40]) {
+			anyTrustSeen = true
+		}
+	}
+
+	if !eigenDASeen || !anyTrustSeen {
+		t.Fatal("expected both eigenda and anytrust certificates to be seen within Sequencer Inbox")
+	}
+
+	err = restServer.Shutdown()
+	Require(t, err)
+}
+
+func checkEigenDABatchPosting(t *testing.T, ctx context.Context, l1client, l2clientA *ethclient.Client, l1info, l2info info, expectedBalance *big.Int, l2ClientsToCheck ...*ethclient.Client) {
+	tx := l2info.PrepareTx("Owner", "User2", l2info.TransferGas, big.NewInt(1e12), nil)
+	err := l2clientA.SendTransaction(ctx, tx)
+	Require(t, err)
+
+	_, err = EnsureTxSucceeded(ctx, l2clientA, tx)
+	Require(t, err)
+
+	// give the inbox reader a bit of time to pick up the delayed message
+	time.Sleep(time.Millisecond * 100)
+
+	// sending l1 messages creates l1 blocks.. make enough to get that delayed inbox message in
+	for i := 0; i < 100; i++ {
+		SendWaitTestTransactions(t, ctx, l1client, []*types.Transaction{
+			l1info.PrepareTx("Faucet", "User", 30000, big.NewInt(1e12), nil),
+		})
+	}
+
+	for _, client := range l2ClientsToCheck {
+		_, err = WaitForTx(ctx, client, tx.Hash(), time.Second*100)
+		Require(t, err)
+
+		l2balance, err := client.BalanceAt(ctx, l2info.GetAddress("User2"), nil)
+		Require(t, err)
+
+		if l2balance.Cmp(expectedBalance) != 0 {
+			Fatal(t, "Unexpected balance:", l2balance)
+		}
+
+	}
+}
+
+// TestEigenDAProxyReachability tests that the EigenDA proxy is accessible
+func testEigenDAProxyReachability(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	memCfgClient := memconfig_client.New(&memconfig_client.Config{URL: proxyURL})
+
+	_, err := memCfgClient.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("❌ EigenDA proxy not reachable at %s: %v", proxyURL, err)
+	}
+	t.Logf("✅ EigenDA proxy reachable at %s", proxyURL)
+}

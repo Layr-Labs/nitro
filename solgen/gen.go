@@ -149,7 +149,7 @@ func main() {
 	for _, path := range yulFilePaths {
 		_, file := filepath.Split(path)
 		name := file[:len(file)-5]
-
+		log.Printf("Processing %s", name)
 		data, err := os.ReadFile(path)
 		if err != nil {
 			log.Fatal("could not read", path, "for contract", name, err)

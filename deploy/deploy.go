@@ -295,6 +295,11 @@ func DeployLegacyOnParentChain(ctx context.Context, parentChainReader *headerrea
 		MaxFeePerGasForRetryables: big.NewInt(0), // needed when utility factories are deployed
 		BatchPosters:              batchPosters,
 		BatchPosterManager:        batchPosterManager,
+		// zero address indicates to the SequencerInbox that certificate verification should be disabled
+		// THIS creates an insecure testing environment for /system_tests
+		// testing a secure E2E Stage1 integration with EigenDA currently can only be done on
+		// a holesky testnet environment
+		EigenDACertVerifier: common.HexToAddress("0x0"),
 	}
 
 	tx, err := rollupCreator.CreateRollup(

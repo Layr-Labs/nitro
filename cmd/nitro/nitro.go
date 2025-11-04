@@ -589,14 +589,18 @@ func mainImpl() int {
 	}
 	// If batchPoster is enabled, validate MaxSize to be at least 10kB below the sequencer inbox’s maxDataSize if the data availability service is not enabled.
 	// The 10kB gap is because its possible for the batch poster to exceed its MaxSize limit and produce batches of slightly larger size.
-	if nodeConfig.Node.BatchPoster.Enable && !nodeConfig.Node.DataAvailability.Enable {
+	if nodeConfig.Node.BatchPoster.Enable && (!nodeConfig.Node.DataAvailability.Enable && !nodeConfig.Node.EigenDA.Enable) {
 		if nodeConfig.Node.BatchPoster.MaxSize > seqInboxMaxDataSize-10000 {
 			log.Error("batchPoster's MaxSize is too large")
 			return 1
 		}
 	}
 
-	if nodeConfig.Execution.Sequencer.Enable {
+	// NOTE: since the SRS is stored within the arbitrator and predetermines the max batch size
+	// supported for proving stateless execution - it could be possible to read from dynamically
+	// otherwise it maybe best to expose the max supported batch size from the disperser directly
+	// to ensure dynamically adaptability within the rollup.
+	if nodeConfig.Node.BatchPoster.Enable && nodeConfig.Node.EigenDA.Enable {
 		// Validate MaxTxDataSize to be at least 5kB below the batch poster's MaxSize to allow space for headers and such.
 		if nodeConfig.Execution.Sequencer.MaxTxDataSize > nodeConfig.Node.BatchPoster.MaxSize-5000 {
 			log.Error("sequencer's MaxTxDataSize too large compared to the batchPoster's MaxSize")

@@ -74,7 +74,7 @@ func TestOverflowAssertions(t *testing.T) {
 		UseBlobs:               true,
 	}
 
-	_, l2node, _, _, l1info, _, l1client, l1stack, assertionChain, _ := createTestNodeOnL1ForBoldProtocol(t, ctx, true, nil, l2chainConfig, nil, sconf, l2info)
+	_, l2node, _, _, l1info, _, l1client, l1stack, assertionChain, _ := createTestNodeOnL1ForBoldProtocol(t, ctx, true, nil, l2chainConfig, nil, sconf, l2info, false)
 	defer requireClose(t, l1stack)
 	defer l2node.StopAndWait()
 
@@ -167,11 +167,11 @@ func TestOverflowAssertions(t *testing.T) {
 	totalMessagesPosted := int64(0)
 	numMessagesPerBatch := int64(32)
 	divergeAt := int64(-1)
-	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, honestSeqInboxBinding, honestSeqInbox, numMessagesPerBatch, divergeAt)
+	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, honestSeqInboxBinding, honestSeqInbox, numMessagesPerBatch, divergeAt, nil)
 	totalMessagesPosted += numMessagesPerBatch
 
 	numMessagesPerBatch = int64(13)
-	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, honestSeqInboxBinding, honestSeqInbox, numMessagesPerBatch, divergeAt)
+	makeBoldBatch(t, l2node, l2info, l1client, &sequencerTxOpts, honestSeqInboxBinding, honestSeqInbox, numMessagesPerBatch, divergeAt, nil)
 	totalMessagesPosted += numMessagesPerBatch
 
 	bc, err := l2node.InboxTracker.GetBatchCount()

@@ -53,6 +53,7 @@ RUN apt-get update && \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0 --target x86_64-unknown-linux-gnu,wasm32-unknown-unknown,wasm32-wasip1
 COPY ./Makefile ./
 COPY arbitrator/Cargo.* arbitrator/
+COPY arbitrator/rust-kzg-bn254 arbitrator/rust-kzg-bn254
 COPY arbitrator/arbutil arbitrator/arbutil
 COPY arbitrator/brotli arbitrator/brotli
 COPY arbitrator/caller-env arbitrator/caller-env
@@ -85,6 +86,7 @@ COPY ./cmd/replay ./cmd/replay
 COPY ./daprovider ./daprovider
 COPY ./daprovider/das/dasutil ./daprovider/das/dasutil
 COPY ./daprovider/das/dastree ./daprovider/das/dastree
+COPY ./eigenda ./eigenda
 COPY ./precompiles ./precompiles
 COPY ./statetransfer ./statetransfer
 COPY ./util ./util
@@ -123,6 +125,7 @@ COPY arbitrator/caller-env arbitrator/caller-env
 COPY arbitrator/prover arbitrator/prover
 COPY arbitrator/wasm-libraries arbitrator/wasm-libraries
 COPY arbitrator/jit arbitrator/jit
+COPY arbitrator/rust-kzg-bn254 arbitrator/rust-kzg-bn254
 COPY arbitrator/stylus arbitrator/stylus
 COPY arbitrator/tools/wasmer arbitrator/tools/wasmer
 COPY --from=brotli-wasm-export / target/
@@ -153,6 +156,7 @@ COPY arbitrator/prover/Cargo.toml arbitrator/prover/
 COPY arbitrator/prover/benches arbitrator/prover/benches
 COPY arbitrator/bench/Cargo.toml arbitrator/bench/
 COPY arbitrator/jit/Cargo.toml arbitrator/jit/
+COPY arbitrator/rust-kzg-bn254 arbitrator/rust-kzg-bn254
 COPY arbitrator/stylus/Cargo.toml arbitrator/stylus/
 COPY arbitrator/tools/wasmer arbitrator/tools/wasmer
 COPY arbitrator/wasm-libraries/user-host-trait/Cargo.toml arbitrator/wasm-libraries/user-host-trait/Cargo.toml
@@ -172,6 +176,7 @@ COPY ./Makefile ./
 COPY arbitrator/prover arbitrator/prover
 COPY arbitrator/wasm-libraries arbitrator/wasm-libraries
 COPY arbitrator/jit arbitrator/jit
+COPY arbitrator/rust-kzg-bn254 arbitrator/rust-kzg-bn254
 COPY arbitrator/stylus arbitrator/stylus
 COPY --from=brotli-wasm-export / target/
 COPY scripts/build-brotli.sh scripts/
@@ -214,6 +219,7 @@ RUN apt-get update && apt-get install -y unzip wget curl
 WORKDIR /workspace/machines
 # Download WAVM machines
 COPY ./scripts/download-machine.sh .
+COPY ./scripts/download-machine-eigenda.sh .
 #RUN ./download-machine.sh consensus-v1-rc1 0xbb9d58e9527566138b682f3a207c0976d5359837f6e330f4017434cca983ff41
 #RUN ./download-machine.sh consensus-v2.1 0x9d68e40c47e3b87a8a7e6368cc52915720a6484bb2f47ceabad7e573e3a11232
 #RUN ./download-machine.sh consensus-v3 0x53c288a0ca7100c0f2db8ab19508763a51c7fd1be125d376d940a65378acaee7
@@ -232,9 +238,9 @@ COPY ./scripts/download-machine.sh .
 #RUN ./download-machine.sh consensus-v11 0xf4389b835497a910d7ba3ebfb77aa93da985634f3c052de1290360635be40c4a
 #RUN ./download-machine.sh consensus-v11.1 0x68e4fe5023f792d4ef584796c84d710303a5e12ea02d6e37e2b5e9c4332507c4
 #RUN ./download-machine.sh consensus-v20 0x8b104a2e80ac6165dc58b9048de12f301d70b02a0ab51396c22b4b4b802a16a4
-RUN ./download-machine.sh consensus-v30 0xb0de9cb89e4d944ae6023a3b62276e54804c242fd8c4c2d8e6cc4450f5fa8b1b && true
-RUN ./download-machine.sh consensus-v31 0x260f5fa5c3176a856893642e149cf128b5a8de9f828afec8d11184415dd8dc69
-RUN ./download-machine.sh consensus-v32 0x184884e1eb9fefdc158f6c8ac912bb183bf3cf83f0090317e0bc4ac5860baa39
+#RUN ./download-machine.sh consensus-v30 0xb0de9cb89e4d944ae6023a3b62276e54804c242fd8c4c2d8e6cc4450f5fa8b1b && true
+#RUN ./download-machine.sh consensus-v31 0x260f5fa5c3176a856893642e149cf128b5a8de9f828afec8d11184415dd8dc69
+#RUN ./download-machine.sh consensus-v32 0x184884e1eb9fefdc158f6c8ac912bb183bf3cf83f0090317e0bc4ac5860baa39
 #RUN ./download-machine.sh consensus-v40-rc.1 0x6dae396b0b7644a2d63b4b22e6452b767aa6a04b6778dadebdd74aa40f40a5c5
 #RUN ./download-machine.sh consensus-v40-rc.2 0xa8206be13d53e456c7ab061d94bab5b229d674ac57ffe7281216479a8820fcc0
 RUN ./download-machine.sh consensus-v41 0xa18d6266cef250802c3cb2bfefe947ea1aa9a32dd30a8d1dfc4568a8714d3a7a
@@ -245,6 +251,11 @@ RUN ./download-machine.sh consensus-v41 0xa18d6266cef250802c3cb2bfefe947ea1aa9a3
 RUN ./download-machine.sh consensus-v50-rc.4 0x393be710f252e8217d66fe179739eba1ed471f0d5a847b5905c30926d853241a
 RUN ./download-machine.sh consensus-v50-rc.5 0xb90895a56a59c0267c2004a0e103ad725bd98d5a05c3262806ab4ccb3f997558
 RUN ./download-machine.sh consensus-v40 0xdb698a2576298f25448bc092e52cf13b1e24141c997135d70f217d674bbeb69a
+RUN ./download-machine-eigenda.sh consensus-eigenda-v32.1 0x04a297cdd13254c4c6c26388915d416286daf22f3a20e3ebee10400a3129dd17
+RUN ./download-machine-eigenda.sh consensus-eigenda-v32.2 0xc723bd1be9fc564796bd8ce5c158c8b2f55d34afb38303a9fb6a8f0fda376edb
+RUN ./download-machine-eigenda.sh consensus-eigenda-v32.3 0x39a7b951167ada11dc7c81f1707fb06e6710ca8b915b2f49e03c130bf7cd53b1
+RUN ./download-machine-eigenda.sh consensus-eigenda-v40 0x2c9a9d645ae56304c483709fc710a58a0935ed43893179fe4b275e1400503ea7
+RUN ./download-machine-eigenda.sh consensus-eigenda-v50-alpha.1 0x34454ede1b5edaee4c5d6c5ccebb20d5cc15d71cf662525be089a60925865ed0
 
 FROM golang:1.25-bookworm AS node-builder
 WORKDIR /workspace
@@ -296,6 +307,8 @@ COPY --from=node-builder /workspace/target/bin/prover /usr/local/bin/
 COPY --from=node-builder /workspace/target/bin/dbconv /usr/local/bin/
 COPY ./scripts/convert-databases.bash /usr/local/bin/
 COPY --from=machine-versions /workspace/machines /home/user/target/machines
+## Load EigenDA BN254 SRS trusted setup values
+COPY --from=wasm-libs-builder /workspace/arbitrator/prover/src/mainnet-files/ /home/user/arbitrator/prover/src/mainnet-files/
 COPY ./scripts/validate-wasm-module-root.sh .
 RUN ./validate-wasm-module-root.sh /home/user/target/machines /usr/local/bin/prover
 USER root

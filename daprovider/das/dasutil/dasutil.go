@@ -110,6 +110,8 @@ func NewWriterForDAS(dasWriter DASWriter) *writerForDAS {
 	return &writerForDAS{dasWriter: dasWriter}
 }
 
+const EigenDAMessageHeaderFlag byte = 0xed
+
 type writerForDAS struct {
 	dasWriter DASWriter
 }

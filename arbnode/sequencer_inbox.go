@@ -6,6 +6,7 @@ package arbnode
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/offchainlabs/nitro/arbutil"
 	"github.com/offchainlabs/nitro/daprovider"
+	"github.com/offchainlabs/nitro/eigenda"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 )
 
@@ -26,6 +28,8 @@ var sequencerBridgeABI *abi.ABI
 var batchDeliveredID common.Hash
 var addSequencerL2BatchFromOriginCallABI abi.Method
 var sequencerBatchDataABI abi.Event
+var addSequencerBatchFromEigenDACallABI abi.Method
+var eigenDAV1CertABI abi.Argument
 
 const sequencerBatchDataEvent = "SequencerBatchData"
 
@@ -36,6 +40,7 @@ const (
 	BatchDataSeparateEvent
 	BatchDataNone
 	BatchDataBlobHashes
+	batchDataEigenDA
 )
 
 func init() {
@@ -46,7 +51,9 @@ func init() {
 	}
 	batchDeliveredID = sequencerBridgeABI.Events["SequencerBatchDelivered"].ID
 	sequencerBatchDataABI = sequencerBridgeABI.Events[sequencerBatchDataEvent]
+	addSequencerBatchFromEigenDACallABI = sequencerBridgeABI.Methods["addSequencerL2BatchFromEigenDA"]
 	addSequencerL2BatchFromOriginCallABI = sequencerBridgeABI.Methods["addSequencerL2BatchFromOrigin0"]
+	eigenDAV1CertABI = addSequencerBatchFromEigenDACallABI.Inputs[1]
 }
 
 type SequencerInbox struct {
@@ -169,9 +176,59 @@ func (m *SequencerInboxBatch) getSequencerData(ctx context.Context, client *ethc
 			data = append(data, h[:]...)
 		}
 		return data, nil
+
+	case batchDataEigenDA:
+		tx, err := arbutil.GetLogTransaction(ctx, client, m.RawLog)
+		if err != nil {
+			return nil, err
+		}
+
+		calldata := tx.Data()
+		if len(calldata) < 4 {
+			return nil, fmt.Errorf("calldata less than 4 bytes: %x", calldata)
+		}
+
+		args := make(map[string]interface{})
+		err = addSequencerBatchFromEigenDACallABI.Inputs.UnpackIntoMap(args, calldata[4:])
+		if err != nil {
+			return nil, err
+		}
+
+		certBytes, err := interfaceToBytesJSON(args["cert"])
+		if err != nil {
+			return nil, err
+		}
+
+		var eigenDACert eigenda.EigenDAV1Cert
+		err = json.Unmarshal(certBytes, &eigenDACert)
+		if err != nil {
+			return nil, err
+		}
+
+		arguments := abi.Arguments{
+			eigenDAV1CertABI,
+		}
+
+		b, err := arguments.Pack(eigenDACert)
+		if err != nil {
+			return nil, err
+		}
+
+		msgData := []byte{daprovider.EigenDAMessageHeaderFlag}
+		msgData = append(msgData, b...)
+
+		return msgData, nil
 	default:
 		return nil, fmt.Errorf("batch has invalid data location %v", m.DataLocation)
 	}
+}
+
+func interfaceToBytesJSON(data interface{}) ([]byte, error) {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
 }
 
 func (m *SequencerInboxBatch) Serialize(ctx context.Context, client *ethclient.Client) ([]byte, error) {

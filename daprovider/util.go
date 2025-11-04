@@ -45,6 +45,7 @@ func RecordPreimagesTo(preimages PreimagesMap) PreimageRecorder {
 
 var (
 	ErrNoBlobReader          = errors.New("blob batch payload was encountered but no BlobReader was configured")
+	ErrNoEigenDAReader       = errors.New("eigenda batch payload was encountered but no EigenDA reader was configured")
 	ErrInvalidBlobDataFormat = errors.New("blob batch data is not a list of hashes as expected")
 	ErrSeqMsgValidation      = errors.New("error validating recovered payload from batch")
 )
@@ -75,17 +76,30 @@ const BlobHashesHeaderFlag byte = L1AuthenticatedMessageHeaderFlag | 0x10 // 0x5
 // BrotliMessageHeaderByte indicates that the message is brotli-compressed.
 const BrotliMessageHeaderByte byte = 0
 
+// EigenDAMessageHeaderFlag indicates that this message contains EigenDA blob data.
+const EigenDAMessageHeaderFlag byte = 0xed
+
 // DACertificateMessageHeaderFlag indicates that this message uses a custom data availability system.
 // Anytrust uses the legacy TreeDASMessageHeaderFlag instead despite also having a certificate.
 const DACertificateMessageHeaderFlag byte = 0x01
 
 // KnownHeaderBits is all header bits with known meaning to this nitro version
-const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte
+const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAMessageHeaderFlag
 
 var DefaultDASRetentionPeriod time.Duration = time.Hour * 24 * 15
 
 // hasBits returns true if `checking` has all `bits`
 func hasBits(checking byte, bits byte) bool {
+	// NOTE: This is done to mitigate a bug where the
+	// bitwise AND between EigenDAMessageHeaderFlag and other flag values would return true
+	// when doing the low-level check - resulting in this function to return true
+	// from other dapReaders and cause terminal errors since an EigenDA message type
+	// would be passed into e.g an AnyTrust reader
+	// assuming 0xed for the message header byte is a fundamental design flaw
+	if checking == EigenDAMessageHeaderFlag && bits != EigenDAMessageHeaderFlag {
+		return false
+	}
+
 	return (checking & bits) == bits
 }
 
@@ -115,6 +129,10 @@ func IsDACertificateMessageHeaderByte(header byte) bool {
 
 func IsBrotliMessageHeaderByte(b uint8) bool {
 	return b == BrotliMessageHeaderByte
+}
+
+func IsEigenDAMessageHeaderByte(header byte) bool {
+	return hasBits(header, EigenDAMessageHeaderFlag)
 }
 
 // IsKnownHeaderByte returns true if the supplied header byte has only known bits
