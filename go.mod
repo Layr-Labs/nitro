@@ -10,7 +10,6 @@ require (
 	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible
 	github.com/Layr-Labs/eigenda v0.9.1
 	github.com/Layr-Labs/eigenda-proxy/clients v0.2.0
-	github.com/OffchainLabs/bold v0.0.2
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/alicebob/miniredis/v2 v2.32.1
 	github.com/andybalholm/brotli v1.0.5

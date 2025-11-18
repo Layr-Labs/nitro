@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -106,7 +107,7 @@ type BatchPoster struct {
 	l1Reader           *headerreader.HeaderReader
 	inbox              *InboxTracker
 	streamer           *TransactionStreamer
-	arbOSVersionGetter execution.ExecutionBatchPoster
+	arbOSVersionGetter execution.ArbOSVersionGetter
 	config             BatchPosterConfigFetcher
 	seqInbox           *bridgegen.SequencerInbox
 	syncMonitor        *SyncMonitor
@@ -313,31 +314,32 @@ var DefaultBatchPosterL1WalletConfig = genericconf.WalletConfig{
 }
 
 var TestBatchPosterConfig = BatchPosterConfig{
-	Enable:                         true,
-	MaxSize:                        100000,
-	Max4844BatchSize:               DefaultBatchPosterConfig.Max4844BatchSize,
-	MaxEigenDABatchSize:            DefaultBatchPosterConfig.MaxEigenDABatchSize,
-	PollInterval:                   time.Millisecond * 10,
-	ErrorDelay:                     time.Millisecond * 10,
-	MaxDelay:                       0,
-	WaitForMaxDelay:                false,
-	CompressionLevel:               2,
-	DASRetentionPeriod:             daprovider.DefaultDASRetentionPeriod,
-	GasRefunderAddress:             "",
-	ExtraBatchGas:                  10_000,
-	Post4844Blobs:                  false,
-	IgnoreBlobPrice:                false,
-	DataPoster:                     dataposter.TestDataPosterConfig,
-	ParentChainWallet:              DefaultBatchPosterL1WalletConfig,
-	L1BlockBound:                   "",
-	L1BlockBoundBypass:             time.Hour,
-	UseAccessLists:                 true,
-	RedisLock:                      redislock.TestCfg,
-	GasEstimateBaseFeeMultipleBips: arbmath.OneInUBips * 3 / 2,
-	CheckBatchCorrectness:          true,
-	DelayBufferThresholdMargin:     0,
-	DelayBufferAlwaysUpdatable:     true,
-	ParentChainEip7623:             "auto",
+	Enable:                             true,
+	DisableDapFallbackStoreDataOnChain: true,
+	MaxSize:                            100000,
+	Max4844BatchSize:                   DefaultBatchPosterConfig.Max4844BatchSize,
+	MaxEigenDABatchSize:                DefaultBatchPosterConfig.MaxEigenDABatchSize,
+	PollInterval:                       time.Millisecond * 10,
+	ErrorDelay:                         time.Millisecond * 10,
+	MaxDelay:                           0,
+	WaitForMaxDelay:                    false,
+	CompressionLevel:                   2,
+	DASRetentionPeriod:                 daprovider.DefaultDASRetentionPeriod,
+	GasRefunderAddress:                 "",
+	ExtraBatchGas:                      10_000,
+	Post4844Blobs:                      false,
+	IgnoreBlobPrice:                    false,
+	DataPoster:                         dataposter.TestDataPosterConfig,
+	ParentChainWallet:                  DefaultBatchPosterL1WalletConfig,
+	L1BlockBound:                       "",
+	L1BlockBoundBypass:                 time.Hour,
+	UseAccessLists:                     true,
+	RedisLock:                          redislock.TestCfg,
+	GasEstimateBaseFeeMultipleBips:     arbmath.OneInUBips * 3 / 2,
+	CheckBatchCorrectness:              true,
+	DelayBufferThresholdMargin:         0,
+	DelayBufferAlwaysUpdatable:         true,
+	ParentChainEip7623:                 "auto",
 }
 
 var EigenDABatchPosterConfig = BatchPosterConfig{
@@ -369,7 +371,7 @@ type BatchPosterOpts struct {
 	L1Reader      *headerreader.HeaderReader
 	Inbox         *InboxTracker
 	Streamer      *TransactionStreamer
-	VersionGetter execution.ExecutionBatchPoster
+	VersionGetter execution.ArbOSVersionGetter
 	SyncMonitor   *SyncMonitor
 	Config        BatchPosterConfigFetcher
 	DeployInfo    *chaininfo.RollupAddresses
@@ -1442,7 +1444,7 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 		var use4844 bool
 		config := b.config()
 		if config.Post4844Blobs && b.dapWriter == nil && latestHeader.ExcessBlobGas != nil && latestHeader.BlobGasUsed != nil {
-			arbOSVersion, err := b.arbOSVersionGetter.ArbOSVersionForMessageIndex(arbutil.MessageIndex(arbmath.SaturatingUSub(uint64(batchPosition.MessageCount), 1)))
+			arbOSVersion, err := b.arbOSVersionGetter.ArbOSVersionForMessageIndex(arbutil.MessageIndex(arbmath.SaturatingUSub(uint64(batchPosition.MessageCount), 1))).Await(ctx)
 			if err != nil {
 				return false, err
 			}
@@ -1691,8 +1693,8 @@ func (b *BatchPoster) MaybePostSequencerBatch(ctx context.Context) (bool, error)
 			}
 			latestBlock := latestHeader.Number.Uint64()
 			firstDelayedMsgBlock := b.building.firstDelayedMsg.Message.Header.BlockNumber
-			threasholdLimit := firstDelayedMsgBlock + delayBufferConfig.Threshold - b.config().DelayBufferThresholdMargin
-			if latestBlock >= threasholdLimit {
+			thresholdLimit := firstDelayedMsgBlock + delayBufferConfig.Threshold - b.config().DelayBufferThresholdMargin
+			if latestBlock >= thresholdLimit {
 				log.Info("force post batch because of the delay buffer",
 					"firstDelayedMsgBlock", firstDelayedMsgBlock,
 					"threshold", delayBufferConfig.Threshold,
@@ -2119,12 +2121,14 @@ func (b *BatchPoster) Start(ctxIn context.Context) {
 	storageRaceEphemeralErrorHandler := util.NewEphemeralErrorHandler(5*time.Minute, storage.ErrStorageRace.Error(), time.Minute)
 	normalGasEstimationFailedEphemeralErrorHandler := util.NewEphemeralErrorHandler(5*time.Minute, ErrNormalGasEstimationFailed.Error(), time.Minute)
 	accumulatorNotFoundEphemeralErrorHandler := util.NewEphemeralErrorHandler(5*time.Minute, AccumulatorNotFoundErr.Error(), time.Minute)
+	nonceTooHighEphemeralErrorHandler := util.NewEphemeralErrorHandler(5*time.Minute, core.ErrNonceTooHigh.Error(), time.Minute)
 	resetAllEphemeralErrs := func() {
 		commonEphemeralErrorHandler.Reset()
 		exceedMaxMempoolSizeEphemeralErrorHandler.Reset()
 		storageRaceEphemeralErrorHandler.Reset()
 		normalGasEstimationFailedEphemeralErrorHandler.Reset()
 		accumulatorNotFoundEphemeralErrorHandler.Reset()
+		nonceTooHighEphemeralErrorHandler.Reset()
 	}
 	b.CallIteratively(func(ctx context.Context) time.Duration {
 		var err error
@@ -2177,6 +2181,7 @@ func (b *BatchPoster) Start(ctxIn context.Context) {
 			logLevel = storageRaceEphemeralErrorHandler.LogLevel(err, logLevel)
 			logLevel = normalGasEstimationFailedEphemeralErrorHandler.LogLevel(err, logLevel)
 			logLevel = accumulatorNotFoundEphemeralErrorHandler.LogLevel(err, logLevel)
+			logLevel = nonceTooHighEphemeralErrorHandler.LogLevel(err, logLevel)
 			logLevel("error posting batch", "err", err)
 			// Only increment batchPosterFailureCounter metric in cases of non-ephemeral errors
 			if util.CompareLogLevels(logLevel, log.Error) {

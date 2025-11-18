@@ -248,14 +248,16 @@ RUN ./download-machine.sh consensus-v41 0xa18d6266cef250802c3cb2bfefe947ea1aa9a3
 #RUN ./download-machine.sh consensus-v50-rc.1 0x8fd725477d8ef58183a1a943c375a8495a22cd2d7d701ac917fe20d69993e88e
 #RUN ./download-machine.sh consensus-v50-rc.2 0xc1ea4d6d2791bf5bdf6de3c2166ce4aab8fe16ca4ad5c226e8ae31a8b77f1a08
 #RUN ./download-machine.sh consensus-v50-rc.3 0x385fa2524d86d4ebc340988224f8686b3f485c7c9f7bc1015a64c85a9c76a6b0
-RUN ./download-machine.sh consensus-v50-rc.4 0x393be710f252e8217d66fe179739eba1ed471f0d5a847b5905c30926d853241a
-RUN ./download-machine.sh consensus-v50-rc.5 0xb90895a56a59c0267c2004a0e103ad725bd98d5a05c3262806ab4ccb3f997558
+#RUN ./download-machine.sh consensus-v50-rc.4 0x393be710f252e8217d66fe179739eba1ed471f0d5a847b5905c30926d853241a
+#RUN ./download-machine.sh consensus-v50-rc.5 0xb90895a56a59c0267c2004a0e103ad725bd98d5a05c3262806ab4ccb3f997558
+#RUN ./download-machine.sh consensus-v50-rc.6 0x2c54f6e9e378ba320ed9c713a1d9f067a572b1437e4f1c40b1a915d3066c04f2
 RUN ./download-machine.sh consensus-v40 0xdb698a2576298f25448bc092e52cf13b1e24141c997135d70f217d674bbeb69a
 RUN ./download-machine-eigenda.sh consensus-eigenda-v32.1 0x04a297cdd13254c4c6c26388915d416286daf22f3a20e3ebee10400a3129dd17
 RUN ./download-machine-eigenda.sh consensus-eigenda-v32.2 0xc723bd1be9fc564796bd8ce5c158c8b2f55d34afb38303a9fb6a8f0fda376edb
 RUN ./download-machine-eigenda.sh consensus-eigenda-v32.3 0x39a7b951167ada11dc7c81f1707fb06e6710ca8b915b2f49e03c130bf7cd53b1
 RUN ./download-machine-eigenda.sh consensus-eigenda-v40 0x2c9a9d645ae56304c483709fc710a58a0935ed43893179fe4b275e1400503ea7
 RUN ./download-machine-eigenda.sh consensus-eigenda-v50-alpha.1 0x34454ede1b5edaee4c5d6c5ccebb20d5cc15d71cf662525be089a60925865ed0
+RUN ./download-machine.sh consensus-v50 0x2c54f6e9e378ba320ed9c713a1d9f067a572b1437e4f1c40b1a915d3066c04f2
 
 FROM golang:1.25-bookworm AS node-builder
 WORKDIR /workspace
@@ -344,6 +346,8 @@ COPY --from=node-builder  /workspace/target/bin/bidder-client  /usr/local/bin/
 COPY --from=node-builder  /workspace/target/bin/el-proxy  /usr/local/bin/
 COPY --from=node-builder  /workspace/target/bin/datool    /usr/local/bin/
 COPY --from=node-builder  /workspace/target/bin/genesis-generator  /usr/local/bin/
+COPY --from=contracts-builder  /workspace/contracts/  /contracts/
+COPY --from=contracts-builder  /workspace/contracts-local/  /contracts-local/
 COPY --from=nitro-legacy /home/user/target/machines /home/user/nitro-legacy/machines
 RUN rm -rf /workspace/target/legacy-machines/latest
 RUN export DEBIAN_FRONTEND=noninteractive && \
@@ -364,16 +368,14 @@ USER user
 # We no longer support pre-arbos-30 wasmmoduleroots (newer wasmmoduleroots can execute old blocks)
 # We keep the code (commented out), and the docker-target, for use in case such an update is needed again.
 FROM nitro-node AS nitro-node-validator
-# USER root
-# COPY --from=nitro-legacy /usr/local/bin/nitro-val /home/user/nitro-legacy/bin/nitro-val
-# COPY --from=nitro-legacy /usr/local/bin/jit /home/user/nitro-legacy/bin/jit
-# RUN export DEBIAN_FRONTEND=noninteractive && \
-#     apt-get update && \
-#     apt-get install -y xxd netcat-traditional && \
-#     rm -rf /var/lib/apt/lists/* /usr/share/doc/* /var/cache/ldconfig/aux-cache /usr/lib/python3.9/__pycache__/ /usr/lib/python3.9/*/__pycache__/ /var/log/*
-# COPY scripts/split-val-entry.sh /usr/local/bin
-# ENTRYPOINT [ "/usr/local/bin/split-val-entry.sh" ]
-# USER user
+USER root
+RUN export DEBIAN_FRONTEND=noninteractive && \
+     apt-get update && \
+     apt-get install -y xxd netcat-traditional && \
+     rm -rf /var/lib/apt/lists/* /usr/share/doc/* /var/cache/ldconfig/aux-cache /usr/lib/python3.9/__pycache__/ /usr/lib/python3.9/*/__pycache__/ /var/log/*
+COPY scripts/split-val-entry.sh /usr/local/bin
+ENTRYPOINT [ "/usr/local/bin/split-val-entry.sh" ]
+USER user
 
 FROM nitro-node-validator AS nitro-node-dev
 USER root

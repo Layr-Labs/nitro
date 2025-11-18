@@ -224,8 +224,9 @@ func TestDASComplexConfigAndRestMirror(t *testing.T) {
 		LocalCache: das.TestCacheConfig,
 
 		LocalFileStorage: das.LocalFileStorageConfig{
-			Enable:  true,
-			DataDir: fileDataDir,
+			Enable:       true,
+			DataDir:      fileDataDir,
+			MaxRetention: time.Hour * 24 * 30,
 		},
 
 		Key: das.KeyConfig{
@@ -369,7 +370,8 @@ func TestDASBatchPosterFallback(t *testing.T) {
 	// Enable the DAP fallback and check the transaction on the second node.
 	// (We don't need to restart the node because of the hot-reload.)
 	builder.nodeConfig.BatchPoster.DisableDapFallbackStoreDataOnChain = false
-	_, err = WaitForTx(ctx, l2B.Client, tx.Hash(), time.Second*3)
+	builder.L2.ConsensusConfigFetcher.Set(builder.nodeConfig)
+	_, err = WaitForTx(ctx, l2B.Client, tx.Hash(), time.Second*5)
 	Require(t, err)
 	l2balance, err := l2B.Client.BalanceAt(ctx, l2info.GetAddress("User2"), nil)
 	Require(t, err)
