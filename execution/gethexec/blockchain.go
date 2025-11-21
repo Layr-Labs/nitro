@@ -123,7 +123,6 @@ func DefaultCacheConfigFor(cachingConfig *CachingConfig) *core.BlockChainConfig 
 		MaxAmountOfGasToSkipStateSaving:    cachingConfig.MaxAmountOfGasToSkipStateSaving,
 		StateScheme:                        cachingConfig.StateScheme,
 		StateHistory:                       cachingConfig.StateHistory,
-		MaxDiffLayers:                      cachingConfig.PathdbMaxDiffLayers,
 	}
 }
 

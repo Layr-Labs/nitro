@@ -321,13 +321,13 @@ func (s *BlocksReExecutor) advanceStateUpToBlock(ctx context.Context, state *sta
 		ExposeMultiGas: s.config.ValidateMultiGas,
 	}
 	for ctx.Err() == nil {
-		var receipts types.Receipts
-		state, block, receipts, err = arbitrum.AdvanceStateByBlock(ctx, s.blockchain, state, blockToRecreate, prevHash, nil, vmConfig)
+		state, block, err = arbitrum.AdvanceStateByBlock(ctx, s.blockchain, state, blockToRecreate, prevHash, nil)
 		if err != nil {
 			return err
 		}
 
 		if vmConfig.ExposeMultiGas {
+			receipts := s.blockchain.GetReceiptsByHash(block.Hash())
 			for _, receipt := range receipts {
 				if receipt.GasUsed != receipt.MultiGasUsed.SingleGas() {
 					return fmt.Errorf("multi-dimensional gas mismatch in block %d, txHash %s: gasUsed=%d, multiGasUsed=%d",
