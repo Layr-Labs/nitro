@@ -321,7 +321,7 @@ func (s *BlocksReExecutor) advanceStateUpToBlock(ctx context.Context, state *sta
 		ExposeMultiGas: s.config.ValidateMultiGas,
 	}
 	for ctx.Err() == nil {
-		state, block, err = arbitrum.AdvanceStateByBlock(ctx, s.blockchain, state, blockToRecreate, prevHash, nil)
+		state, block, _, err = arbitrum.AdvanceStateByBlock(ctx, s.blockchain, state, blockToRecreate, prevHash, nil, vmConfig)
 		if err != nil {
 			return err
 		}
