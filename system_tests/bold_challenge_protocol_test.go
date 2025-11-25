@@ -119,7 +119,7 @@ func testChallengeProtocolBOLD(t *testing.T, eigenDAOpts *EigenDABoldBatchOpts, 
 		MinimumAssertionPeriod: 0,
 	}
 
-	_, l2nodeA, _, _, l1info, _, l1client, l1stack, assertionChain, stakeTokenAddr, asserterOpts := createTestNodeOnL1ForBoldProtocol(
+	_, l2nodeA, _, _, l1info, _, l1client, l1stack, assertionChain, stakeTokenAddr, _ := createTestNodeOnL1ForBoldProtocol(
 		t,
 		ctx,
 		true,
