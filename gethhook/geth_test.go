@@ -34,7 +34,19 @@ func (r *TestChainContext) Engine() consensus.Engine {
 
 func (r *TestChainContext) Config() *params.ChainConfig { return r.chainConfig }
 
+func (r *TestChainContext) CurrentHeader() *types.Header {
+	return &types.Header{}
+}
+
 func (r *TestChainContext) GetHeader(hash common.Hash, num uint64) *types.Header {
+	return &types.Header{}
+}
+
+func (r *TestChainContext) GetHeaderByNumber(num uint64) *types.Header {
+	return &types.Header{}
+}
+
+func (r *TestChainContext) GetHeaderByHash(hash common.Hash) *types.Header {
 	return &types.Header{}
 }
 

@@ -54,7 +54,8 @@ func getBlockHeaderByHash(hash common.Hash) *types.Header {
 }
 
 type WavmChainContext struct {
-	chainConfig *params.ChainConfig
+	chainConfig   *params.ChainConfig
+	currentHeader *types.Header
 }
 
 func (c WavmChainContext) Config() *params.ChainConfig {
@@ -65,12 +66,29 @@ func (c WavmChainContext) Engine() consensus.Engine {
 	return arbos.Engine{}
 }
 
+func (c WavmChainContext) CurrentHeader() *types.Header {
+	return c.currentHeader
+}
+
 func (c WavmChainContext) GetHeader(hash common.Hash, num uint64) *types.Header {
 	header := getBlockHeaderByHash(hash)
 	if !header.Number.IsUint64() || header.Number.Uint64() != num {
 		panic(fmt.Sprintf("Retrieved wrong block number for header hash %v -- requested %v but got %v", hash, num, header.Number.String()))
 	}
 	return header
+}
+
+func (c WavmChainContext) GetHeaderByNumber(num uint64) *types.Header {
+	if c.currentHeader != nil && c.currentHeader.Number.Uint64() == num {
+		return c.currentHeader
+	}
+	// For other block numbers, we need to look them up by hash
+	// In the replay context, we can only access blocks via hash through the preimage oracle
+	return nil
+}
+
+func (c WavmChainContext) GetHeaderByHash(hash common.Hash) *types.Header {
+	return getBlockHeaderByHash(hash)
 }
 
 type WavmInbox struct{}
@@ -340,7 +358,7 @@ func main() {
 
 		message := readMessage(chainConfig.ArbitrumChainParams.DataAvailabilityCommittee)
 
-		chainContext := WavmChainContext{chainConfig: chainConfig}
+		chainContext := WavmChainContext{chainConfig: chainConfig, currentHeader: lastBlockHeader}
 		newBlock, _, err = arbos.ProduceBlock(message.Message, message.DelayedMessagesRead, lastBlockHeader, statedb, chainContext, false, core.NewMessageReplayContext(), false)
 		if err != nil {
 			panic(err)
