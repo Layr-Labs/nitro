@@ -4,8 +4,8 @@ on:
   workflow_call:
     secrets:
       CODECOV_TOKEN:
-        required: false
-        description: Token to upload reports to Codecov. Required if `upload_report` is on.
+        required: true
+        description: Token to upload reports to Codecov.
     inputs:
       post_comment:
         description: 'Set to true to post a test summary comment on the PR.'
@@ -32,11 +32,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Download JUnit reports
-        uses: actions/download-artifact@v6
+      - name: Download Go JUnit reports
+        uses: actions/download-artifact@v4
         with:
-          pattern: junit-reports-*
-          path: downloaded-reports/
+          name: go-junit-reports
+          path: downloaded-reports/go
+
+      - name: Download Rust JUnit reports
+        uses: actions/download-artifact@v4
+        continue-on-error: true # Rust pipeline might have not been run
+        with:
+          name: rust-junit-reports
+          path: downloaded-reports/rust
 
       - name: Post test summary comment
         if: ${{ inputs.post_comment }}

@@ -67,7 +67,7 @@ jobs:
         run: ./scripts/start-eigenda-proxy.sh
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@v8
         with:
           version: v2.5
           skip-cache: true
@@ -120,7 +120,7 @@ jobs:
         run: ${{ github.workspace }}/.github/workflows/runExecutionSpecTests.sh
 
       - name: Archive detailed run log
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.test-mode }}-full.log
           path: full.log
