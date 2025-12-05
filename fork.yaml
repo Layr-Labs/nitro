@@ -5,13 +5,13 @@ footer: |  # define the footer with markdown
 base:
   name: OffchainLabs/nitro
   url: https://github.com/OffchainLabs/nitro
-  ## v3.8.0-rc7 upstream pin
-  hash: ef47e289dcdd3eb387f6ba9c64dfbf73d980c1e5 
+  ## v3.9.0 upstream pin
+  hash: 694aea285d8600446056b41f976b78502fff4a2b
 fork:
   name: Layr-Labs/nitro
   url: https://github.com/Layr-Labs/nitro
-  ## latest v3.8.0-rc7 downstream fork commit pin
-  hash: a8de9b68c8a01bafb7bfc0c2db457ed0ecb35680
+  ## v3.9.0 + EigenDA fork-specific customizations
+  hash: 4ea1899d856cd007d156f27e2f957931d94ad6c4
 def:
     title: "EigenDA x Arbitrum Nitro Fork Diff Overview"
     description: | # description in markdown
