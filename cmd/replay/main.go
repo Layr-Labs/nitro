@@ -54,7 +54,9 @@ func getBlockHeaderByHash(hash common.Hash) *types.Header {
 }
 
 type WavmChainContext struct {
-	chainConfig   *params.ChainConfig
+	chainConfig *params.ChainConfig
+	// currentHeader is required for ChainContext interface compatibility with go-ethereum arbos_51 branch
+	// which adds CurrentHeader(), GetHeaderByNumber(), and GetHeaderByHash() methods for ArbOS 51 support
 	currentHeader *types.Header
 }
 
