@@ -139,6 +139,8 @@ func (c noopChainContext) GetHeader(common.Hash, uint64) *types.Header {
 	return nil
 }
 
+// GetHeaderByNumber, GetHeaderByHash are required by ChainContext interface in go-ethereum arbos_51 branch
+// Added for ArbOS 51 compatibility
 func (c noopChainContext) GetHeaderByNumber(uint64) *types.Header {
 	return nil
 }

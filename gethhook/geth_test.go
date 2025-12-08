@@ -42,6 +42,8 @@ func (r *TestChainContext) GetHeader(hash common.Hash, num uint64) *types.Header
 	return &types.Header{}
 }
 
+// GetHeaderByNumber, GetHeaderByHash are required by ChainContext interface in go-ethereum arbos_51 branch
+// Added for ArbOS 51 compatibility
 func (r *TestChainContext) GetHeaderByNumber(num uint64) *types.Header {
 	return &types.Header{}
 }
