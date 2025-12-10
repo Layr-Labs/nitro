@@ -10,8 +10,8 @@ base:
 fork:
   name: Layr-Labs/nitro
   url: https://github.com/Layr-Labs/nitro
-  ## v3.9.0 + EigenDA fork-specific customizations
-  hash: 4ea1899d856cd007d156f27e2f957931d94ad6c4
+  ## v3.9.0 + EigenDA fork-specific customizations (no arbos_51 upgrade)
+  hash: 6e485f269db8e1fe60f8fa3a2e89a7bdd28f57a3
 def:
     title: "EigenDA x Arbitrum Nitro Fork Diff Overview"
     description: | # description in markdown
