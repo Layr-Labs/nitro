@@ -19,4 +19,4 @@ build-forge-gas-dimensions:
 	FOUNDRY_PROFILE=gas-dimensions forge build
 
 build-forge-gas-dimensions-yul:
-	FOUNDRY_PROFILE=gas-dimensions-yul forge build --skip *.sol || true
+	FOUNDRY_PROFILE=gas-dimensions-yul forge build --skip *.sol
