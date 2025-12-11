@@ -26,10 +26,6 @@ func (d *readerForEigenDA) IsValidHeaderByte(ctx context.Context, headerByte byt
 }
 
 // CollectPreimages collects preimages from the DA provider
-// TODO: Updated to v3.9.0 Promise API pattern (containers.DoPromise). Revert to old pattern if this breaks:
-//
-//	promise, ctx := containers.NewPromiseWithContext[daprovider.PreimagesResult](context.Background())
-//	go func() { ... promise.ProduceError(err) / promise.Produce(result) }()
 func (b *readerForEigenDA) CollectPreimages(
 	batchNum uint64,
 	batchBlockHash common.Hash,
@@ -46,10 +42,6 @@ func (b *readerForEigenDA) CollectPreimages(
 	})
 }
 
-// TODO: Updated to v3.9.0 Promise API pattern (containers.DoPromise). Revert to old pattern if this breaks:
-//
-//	promise, ctx := containers.NewPromiseWithContext[daprovider.PayloadResult](context.Background())
-//	go func() { ... promise.ProduceError(err) / promise.Produce(result) }()
 func (d *readerForEigenDA) RecoverPayload(
 	batchNum uint64,
 	batchBlockHash common.Hash,
