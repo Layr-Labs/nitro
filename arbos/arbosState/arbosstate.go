@@ -438,10 +438,6 @@ func (state *ArbosState) UpgradeArbosVersion(
 			ensure(p.UpgradeToArbosVersion(nextArbosVersion))
 			ensure(p.Save())
 			ensure(state.l2PricingState.SetMaxPerTxGasLimit(l2pricing.InitialPerTxGasLimitV50))
-		case params.ArbosVersion_51:
-			// ArbOS 51: Multi-constraint fix
-			// Required for go-ethereum arbos_51 branch compatibility (adds ArbosVersion_51 constant)
-			// No state changes required for this version upgrade
 		default:
 			return fmt.Errorf(
 				"the chain is upgrading to unsupported ArbOS version %v, %w",

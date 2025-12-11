@@ -88,12 +88,6 @@ func (d *DB) AncientRange(kind string, start, count, maxBytes uint64) ([][]byte,
 	return nil, errors.New("unimplemented")
 }
 
-// AncientBytes was added to the ethdb.Database interface in go-ethereum for v3.9.0
-// Required for interface compatibility, but not implemented in mel-replay
-func (d *DB) AncientBytes(kind string, id, offset, length uint64) ([]byte, error) {
-	return nil, errors.New("unimplemented")
-}
-
 func (d *DB) Ancients() (uint64, error) {
 	return 0, errors.New("unimplemented")
 }
