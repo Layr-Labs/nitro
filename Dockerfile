@@ -256,7 +256,7 @@ RUN ./download-machine-eigenda.sh consensus-eigenda-v32.1 0x04a297cdd13254c4c6c2
 RUN ./download-machine-eigenda.sh consensus-eigenda-v32.2 0xc723bd1be9fc564796bd8ce5c158c8b2f55d34afb38303a9fb6a8f0fda376edb
 RUN ./download-machine-eigenda.sh consensus-eigenda-v32.3 0x39a7b951167ada11dc7c81f1707fb06e6710ca8b915b2f49e03c130bf7cd53b1
 RUN ./download-machine-eigenda.sh consensus-eigenda-v40 0x2c9a9d645ae56304c483709fc710a58a0935ed43893179fe4b275e1400503ea7
-RUN ./download-machine-eigenda.sh consensus-eigenda-v50-alpha.1 0x34454ede1b5edaee4c5d6c5ccebb20d5cc15d71cf662525be089a60925865ed0
+#RUN ./download-machine-eigenda.sh consensus-eigenda-v50-alpha.1 0x34454ede1b5edaee4c5d6c5ccebb20d5cc15d71cf662525be089a60925865ed0
 RUN ./download-machine-eigenda.sh consensus-eigenda-v50 0x54c6ce94cc0ca6dd16e931e782f612c094163fac83845f719dea100489073745
 RUN ./download-machine.sh consensus-v50 0x2c54f6e9e378ba320ed9c713a1d9f067a572b1437e4f1c40b1a915d3066c04f2
 
