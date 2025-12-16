@@ -119,7 +119,7 @@ func testChallengeProtocolBOLD(t *testing.T, eigenDAOpts *EigenDABoldBatchOpts, 
 		MinimumAssertionPeriod: 0,
 	}
 
-	_, l2nodeA, _, _, l1info, _, l1client, l1stack, assertionChain, stakeTokenAddr := createTestNodeOnL1ForBoldProtocol(
+	_, l2nodeA, _, _, l1info, _, l1client, l1stack, assertionChain, stakeTokenAddr, _ := createTestNodeOnL1ForBoldProtocol(
 		t,
 		ctx,
 		true,
@@ -287,7 +287,7 @@ func testChallengeProtocolBOLD(t *testing.T, eigenDAOpts *EigenDABoldBatchOpts, 
 		rawdb.NewTable(l2nodeB.ArbDB, storage.StakerPrefix),
 		l2nodeB.L1Reader,
 		&evilOpts,
-		NewFetcherFromConfig(l2nodeConfig),
+		NewCommonConfigFetcher(l2nodeConfig),
 		l2nodeB.SyncMonitor,
 		l1ChainId,
 	)
@@ -567,7 +567,7 @@ func createTestNodeOnL1ForBoldProtocol(
 ) (
 	l2info info, currentNode *arbnode.Node, l2client *ethclient.Client, l2stack *node.Node,
 	l1info info, l1backend *eth.Ethereum, l1client *ethclient.Client, l1stack *node.Node,
-	assertionChain *solimpl.AssertionChain, stakeTokenAddr common.Address,
+	assertionChain *solimpl.AssertionChain, stakeTokenAddr common.Address, asserterOpts *bind.TransactOpts,
 ) {
 	if nodeConfig == nil {
 		nodeConfig = arbnode.ConfigDefaultL1Test()
@@ -583,7 +583,7 @@ func createTestNodeOnL1ForBoldProtocol(
 	}
 	fatalErrChan := make(chan error, 10)
 	withoutClientWrapper := false
-	l1info, l1client, l1backend, l1stack, _ = createTestL1BlockChain(t, nil, withoutClientWrapper)
+	l1info, l1client, l1backend, l1stack, _, _ = createTestL1BlockChain(t, nil, withoutClientWrapper)
 	var l2chainDb ethdb.Database
 	var l2arbDb ethdb.Database
 	var l2blockchain *core.BlockChain
@@ -594,6 +594,8 @@ func createTestNodeOnL1ForBoldProtocol(
 
 	l1info.GenerateAccount("Asserter")
 	l1info.GenerateAccount("EvilAsserter")
+	tmpOpts := l1info.GetDefaultTransactOpts("Asserter", ctx)
+	asserterOpts = &tmpOpts
 
 	SendWaitTestTransactions(t, ctx, l1client, []*types.Transaction{
 		l1info.PrepareTx("Faucet", "RollupOwner", 30000, big.NewInt(9223372036854775807), nil),
@@ -656,15 +658,14 @@ func createTestNodeOnL1ForBoldProtocol(
 	AddValNodeIfNeeded(t, ctx, nodeConfig, true, "", "")
 
 	parentChainId, err := l1client.ChainID(ctx)
-	execConfigFetcher := func() *gethexec.Config { return execConfig }
-	execNode, err := gethexec.CreateExecutionNode(ctx, l2stack, l2chainDb, l2blockchain, l1client, execConfigFetcher, parentChainId, 0)
+	execNode, err := gethexec.CreateExecutionNode(ctx, l2stack, l2chainDb, l2blockchain, l1client, NewCommonConfigFetcher(execConfig), parentChainId, 0)
 	Require(t, err)
 
 	Require(t, err)
 	locator, err := server_common.NewMachineLocator("")
 	Require(t, err)
 	currentNode, err = arbnode.CreateNodeFullExecutionClient(
-		ctx, l2stack, execNode, execNode, execNode, execNode, l2arbDb, NewFetcherFromConfig(nodeConfig), l2blockchain.Config(), l1client,
+		ctx, l2stack, execNode, execNode, execNode, execNode, l2arbDb, NewCommonConfigFetcher(nodeConfig), l2blockchain.Config(), l1client,
 		addresses, sequencerTxOptsPtr, sequencerTxOptsPtr, dataSigner, fatalErrChan, parentChainId,
 		nil, // Blob reader.
 		locator.LatestWasmModuleRoot(),
@@ -681,7 +682,7 @@ func createTestNodeOnL1ForBoldProtocol(
 		rawdb.NewTable(l2arbDb, storage.StakerPrefix),
 		currentNode.L1Reader,
 		&opts,
-		NewFetcherFromConfig(nodeConfig),
+		NewCommonConfigFetcher(nodeConfig),
 		currentNode.SyncMonitor,
 		parentChainId,
 	)
@@ -872,14 +873,13 @@ func create2ndNodeWithConfigForBoldProtocol(
 	l2blockchain, err := gethexec.WriteOrTestBlockChain(l2chainDb, coreCacheConfig, initReader, chainConfig, nil, nil, initMessage, &execConfig.TxIndexer, 0)
 	Require(t, err)
 
-	execConfigFetcher := func() *gethexec.Config { return execConfig }
 	l1ChainId, err := l1client.ChainID(ctx)
 	Require(t, err)
-	execNode, err := gethexec.CreateExecutionNode(ctx, l2stack, l2chainDb, l2blockchain, l1client, execConfigFetcher, l1ChainId, 0)
+	execNode, err := gethexec.CreateExecutionNode(ctx, l2stack, l2chainDb, l2blockchain, l1client, NewCommonConfigFetcher(execConfig), l1ChainId, 0)
 	Require(t, err)
 	locator, err := server_common.NewMachineLocator("")
 	Require(t, err)
-	l2node, err := arbnode.CreateNodeFullExecutionClient(ctx, l2stack, execNode, execNode, execNode, execNode, l2arbDb, NewFetcherFromConfig(nodeConfig), l2blockchain.Config(), l1client, addresses, &txOpts, &txOpts, dataSigner, fatalErrChan, l1ChainId, nil /* blob reader */, locator.LatestWasmModuleRoot())
+	l2node, err := arbnode.CreateNodeFullExecutionClient(ctx, l2stack, execNode, execNode, execNode, execNode, l2arbDb, NewCommonConfigFetcher(nodeConfig), l2blockchain.Config(), l1client, addresses, &txOpts, &txOpts, dataSigner, fatalErrChan, l1ChainId, nil /* blob reader */, locator.LatestWasmModuleRoot())
 	Require(t, err)
 
 	l2client := ClientForStack(t, l2stack)
@@ -896,7 +896,7 @@ func create2ndNodeWithConfigForBoldProtocol(
 		rawdb.NewTable(l2arbDb, storage.StakerPrefix),
 		l2node.L1Reader,
 		&evilOpts,
-		NewFetcherFromConfig(nodeConfig),
+		NewCommonConfigFetcher(nodeConfig),
 		l2node.SyncMonitor,
 		l1ChainId,
 	)

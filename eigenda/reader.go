@@ -31,21 +31,15 @@ func (b *readerForEigenDA) CollectPreimages(
 	batchBlockHash common.Hash,
 	sequencerMsg []byte,
 ) containers.PromiseInterface[daprovider.PreimagesResult] {
-	promise, ctx := containers.NewPromiseWithContext[daprovider.PreimagesResult](context.Background())
-	go func() {
+	return containers.DoPromise(context.Background(), func(ctx context.Context) (daprovider.PreimagesResult, error) {
 		var preimages daprovider.PreimagesMap
 		var preimageRecorder daprovider.PreimageRecorder
 		preimages = make(daprovider.PreimagesMap)
 		preimageRecorder = daprovider.RecordPreimagesTo(preimages)
 
 		_, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], b.readerEigenDA, preimageRecorder)
-		if err != nil {
-			promise.ProduceError(err)
-		} else {
-			promise.Produce(daprovider.PreimagesResult{Preimages: preimages})
-		}
-	}()
-	return promise
+		return daprovider.PreimagesResult{Preimages: preimages}, err
+	})
 }
 
 func (d *readerForEigenDA) RecoverPayload(
@@ -53,16 +47,10 @@ func (d *readerForEigenDA) RecoverPayload(
 	batchBlockHash common.Hash,
 	sequencerMsg []byte,
 ) containers.PromiseInterface[daprovider.PayloadResult] {
-	promise, ctx := containers.NewPromiseWithContext[daprovider.PayloadResult](context.Background())
-	go func() {
+	return containers.DoPromise(context.Background(), func(ctx context.Context) (daprovider.PayloadResult, error) {
 		payload, err := RecoverPayloadFromEigenDABatch(ctx, sequencerMsg[sequencerMsgOffset:], d.readerEigenDA, nil)
-		if err != nil {
-			promise.ProduceError(err)
-		} else {
-			promise.Produce(daprovider.PayloadResult{Payload: payload})
-		}
-	}()
-	return promise
+		return daprovider.PayloadResult{Payload: payload}, err
+	})
 }
 
 func RecoverPayloadFromEigenDABatch(ctx context.Context,
