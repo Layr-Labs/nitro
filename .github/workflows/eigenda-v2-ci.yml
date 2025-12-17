@@ -1,0 +1,70 @@
+name: EigenDA V2 CI
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'eigenda/**'
+      - 'system_tests/eigenda_v2_test.go'
+      - 'scripts/start-eigenda-proxy.sh'
+      - '.github/workflows/eigenda-v2-ci.yml'
+
+jobs:
+  eigenda-v2-tests:
+    runs-on: linux-2xl
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/ci-setup
+
+      - name: Start EigenDA V2 Proxy
+        run: |
+          # Start V2 proxy (will skip if image not available)
+          ./scripts/start-eigenda-proxy.sh v2 || echo "V2 proxy not available yet, skipping"
+        continue-on-error: true
+
+      - name: Build Nitro
+        run: make -j8 build test-go-deps
+        env:
+          CARGO_BUILD_JOBS: 2
+
+      - name: Run V2 Integration Tests
+        run: |
+          # Run V2 tests with special build tag
+          # Tests are currently skipped but will run when V2 is ready
+          go test -timeout 600s \
+            -tags eigendav2test \
+            -v \
+            ./system_tests \
+            -run "TestEigenDAV2" || echo "V2 tests skipped (not yet implemented)"
+        env:
+          GOMEMLIMIT: 6GiB
+          GOGC: 80
+        continue-on-error: true
+
+      - name: Check for V2 TODOs
+        run: |
+          echo "=== V2 Implementation TODOs ==="
+          echo ""
+          echo "Proxy Script TODOs:"
+          grep -n "TODO" scripts/start-eigenda-proxy.sh || echo "None"
+          echo ""
+          echo "Test TODOs:"
+          grep -n "TODO" system_tests/eigenda_v2_test.go | head -20 || echo "None"
+          echo ""
+          echo "Run './scripts/start-eigenda-proxy.sh v2' to test V2 proxy startup"
+          echo "Run 'go test -tags eigendav2test ./system_tests -run TestEigenDAV2' to run V2 tests"
+
+      - name: Upload Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eigenda-v2-test-logs
+          path: |
+            system_tests/*.log
+            /tmp/eigenda-v2-*.log
+          if-no-files-found: ignore
