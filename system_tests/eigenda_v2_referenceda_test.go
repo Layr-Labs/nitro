@@ -4,6 +4,20 @@
 //go:build eigendav2test
 // +build eigendav2test
 
+// Package arbtest contains system tests for combined EigenDA V2 and ReferenceDA integration.
+//
+// This file tests the integration between EigenDA V2 (when available) and ReferenceDA
+// as a fallback DA solution. These tests validate:
+// 1. EigenDA V2 as primary DA with ReferenceDA as fallback
+// 2. Failover scenarios (V2 → ReferenceDA)
+// 3. ALT DA spec compatibility between both implementations
+// 4. Backward compatibility (V2 reading V1 certificates)
+// 5. Recency checks for L1 block references
+//
+// Note: Tests in this file require the eigendav2test build tag and are currently
+// skipped until EigenDA V2 proxy becomes available. The infrastructure is ready
+// and tests will automatically run once V2 is deployed.
+
 package arbtest
 
 import (

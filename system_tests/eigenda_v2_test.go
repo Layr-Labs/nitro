@@ -4,6 +4,22 @@
 //go:build eigendav2test
 // +build eigendav2test
 
+// Package arbtest contains system tests for EigenDA V2 integration.
+//
+// EigenDA V2 represents the integration of EigenDA with Arbitrum's ALT DA
+// (Alternative Data Availability) specification. Unlike V1 which uses a custom
+// Store() API, V2 implements the standardized ALT DA interface.
+//
+// Tests in this file validate:
+// 1. V2 proxy connectivity and health checks
+// 2. Batch posting through V2 proxy
+// 3. Node synchronization using V2 certificates
+// 4. Backward compatibility with V1 certificates
+//
+// Note: These tests require the eigendav2test build tag and are currently skipped
+// until the V2 proxy is available. The test infrastructure is ready and tests will
+// automatically run once V2 is deployed.
+
 package arbtest
 
 import (

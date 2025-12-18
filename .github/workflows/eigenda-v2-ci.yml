@@ -51,7 +51,11 @@ jobs:
       - name: Run ReferenceDA Integration Tests
         run: |
           # Run ReferenceDA (CustomDA/ALT DA) tests
-          # These tests use the existing ReferenceDA implementation
+          # These tests use the existing ReferenceDA implementation and should pass
+          # Tests include:
+          # - TestReferenceDAServerReachability: Basic server startup
+          # - TestReferenceDAStoreRetrieve: Store/retrieve operations
+          # - TestReferenceDAIntegration: Full L1/L2 integration with certificate verification
           go test -timeout 600s \
             -v \
             ./system_tests \
@@ -59,7 +63,6 @@ jobs:
         env:
           GOMEMLIMIT: 6GiB
           GOGC: 80
-        continue-on-error: true
 
       - name: Check for V2 TODOs
         run: |

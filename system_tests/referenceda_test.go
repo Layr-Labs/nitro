@@ -1,12 +1,26 @@
 // Copyright 2021-2022, Offchain Labs, Inc.
 // For license information, see https://github.com/nitro/blob/master/LICENSE
 
+// Package arbtest contains system tests for ReferenceDA (CustomDA/ALT DA) integration.
+//
+// ReferenceDA is Arbitrum's reference implementation of the ALT DA (Alternative Data Availability)
+// specification. It provides a provider-agnostic DA interface that can be used as a fallback
+// or alternative to EigenDA.
+//
+// Tests in this file validate:
+// 1. ReferenceDA server setup and connectivity
+// 2. Basic store/retrieve operations
+// 3. Full L1/L2 integration with batch posting
+// 4. Certificate verification in the sequencer inbox
+//
+// These tests leverage the existing ReferenceDA implementation in daprovider/referenceda/
+// and demonstrate how external DA providers can integrate with Arbitrum Nitro.
+
 package arbtest
 
 import (
 	"context"
 	"math/big"
-	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -70,13 +84,14 @@ func TestReferenceDAIntegration(t *testing.T) {
 
 	// Test batch posting through ReferenceDA
 	checkReferenceDABatchPosting(t, ctx, builder.L1.Client, builder.L2.Client,
-		builder.L1Info, builder.L2Info, big.NewInt(1e12), l2B.Client)
+		builder.L1Info, builder.L2Info, big.NewInt(1e12), builder.addresses.SequencerInbox, l2B.Client)
 
 	builder.L2.cleanup()
 }
 
 // checkReferenceDABatchPosting verifies batch posting works through ReferenceDA
-func checkReferenceDABatchPosting(t *testing.T, ctx context.Context, l1client, l2clientA *ethclient.Client, l1info, l2info info, expectedBalance *big.Int, l2ClientsToCheck ...*ethclient.Client) {
+// and verifies that ReferenceDA certificates appear in the sequencer inbox
+func checkReferenceDABatchPosting(t *testing.T, ctx context.Context, l1client, l2clientA *ethclient.Client, l1info, l2info info, expectedBalance *big.Int, sequencerInboxAddr common.Address, l2ClientsToCheck ...*ethclient.Client) {
 	// Prepare and send transaction
 	tx := l2info.PrepareTx("Owner", "User2", l2info.TransferGas, big.NewInt(1e12), nil)
 	err := l2clientA.SendTransaction(ctx, tx)
@@ -108,7 +123,40 @@ func checkReferenceDABatchPosting(t *testing.T, ctx context.Context, l1client, l
 		}
 	}
 
+	// Verify ReferenceDA certificates in sequencer inbox
+	seqInbox, err := arbnode.NewSequencerInbox(l1client, sequencerInboxAddr, 0)
+	Require(t, err)
+
+	latestBlock, err := l1client.BlockNumber(ctx)
+	Require(t, err)
+
+	// #nosec G115 -- Block numbers are unlikely to exceed int64's maximum value
+	batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
+	Require(t, err)
+
+	// Verify that ReferenceDA certificates are present
+	var referenceDASeen bool
+	for _, batch := range batches {
+		serializedBatch, err := batch.Serialize(ctx, l1client)
+		Require(t, err)
+
+		if len(serializedBatch) <= 40 {
+			continue
+		}
+
+		if daprovider.IsDACertificateMessageHeaderByte(serializedBatch[40]) {
+			referenceDASeen = true
+			t.Logf("Found ReferenceDA certificate in batch")
+			break
+		}
+	}
+
+	if !referenceDASeen {
+		t.Fatal("Expected ReferenceDA certificates in sequencer inbox, but found none")
+	}
+
 	t.Logf("✅ ReferenceDA batch posting successful, balance verified: %s", expectedBalance.String())
+	t.Logf("✅ ReferenceDA certificates verified in sequencer inbox")
 }
 
 // setupReferenceDAServer creates and starts a ReferenceDA server
