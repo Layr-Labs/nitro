@@ -7,6 +7,8 @@ on:
     paths:
       - 'eigenda/**'
       - 'system_tests/eigenda_v2_test.go'
+      - 'system_tests/referenceda_test.go'
+      - 'daprovider/referenceda/**'
       - 'scripts/start-eigenda-proxy.sh'
       - '.github/workflows/eigenda-v2-ci.yml'
 
@@ -46,6 +48,19 @@ jobs:
           GOGC: 80
         continue-on-error: true
 
+      - name: Run ReferenceDA Integration Tests
+        run: |
+          # Run ReferenceDA (CustomDA/ALT DA) tests
+          # These tests use the existing ReferenceDA implementation
+          go test -timeout 600s \
+            -v \
+            ./system_tests \
+            -run "TestReferenceDA"
+        env:
+          GOMEMLIMIT: 6GiB
+          GOGC: 80
+        continue-on-error: true
+
       - name: Check for V2 TODOs
         run: |
           echo "=== V2 Implementation TODOs ==="
@@ -53,11 +68,13 @@ jobs:
           echo "Proxy Script TODOs:"
           grep -n "TODO" scripts/start-eigenda-proxy.sh || echo "None"
           echo ""
-          echo "Test TODOs:"
+          echo "V2 Test TODOs:"
           grep -n "TODO" system_tests/eigenda_v2_test.go | head -20 || echo "None"
           echo ""
-          echo "Run './scripts/start-eigenda-proxy.sh v2' to test V2 proxy startup"
-          echo "Run 'go test -tags eigendav2test ./system_tests -run TestEigenDAV2' to run V2 tests"
+          echo "=== Commands ==="
+          echo "V2 Proxy: ./scripts/start-eigenda-proxy.sh v2"
+          echo "V2 Tests: go test -tags eigendav2test ./system_tests -run TestEigenDAV2"
+          echo "ReferenceDA Tests: go test ./system_tests -run TestReferenceDA"
 
       - name: Upload Test Logs
         if: always()
