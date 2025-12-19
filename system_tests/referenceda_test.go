@@ -244,7 +244,11 @@ func TestReferenceDAServerReachability(t *testing.T) {
 
 	server, err := dapserver.NewServerWithDAPProvider(ctx, &config, reader, writer, validator, headerBytes, data_streaming.PayloadCommitmentVerifier())
 	Require(t, err)
-	defer server.Shutdown(ctx)
+	defer func() {
+		if err := server.Shutdown(ctx); err != nil {
+			t.Logf("Error shutting down server: %v", err)
+		}
+	}()
 
 	t.Logf("✅ ReferenceDA server started and reachable")
 }
@@ -278,7 +282,11 @@ func TestReferenceDAStoreRetrieve(t *testing.T) {
 
 	server, err := dapserver.NewServerWithDAPProvider(ctx, &config, reader, writer, validator, headerBytes, data_streaming.PayloadCommitmentVerifier())
 	Require(t, err)
-	defer server.Shutdown(ctx)
+	defer func() {
+		if err := server.Shutdown(ctx); err != nil {
+			t.Logf("Error shutting down server: %v", err)
+		}
+	}()
 
 	t.Logf("✅ ReferenceDA store/retrieve test completed successfully")
 }
