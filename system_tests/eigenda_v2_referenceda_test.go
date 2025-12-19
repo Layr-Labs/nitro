@@ -209,6 +209,7 @@ func setupReferenceDAServerForFallback(t *testing.T, ctx context.Context, l1Clie
 	config := dapserver.ServerConfig{
 		Addr:               "localhost",
 		Port:               0,
+		JWTSecret:          "",
 		EnableDAWriter:     true,
 		ServerTimeouts:     genericconf.HTTPServerTimeoutConfig{},
 		RPCServerBodyLimit: 256 * 1024 * 1024,

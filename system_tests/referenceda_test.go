@@ -187,6 +187,7 @@ func setupReferenceDAServer(t *testing.T, ctx context.Context, l1Client *ethclie
 	providerServerConfig := dapserver.ServerConfig{
 		Addr:               "localhost",
 		Port:               0, // Auto-assign port
+		JWTSecret:          "",
 		EnableDAWriter:     true,
 		ServerTimeouts:     genericconf.HTTPServerTimeoutConfig{},
 		RPCServerBodyLimit: 256 * 1024 * 1024, // 256MB for testing
@@ -235,6 +236,7 @@ func TestReferenceDAServerReachability(t *testing.T) {
 	config := dapserver.ServerConfig{
 		Addr:               "localhost",
 		Port:               0,
+		JWTSecret:          "",
 		EnableDAWriter:     true,
 		ServerTimeouts:     genericconf.HTTPServerTimeoutConfig{},
 		RPCServerBodyLimit: data_streaming.TestHttpBodyLimit,
@@ -268,6 +270,7 @@ func TestReferenceDAStoreRetrieve(t *testing.T) {
 	config := dapserver.ServerConfig{
 		Addr:               "localhost",
 		Port:               0,
+		JWTSecret:          "",
 		EnableDAWriter:     true,
 		ServerTimeouts:     genericconf.HTTPServerTimeoutConfig{},
 		RPCServerBodyLimit: data_streaming.TestHttpBodyLimit,
