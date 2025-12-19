@@ -71,8 +71,9 @@ func TestEigenDAV2WithReferenceDAFallback(t *testing.T) {
 	builder.nodeConfig.EigenDA.Rpc = proxyV2URL
 
 	// Fallback: ReferenceDA (CustomDA/ALT DA)
+	// Note: referenceDAAddr already includes "http://" prefix
 	builder.nodeConfig.DAProvider.Enable = true
-	builder.nodeConfig.DAProvider.RPC.URL = "http://" + referenceDAAddr
+	builder.nodeConfig.DAProvider.RPC.URL = referenceDAAddr
 	builder.nodeConfig.DAProvider.WithWriter = true
 
 	// Enable automatic failover from EigenDA to ReferenceDA
@@ -87,7 +88,7 @@ func TestEigenDAV2WithReferenceDAFallback(t *testing.T) {
 	l1NodeConfigB.EigenDA.Enable = true
 	l1NodeConfigB.EigenDA.Rpc = proxyV2URL
 	l1NodeConfigB.DAProvider.Enable = true
-	l1NodeConfigB.DAProvider.RPC.URL = "http://" + referenceDAAddr
+	l1NodeConfigB.DAProvider.RPC.URL = referenceDAAddr
 	l1NodeConfigB.BatchPoster.EnableEigenDAFailover = true
 
 	nodeBParams := SecondNodeParams{

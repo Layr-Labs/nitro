@@ -60,8 +60,9 @@ func TestReferenceDAIntegration(t *testing.T) {
 	t.Logf("Validator contract address: %s", validatorAddr.Hex())
 
 	// Configure L2 node to use ReferenceDA via DAProvider
+	// Note: referenceDAAddr already includes "http://" prefix
 	builder.nodeConfig.DAProvider.Enable = true
-	builder.nodeConfig.DAProvider.RPC.URL = "http://" + referenceDAAddr
+	builder.nodeConfig.DAProvider.RPC.URL = referenceDAAddr
 	builder.nodeConfig.DAProvider.WithWriter = true
 
 	// Build L2 chain with ReferenceDA
@@ -72,7 +73,7 @@ func TestReferenceDAIntegration(t *testing.T) {
 	l1NodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest()
 	l1NodeConfigB.BlockValidator.Enable = false
 	l1NodeConfigB.DAProvider.Enable = true
-	l1NodeConfigB.DAProvider.RPC.URL = "http://" + referenceDAAddr
+	l1NodeConfigB.DAProvider.RPC.URL = referenceDAAddr
 	l1NodeConfigB.DAProvider.WithWriter = false // Reader only
 
 	nodeBParams := SecondNodeParams{
