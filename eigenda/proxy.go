@@ -28,10 +28,25 @@ func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) (*disperser.B
 		return nil, fmt.Errorf("failed to set data: %w", err)
 	}
 
+	if len(cert) == 0 {
+		return nil, fmt.Errorf("received empty certificate from proxy")
+	}
+
+	// Check version byte to determine certificate format
+	version := cert[0]
+
+	// V2 certificate (version 0x02): Not supported through V1 code path
+	// V2 uses ALT-DA spec and should be accessed through DAProvider interface, not EigenDA.Enable
+	// Returning ErrServiceUnavailable will trigger failover to DAProvider if configured
+	if version == 0x02 {
+		return nil, standard_client.ErrServiceUnavailable
+	}
+
+	// V1 certificate (version 0x00): decode as disperser.BlobInfo
 	var blobInfo disperser.BlobInfo
 	err = rlp.DecodeBytes(cert[1:], &blobInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode blob info: %w", err)
+		return nil, fmt.Errorf("failed to decode V1 blob info: %w", err)
 	}
 
 	return &blobInfo, nil
