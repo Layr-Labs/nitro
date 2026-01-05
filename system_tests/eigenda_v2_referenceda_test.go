@@ -36,6 +36,7 @@ import (
 	"github.com/offchainlabs/nitro/daprovider/data_streaming"
 	"github.com/offchainlabs/nitro/daprovider/referenceda"
 	dapserver "github.com/offchainlabs/nitro/daprovider/server"
+	"github.com/offchainlabs/nitro/solgen/go/localgen"
 	"github.com/offchainlabs/nitro/util/signature"
 )
 
@@ -55,7 +56,7 @@ func TestEigenDAV2WithReferenceDAFallback(t *testing.T) {
 	builder.BuildL1(t)
 
 	// Setup ReferenceDA server as fallback DA provider
-	referenceDAServer, referenceDAAddr, validatorAddr := setupReferenceDAServerForFallback(t, ctx, builder.L1.Client)
+	referenceDAServer, referenceDAAddr, validatorAddr := setupReferenceDAServerForFallback(t, ctx, builder.L1.Client, builder.L1Info)
 	defer func() {
 		if err := referenceDAServer.Shutdown(ctx); err != nil {
 			t.Logf("Error shutting down ReferenceDA server: %v", err)
@@ -191,13 +192,28 @@ func TestV2CertificateBackwardCompatibility(t *testing.T) {
 }
 
 // setupReferenceDAServerForFallback creates ReferenceDA server for fallback testing
-func setupReferenceDAServerForFallback(t *testing.T, ctx context.Context, l1Client *ethclient.Client) (*http.Server, string, common.Address) {
-	// Generate signing key
+func setupReferenceDAServerForFallback(t *testing.T, ctx context.Context, l1Client *ethclient.Client, l1info *BlockchainTestInfo) (*http.Server, string, common.Address) {
+	// Generate signing key for ReferenceDA
 	privateKey, err := crypto.GenerateKey()
 	Require(t, err)
 	dataSigner := signature.DataSignerFromPrivateKey(privateKey)
 
-	validatorAddr := common.HexToAddress("0x0000000000000000000000000000000000000456")
+	// Deploy ReferenceDAProofValidator contract with the signer as a trusted signer
+	signerAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
+	deployAuth := l1info.GetDefaultTransactOpts("RollupOwner", ctx)
+
+	validatorAddr, tx, _, err := localgen.DeployReferenceDAProofValidator(
+		&deployAuth,
+		l1Client,
+		[]common.Address{signerAddress}, // Trusted signers
+	)
+	Require(t, err)
+	_, err = EnsureTxSucceeded(ctx, l1Client, tx)
+	Require(t, err)
+
+	t.Logf("Deployed ReferenceDAProofValidator at %s with trusted signer %s", validatorAddr.Hex(), signerAddress.Hex())
+
+	// Create in-memory storage for testing
 	storage := referenceda.GetInMemoryStorage()
 
 	// Create ReferenceDA components
@@ -209,6 +225,7 @@ func setupReferenceDAServerForFallback(t *testing.T, ctx context.Context, l1Clie
 	config := dapserver.ServerConfig{
 		Addr:               "localhost",
 		Port:               0,
+		JWTSecret:          "",
 		EnableDAWriter:     true,
 		ServerTimeouts:     genericconf.HTTPServerTimeoutConfig{},
 		RPCServerBodyLimit: 256 * 1024 * 1024,

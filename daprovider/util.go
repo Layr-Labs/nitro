@@ -84,7 +84,7 @@ const EigenDAMessageHeaderFlag byte = 0xed
 const DACertificateMessageHeaderFlag byte = 0x01
 
 // KnownHeaderBits is all header bits with known meaning to this nitro version
-const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAMessageHeaderFlag
+const KnownHeaderBits byte = DASMessageHeaderFlag | TreeDASMessageHeaderFlag | L1AuthenticatedMessageHeaderFlag | ZeroheavyMessageHeaderFlag | BlobHashesHeaderFlag | BrotliMessageHeaderByte | EigenDAMessageHeaderFlag | DACertificateMessageHeaderFlag
 
 var DefaultDASRetentionPeriod time.Duration = time.Hour * 24 * 15
 
