@@ -20,6 +20,8 @@
 //
 //   # Run e2e tests
 //   go test -tags eigendav2e2etest -v ./system_tests -run TestEigenDAV2E2E
+//
+// TODO: Add blob dispersal verification, failover testing, Holesky testnet integration, and DA node storage checks
 
 package arbtest
 
@@ -30,17 +32,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
-
 	"github.com/offchainlabs/nitro/arbnode"
 )
 
 const (
 	// V2 proxy URL for e2e tests
 	proxyV2E2EURL = "http://127.0.0.1:4242"
-
-	// Holesky testnet RPC (can be overridden via env var)
-	holeskyRPC = "https://ethereum-holesky-rpc.publicnode.com"
 )
 
 // TestEigenDAV2E2EConnectivity verifies the proxy is properly configured for real disperser
@@ -91,68 +88,6 @@ func TestEigenDAV2E2EConnectivity(t *testing.T) {
 	}
 
 	t.Logf("✅ arb API enabled (status %d for /put)", resp.StatusCode)
-
-	// Test 3: Verify disperser connectivity
-	t.Log("--- Test 3: Disperser connectivity ---")
-	// TODO: Add actual disperser ping/status check when proxy exposes it
-	t.Log("⚠️  Disperser connectivity check not yet implemented")
-	t.Log("    Will be tested during actual blob dispersal in integration test")
-}
-
-// TestEigenDAV2E2EBlobDispersal tests actual blob dispersal to EigenDA network
-func TestEigenDAV2E2EBlobDispersal(t *testing.T) {
-	t.Skip("TODO: Implement full blob dispersal test with real EigenDA network")
-
-	// TODO: This test should:
-	// 1. Setup L1 chain
-	// 2. Configure L2 with EigenDA V2 proxy (disperser mode)
-	// 3. Post a batch that triggers blob dispersal
-	// 4. Verify blob was dispersed to DA nodes
-	// 5. Verify certificate in sequencer inbox
-	// 6. Setup second node and verify it can retrieve from DA
-	// 7. Verify attestations from quorum
-}
-
-// TestEigenDAV2E2EWithRealDisperserFallback tests failover with real disperser
-func TestEigenDAV2E2EWithRealDisperserFallback(t *testing.T) {
-	t.Skip("TODO: Implement disperser failover test")
-
-	// TODO: This test should:
-	// 1. Setup dual DA (EigenDA V2 + ReferenceDA)
-	// 2. Configure to use real disperser
-	// 3. Test normal operation (should use EigenDA)
-	// 4. Simulate disperser failure
-	// 5. Verify automatic failover to ReferenceDA
-	// 6. Verify mixed certificates in sequencer inbox
-}
-
-// TestEigenDAV2E2EHoleskyTestnet tests against Holesky testnet
-func TestEigenDAV2E2EHoleskyTestnet(t *testing.T) {
-	t.Skip("TODO: Implement Holesky testnet integration test")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// TODO: This test should:
-	// 1. Connect to Holesky testnet via RPC
-	// 2. Use Holesky EigenDA contracts
-	// 3. Disperse blobs to Holesky DA network
-	// 4. Verify certificate on Holesky L1
-
-	// Verify Holesky RPC is accessible
-	client, err := ethclient.DialContext(ctx, holeskyRPC)
-	if err != nil {
-		t.Skipf("Cannot connect to Holesky RPC: %v", err)
-	}
-	defer client.Close()
-
-	blockNum, err := client.BlockNumber(ctx)
-	if err != nil {
-		t.Skipf("Cannot query Holesky: %v", err)
-	}
-
-	t.Logf("✅ Connected to Holesky testnet (block: %d)", blockNum)
-	t.Log("TODO: Complete Holesky integration test implementation")
 }
 
 // TestEigenDAV2E2EFullIntegration is the comprehensive e2e test with real infrastructure
@@ -196,14 +131,7 @@ func TestEigenDAV2E2EFullIntegration(t *testing.T) {
 	checkBatchPosting(t, ctx, builder.L1.Client, builder.L2.Client,
 		builder.L1Info, builder.L2Info, big.NewInt(1e12), l2B.Client)
 
-	// TODO: Add checks for:
-	// - Blob was actually dispersed to DA nodes
-	// - Certificate includes valid attestations
-	// - Second node retrieved blob from DA network
-	// - Verify data availability proofs
-
 	t.Log("✅ Full e2e test completed")
-	t.Log("⚠️  Note: Additional verification of DA node storage not yet implemented")
 
 	builder.L2.cleanup()
 }
