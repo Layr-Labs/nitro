@@ -1,3 +1,8 @@
+// Package eigenda provides the legacy V1 EigenDA client interface.
+//
+// DEPRECATED: This package implements the V1 custom Store() API.
+// For V2, use the DAProvider interface which implements the ALT-DA spec.
+// Configure with DAProvider.Enable instead of EigenDA.Enable.
 package eigenda
 
 import (
@@ -35,11 +40,11 @@ func (c *EigenDAProxyClient) Put(ctx context.Context, data []byte) (*disperser.B
 	// Check version byte to determine certificate format
 	version := cert[0]
 
-	// V2 certificate (version 0x02): Not supported through V1 code path
-	// V2 uses ALT-DA spec and should be accessed through DAProvider interface, not EigenDA.Enable
-	// Returning ErrServiceUnavailable will trigger failover to DAProvider if configured
+	// V2 certificate (version 0x02): Not supported through this V1 legacy interface
+	// This check prevents misconfiguration - V2 must use DAProvider.Enable, not EigenDA.Enable
+	// If you see this error, update your config to use DAProvider interface for V2
 	if version == 0x02 {
-		return nil, standard_client.ErrServiceUnavailable
+		return nil, fmt.Errorf("EigenDA V2 detected but accessed through deprecated V1 interface - use DAProvider.Enable for V2")
 	}
 
 	// V1 certificate (version 0x00): decode as disperser.BlobInfo

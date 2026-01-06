@@ -6,19 +6,14 @@
 
 // Package arbtest contains system tests for EigenDA V2 integration.
 //
-// EigenDA V2 represents the integration of EigenDA with Arbitrum's ALT DA
-// (Alternative Data Availability) specification. Unlike V1 which uses a custom
-// Store() API, V2 implements the standardized ALT DA interface.
+// EigenDA V2 implements the ALT-DA (Alternative Data Availability) spec and is accessed
+// through the DAProvider interface (not the legacy EigenDA.Enable config).
 //
-// Tests in this file validate:
-// 1. V2 proxy connectivity and health checks
-// 2. Batch posting through V2 proxy
-// 3. Node synchronization using V2 certificates
-// 4. Backward compatibility with V1 certificates
-//
-// Note: These tests require the eigendav2test build tag and are currently skipped
-// until the V2 proxy is available. The test infrastructure is ready and tests will
-// automatically run once V2 is deployed.
+// These tests validate:
+// 1. V2 proxy connectivity through DAProvider interface
+// 2. Batch posting using V2 with memstore
+// 3. Certificate verification in sequencer inbox
+// 4. Multi-node synchronization with V2 certificates
 
 package arbtest
 
@@ -38,29 +33,24 @@ import (
 )
 
 const (
-	// V2 proxy URL - same port as V1 for now
+	// V2 proxy URL
 	proxyV2URL = "http://127.0.0.1:4242"
 )
 
-// TestEigenDAV2Integration is the main comprehensive integration test for EigenDA V2
-// This validates the complete V2 stack including:
-// - V2 proxy connectivity and health
-// - Batch posting through V2 with memstore
-// - Certificate verification in sequencer inbox
-// - Multi-node synchronization
-// - Backward compatibility with V1
+// TestEigenDAV2Integration is the main integration test for EigenDA V2
+// This validates V2 through the DAProvider interface (ALT-DA spec)
 func TestEigenDAV2Integration(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Test 1: V2 proxy reachability
-	t.Run("ProxyReachability", testEigenDAV2ProxyReachability)
+	t.Run("ProxyReachability", func(t *testing.T) {
+		testEigenDAV2ProxyReachability(t)
+	})
 
-	// Test 2: V2 batch posting with full e2e validation
-	t.Run("BatchPosting", testEigenDAV2BatchPosting)
-
-	// Test 3: Backward compatibility (V2 node reading V1 certs)
-	// Still TODO - requires both V1 and V2 proxy running
-	t.Run("BackwardCompatibility", func(t *testing.T) {
-		t.Skip("Requires both V1 and V2 proxy setup - future enhancement")
-		testV2ReadsV1Certificates(t)
+	// Test 2: V2 batch posting through DAProvider interface
+	t.Run("BatchPosting", func(t *testing.T) {
+		testEigenDAV2BatchPosting(t, ctx)
 	})
 }
 
@@ -69,59 +59,44 @@ func testEigenDAV2ProxyReachability(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// V2 proxy should respond to HTTP requests
-	// We test basic connectivity by making a simple HTTP request
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", proxyV2URL+"/health", nil)
 	if err != nil {
-		// If /health doesn't exist, try root - any response means proxy is up
+		// If /health doesn't exist, try root
 		req, err = http.NewRequestWithContext(ctx, "GET", proxyV2URL+"/", nil)
 		Require(t, err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Fatalf("❌ EigenDA V2 proxy not reachable at %s: %v", proxyV2URL, err)
+		t.Fatalf("EigenDA V2 proxy not reachable at %s: %v", proxyV2URL, err)
 	}
 	defer resp.Body.Close()
 
-	// Any HTTP response (even 404) means the server is running
-	if resp.StatusCode == 0 {
-		t.Fatalf("❌ EigenDA V2 proxy returned invalid status code")
-	}
-
-	t.Logf("✅ EigenDA V2 proxy reachable at %s", proxyV2URL)
-	t.Logf("   HTTP Status: %d", resp.StatusCode)
+	t.Logf("✅ EigenDA V2 proxy reachable at %s (HTTP %d)", proxyV2URL, resp.StatusCode)
 }
 
-// testEigenDAV2BatchPosting tests batch posting through V2 proxy
-// This is a comprehensive e2e test that validates:
-// 1. L1 and L2 node setup with V2 proxy
-// 2. Batch posting through V2 (using memstore for testing)
-// 3. Certificate verification in sequencer inbox
-// 4. Second node syncing from L1 using V2 certificates
-func testEigenDAV2BatchPosting(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Setup L1 chain and contracts
-	builder := NewNodeBuilder(ctx).DefaultConfig(t, true)
-	builder.parallelise = false
+// testEigenDAV2BatchPosting tests batch posting through V2 proxy via DAProvider interface
+func testEigenDAV2BatchPosting(t *testing.T, ctx context.Context) {
+	// Setup L1 chain
+	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
 	builder.BuildL1(t)
 
-	// Configure L2 sequencer to use EigenDA V2 proxy
-	builder.nodeConfig.EigenDA.Enable = true
-	builder.nodeConfig.EigenDA.Rpc = proxyV2URL
+	// Configure L2 to use EigenDA V2 through DAProvider interface (ALT-DA spec)
+	// NOT using EigenDA.Enable (that's V1) - V2 uses DAProvider
+	builder.nodeConfig.DAProvider.Enable = true
+	builder.nodeConfig.DAProvider.RPC.URL = proxyV2URL
+	builder.nodeConfig.DAProvider.WithWriter = true
 
 	builder.L2Info.GenerateAccount("User2")
 	builder.BuildL2OnL1(t)
 
-	// Setup second node (non-sequencer) for sync testing
+	// Setup second node for sync testing
 	l1NodeConfigB := arbnode.ConfigDefaultL1NonSequencerTest()
 	l1NodeConfigB.BlockValidator.Enable = false
-	l1NodeConfigB.EigenDA.Enable = true
-	l1NodeConfigB.EigenDA.Rpc = proxyV2URL
+	l1NodeConfigB.DAProvider.Enable = true
+	l1NodeConfigB.DAProvider.RPC.URL = proxyV2URL
 
 	nodeBParams := SecondNodeParams{
 		nodeConfig: l1NodeConfigB,
@@ -130,31 +105,14 @@ func testEigenDAV2BatchPosting(t *testing.T) {
 	l2B, cleanupB := builder.Build2ndNode(t, &nodeBParams)
 	defer cleanupB()
 
-	// Test batch posting with certificate verification
+	// Post transaction and verify
 	checkEigenDAV2BatchPosting(t, ctx, builder.L1.Client, builder.L2.Client,
 		builder.L1Info, builder.L2Info, big.NewInt(1e12), builder.addresses.SequencerInbox, l2B.Client)
 
 	builder.L2.cleanup()
 }
 
-// testV2ReadsV1Certificates tests backward compatibility
-// This is CRITICAL: V2 nodes must be able to read V1 certificates
-func testV2ReadsV1Certificates(t *testing.T) {
-	t.Skip("Backward compatibility test - requires both V1 and V2 setup")
-
-	// TODO: Implement backward compatibility test
-	// 1. Start V1 proxy and post batches
-	// 2. Stop V1 proxy
-	// 3. Start V2 proxy
-	// 4. Start V2 node
-	// 5. Verify V2 node can read V1 certificates from sequencer inbox
-	// 6. Verify V2 node can sync from L1 with V1 batches
-
-	t.Logf("TODO: Implement V1 -> V2 backward compatibility test")
-}
-
 // checkEigenDAV2BatchPosting verifies batch posting through V2 proxy
-// and validates that EigenDA V2 certificates appear in the sequencer inbox
 func checkEigenDAV2BatchPosting(t *testing.T, ctx context.Context, l1client, l2clientA *ethclient.Client, l1info, l2info info, expectedBalance *big.Int, sequencerInboxAddr common.Address, l2ClientsToCheck ...*ethclient.Client) {
 	// Prepare and send L2 transaction
 	tx := l2info.PrepareTx("Owner", "User2", l2info.TransferGas, big.NewInt(1e12), nil)
@@ -176,7 +134,7 @@ func checkEigenDAV2BatchPosting(t *testing.T, ctx context.Context, l1client, l2c
 		})
 	}
 
-	// Verify transaction processed and balance correct on all clients (including second node)
+	// Verify transaction processed and balance correct on all clients
 	for _, client := range l2ClientsToCheck {
 		_, err = WaitForTx(ctx, client, tx.Hash(), time.Second*100)
 		Require(t, err)
@@ -198,13 +156,13 @@ func checkEigenDAV2BatchPosting(t *testing.T, ctx context.Context, l1client, l2c
 	latestBlock, err := l1client.BlockNumber(ctx)
 	Require(t, err)
 
-	// #nosec G115 -- Block numbers are unlikely to exceed int64's maximum value
+	// #nosec G115
 	batches, err := seqInbox.LookupBatchesInRange(ctx, big.NewInt(0), big.NewInt(int64(latestBlock)))
 	Require(t, err)
 
 	t.Logf("Found %d batches in sequencer inbox", len(batches))
 
-	// Verify that EigenDA certificates are present
+	// Verify that EigenDA V2 certificates are present
 	var eigenDAV2Seen bool
 	for _, batch := range batches {
 		serializedBatch, err := batch.Serialize(ctx, l1client)
@@ -214,7 +172,7 @@ func checkEigenDAV2BatchPosting(t *testing.T, ctx context.Context, l1client, l2c
 			continue
 		}
 
-		// V2 uses the same EigenDA message header byte as V1 (0xed)
+		// V2 uses EigenDA message header byte (0xed)
 		if daprovider.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
 			eigenDAV2Seen = true
 			t.Logf("✅ Found EigenDA V2 certificate in batch")
@@ -230,7 +188,6 @@ func checkEigenDAV2BatchPosting(t *testing.T, ctx context.Context, l1client, l2c
 }
 
 // TestEigenDAV2ProxyReachability is a standalone test for CI
-// Can be run independently to just check if V2 proxy is up
 func TestEigenDAV2ProxyReachability(t *testing.T) {
 	testEigenDAV2ProxyReachability(t)
 }
