@@ -5,11 +5,8 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'eigenda/**'
       - 'system_tests/eigenda_v2_test.go'
-      - 'system_tests/referenceda_test.go'
-      - 'daprovider/referenceda/**'
-      - 'scripts/start-eigenda-proxy.sh'
+      - 'scripts/start-eigenda-proxy-v2.sh'
       - '.github/workflows/eigenda-v2-ci.yml'
 
 jobs:
@@ -26,7 +23,7 @@ jobs:
       - name: Start EigenDA V2 Proxy
         run: |
           # Start V2 proxy (will skip if image not available)
-          ./scripts/start-eigenda-proxy.sh v2 || echo "V2 proxy not available yet, skipping"
+          ./scripts/start-eigenda-proxy-v2.sh || echo "V2 proxy not available yet, skipping"
         continue-on-error: true
 
       - name: Build Nitro
@@ -34,32 +31,15 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 2
 
-      - name: Run V2 Integration Tests
+      - name: Run EigenDA V2 Integration Tests
         run: |
-          # Run V2 tests with special build tag
-          # Tests are currently skipped but will run when V2 is ready
+          # Run EigenDA V2 tests with special build tag
+          # These tests validate that the EigenDA V2 proxy works with CustomDA infrastructure
           go test -timeout 600s \
             -tags eigendav2test \
             -v \
             ./system_tests \
-            -run "TestEigenDAV2" || echo "V2 tests skipped (not yet implemented)"
-        env:
-          GOMEMLIMIT: 6GiB
-          GOGC: 80
-        continue-on-error: true
-
-      - name: Run ReferenceDA Integration Tests
-        run: |
-          # Run ReferenceDA (CustomDA/ALT DA) tests
-          # These tests use the existing ReferenceDA implementation and should pass
-          # Tests include:
-          # - TestReferenceDAServerReachability: Basic server startup
-          # - TestReferenceDAStoreRetrieve: Store/retrieve operations
-          # - TestReferenceDAIntegration: Full L1/L2 integration with certificate verification
-          go test -timeout 600s \
-            -v \
-            ./system_tests \
-            -run "TestReferenceDA"
+            -run "TestEigenDAV2"
         env:
           GOMEMLIMIT: 6GiB
           GOGC: 80
@@ -69,15 +49,14 @@ jobs:
           echo "=== V2 Implementation TODOs ==="
           echo ""
           echo "Proxy Script TODOs:"
-          grep -n "TODO" scripts/start-eigenda-proxy.sh || echo "None"
+          grep -n "TODO" scripts/start-eigenda-proxy-v2.sh || echo "None"
           echo ""
           echo "V2 Test TODOs:"
           grep -n "TODO" system_tests/eigenda_v2_test.go | head -20 || echo "None"
           echo ""
           echo "=== Commands ==="
-          echo "V2 Proxy: ./scripts/start-eigenda-proxy.sh v2"
+          echo "V2 Proxy: ./scripts/start-eigenda-proxy-v2.sh"
           echo "V2 Tests: go test -tags eigendav2test ./system_tests -run TestEigenDAV2"
-          echo "ReferenceDA Tests: go test ./system_tests -run TestReferenceDA"
 
       - name: Upload Test Logs
         if: always()

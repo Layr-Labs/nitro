@@ -40,10 +40,15 @@ make test-go-challenge        # Run challenge/fraud proof tests
 make test-go-stylus          # Run Stylus WASM execution tests  
 make test-go-redis           # Run Redis-dependent tests
 
-# EigenDA integration tests
+# EigenDA V1 integration tests
 # MUST start proxy first with this shell script. If it fails, that likely means that the proxy has already been started
 ./scripts/start-eigenda-proxy.sh
 go test -timeout 600s -run ^TestEigenDAIntegration$ github.com/offchainlabs/nitro/system_tests
+
+# EigenDA V2 integration tests (ALT-DA spec with 0x01 certificates)
+# MUST start V2 proxy first with this shell script
+./scripts/start-eigenda-proxy-v2.sh
+go test -timeout 600s -tags eigendav2test -run ^TestEigenDAV2 github.com/offchainlabs/nitro/system_tests
 ```
 
 ### Linting and Formatting

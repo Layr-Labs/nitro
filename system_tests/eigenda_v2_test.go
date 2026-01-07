@@ -6,14 +6,11 @@
 
 // Package arbtest contains system tests for EigenDA V2 integration.
 //
-// EigenDA V2 implements the ALT-DA (Alternative Data Availability) spec and is accessed
-// through the DAProvider interface (not the legacy EigenDA.Enable config).
 //
 // These tests validate:
-// 1. V2 proxy connectivity through DAProvider interface
-// 2. Batch posting using V2 with memstore
-// 3. Certificate verification in sequencer inbox
-// 4. Multi-node synchronization with V2 certificates
+// 1. V2 proxy connectivity
+// 2. Batch posting through V2 proxy using DA certificates (0x01)
+// 3. Multi-node synchronization
 
 package arbtest
 
@@ -77,14 +74,13 @@ func testEigenDAV2ProxyReachability(t *testing.T) {
 	t.Logf("✅ EigenDA V2 proxy reachable at %s (HTTP %d)", proxyV2URL, resp.StatusCode)
 }
 
-// testEigenDAV2BatchPosting tests batch posting through V2 proxy via DAProvider interface
+// testEigenDAV2BatchPosting tests batch posting through V2 proxy using DA certificates
 func testEigenDAV2BatchPosting(t *testing.T, ctx context.Context) {
 	// Setup L1 chain
 	builder := NewNodeBuilder(ctx).DefaultConfig(t, true).DontParalellise()
 	builder.BuildL1(t)
 
-	// Configure L2 to use EigenDA V2 through DAProvider interface (ALT-DA spec)
-	// NOT using EigenDA.Enable (that's V1) - V2 uses DAProvider
+	// Configure L2 to use EigenDA V2 through DAProvider (ALT-DA spec with 0x01 certificates)
 	builder.nodeConfig.DAProvider.Enable = true
 	builder.nodeConfig.DAProvider.RPC.URL = proxyV2URL
 	builder.nodeConfig.DAProvider.WithWriter = true
@@ -162,8 +158,8 @@ func checkEigenDAV2BatchPosting(t *testing.T, ctx context.Context, l1client, l2c
 
 	t.Logf("Found %d batches in sequencer inbox", len(batches))
 
-	// Verify that EigenDA V2 certificates are present
-	var eigenDAV2Seen bool
+	// Verify that DA certificates are present (0x01 header byte)
+	var daCertificateSeen bool
 	for _, batch := range batches {
 		serializedBatch, err := batch.Serialize(ctx, l1client)
 		Require(t, err)
@@ -172,16 +168,15 @@ func checkEigenDAV2BatchPosting(t *testing.T, ctx context.Context, l1client, l2c
 			continue
 		}
 
-		// V2 uses EigenDA message header byte (0xed)
-		if daprovider.IsEigenDAMessageHeaderByte(serializedBatch[40]) {
-			eigenDAV2Seen = true
-			t.Logf("✅ Found EigenDA V2 certificate in batch")
+		if daprovider.IsDACertificateMessageHeaderByte(serializedBatch[40]) {
+			daCertificateSeen = true
+			t.Logf("✅ Found DA certificate (0x01) in batch")
 			break
 		}
 	}
 
-	if !eigenDAV2Seen {
-		t.Fatal("Expected EigenDA V2 certificates in sequencer inbox, but found none")
+	if !daCertificateSeen {
+		t.Fatal("Expected DA certificates in sequencer inbox, but found none")
 	}
 
 	t.Logf("✅ V2 batch posting successful - transaction processed and certificates verified")
