@@ -676,10 +676,17 @@ func getDAS(
 	if daClient != nil {
 		promise := daClient.GetSupportedHeaderBytes()
 		result, err := promise.Await(ctx)
+		var headerBytes []byte
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to get supported header bytes from DA client: %w", err)
+			// If getSupportedHeaderBytes is not supported (e.g., simple storage proxies),
+			// assume DACertificate header byte (0x01) for ALT-DA/CustomDA compatibility.
+			// This matches how EigenDA V1 and AnyTrust manually specify their header bytes.
+			log.Warn("DA client does not support getSupportedHeaderBytes, defaulting to DACertificate (0x01)", "err", err)
+			headerBytes = []byte{daprovider.DACertificateMessageHeaderFlag}
+		} else {
+			headerBytes = result.HeaderBytes
 		}
-		if err := dapReaders.RegisterAll(result.HeaderBytes, daClient); err != nil {
+		if err := dapReaders.RegisterAll(headerBytes, daClient); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to register DA client: %w", err)
 		}
 	}
