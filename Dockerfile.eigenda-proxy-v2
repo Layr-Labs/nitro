@@ -1,0 +1,38 @@
+# Dockerfile for EigenDA Proxy with Arbitrum CustomDA RPC support
+#
+# Builds the proxy from eigenda master branch which includes Arbitrum RPC server
+# support added in December 2025 (not yet in any released Docker image).
+#
+# The commit is pinned for reproducibility. Update EIGENDA_COMMIT when a new
+# release with Arbitrum support is available.
+
+FROM golang:1.24-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git make bash
+
+# Pin to specific commit with Arbitrum CustomDA support
+# This commit includes the arbitrum_altda server added on 2025-12-22
+ARG EIGENDA_COMMIT=4223978c9e0a983455326faf9bc04c8f629edf1d
+
+WORKDIR /build
+
+# Clone EigenDA at specific commit
+RUN git clone https://github.com/Layr-Labs/eigenda.git . && \
+    git checkout ${EIGENDA_COMMIT}
+
+# Build the proxy
+WORKDIR /build/api/proxy
+RUN make build
+
+# Runtime stage
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates
+
+COPY --from=builder /build/api/proxy/bin/eigenda-proxy /usr/local/bin/eigenda-proxy
+COPY --from=builder /build/api/proxy/resources /app/resources
+
+WORKDIR /app
+
+ENTRYPOINT ["/usr/local/bin/eigenda-proxy"]
