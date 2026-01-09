@@ -2,6 +2,7 @@
 .make
 **/.dockerignore
 **/Dockerfile
+**/Dockerfile.*
 **/.gitignore
 **/.git
 **/.gitmodules
