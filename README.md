@@ -1,4 +1,10 @@
 <br />
+
+> [!CAUTION]
+> **DEPRECATED - This repository is no longer supported or maintained.**
+>
+> This repository has been sunset in accordance with the sunsetting of EigenDA v1. Please do not use this code for production purposes.
+
 <p align="center">
   <a href="https://arbitrum.io/">
     <img src="https://arbitrum.io/assets/arbitrum/logo_color.png" alt="Logo" width="80" height="80">
